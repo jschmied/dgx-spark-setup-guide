@@ -1,0 +1,262 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Gen t/s",
+      "gridPos": {"x": 0, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "llamacpp:predicted_tokens_seconds"}],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 20}, {"color": "green", "value": 40}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Prompt t/s",
+      "gridPos": {"x": 3, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "llamacpp:prompt_tokens_seconds"}],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 500}, {"color": "green", "value": 900}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 110,
+      "type": "stat",
+      "title": "Predicted total",
+      "gridPos": {"x": 6, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "llamacpp:tokens_predicted_total"}],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 111,
+      "type": "stat",
+      "title": "Prompt total",
+      "gridPos": {"x": 9, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "llamacpp:prompt_tokens_total"}],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 100,
+      "type": "stat",
+      "title": "GPU util",
+      "gridPos": {"x": 12, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "DCGM_FI_DEV_GPU_UTIL"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 0, "min": 0, "max": 100, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 50}, {"color": "yellow", "value": 95}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 101,
+      "type": "stat",
+      "title": "GPU power",
+      "gridPos": {"x": 15, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "DCGM_FI_DEV_POWER_USAGE"}],
+      "fieldConfig": {"defaults": {"unit": "watt", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 20}, {"color": "yellow", "value": 60}, {"color": "red", "value": 100}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 102,
+      "type": "stat",
+      "title": "GPU temp",
+      "gridPos": {"x": 18, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "DCGM_FI_DEV_GPU_TEMP"}],
+      "fieldConfig": {"defaults": {"unit": "celsius", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 35}, {"color": "yellow", "value": 70}, {"color": "red", "value": 85}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 103,
+      "type": "stat",
+      "title": "XID errors",
+      "gridPos": {"x": 21, "y": 0, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "DCGM_FI_DEV_XID_ERRORS"}],
+      "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "background", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Max n_tokens",
+      "gridPos": {"x": 0, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "llamacpp:n_tokens_max"}],
+      "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 32,
+      "type": "stat",
+      "title": "llama scrape",
+      "gridPos": {"x": 3, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "up{job=\"llama-server\"}"}],
+      "fieldConfig": {"defaults": {"unit": "none", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "background", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 104,
+      "type": "stat",
+      "title": "dcgm scrape",
+      "gridPos": {"x": 6, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "up{job=\"dcgm\"}"}],
+      "fieldConfig": {"defaults": {"unit": "none", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "background", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 105,
+      "type": "stat",
+      "title": "SM clock",
+      "gridPos": {"x": 9, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "DCGM_FI_DEV_SM_CLOCK"}],
+      "fieldConfig": {"defaults": {"unit": "rotmhz", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "yellow", "value": 1500}, {"color": "green", "value": 2300}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 106,
+      "type": "stat",
+      "title": "Energy 24h (Wh)",
+      "gridPos": {"x": 12, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "increase(DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION[24h]) / 1000 / 3600"}],
+      "fieldConfig": {"defaults": {"unit": "wh", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 107,
+      "type": "stat",
+      "title": "Tokens 1h",
+      "gridPos": {"x": 15, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "increase(llamacpp:tokens_predicted_total[1h])"}],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 108,
+      "type": "stat",
+      "title": "Tokens 24h",
+      "gridPos": {"x": 18, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "increase(llamacpp:tokens_predicted_total[24h])"}],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 109,
+      "type": "stat",
+      "title": "Slot util %",
+      "gridPos": {"x": 21, "y": 3, "w": 3, "h": 3},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "llamacpp:requests_processing / 4 * 100"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 0, "min": 0, "max": 100, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 50}, {"color": "yellow", "value": 90}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Throughput (tokens/sec, log)",
+      "gridPos": {"x": 0, "y": 6, "w": 12, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "llamacpp:predicted_tokens_seconds", "legendFormat": "generation"},
+        {"refId": "B", "expr": "llamacpp:prompt_tokens_seconds", "legendFormat": "prompt"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "spanNulls": true, "scaleDistribution": {"type": "log", "log": 10}}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}}
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Slots & queue",
+      "gridPos": {"x": 12, "y": 6, "w": 12, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "llamacpp:requests_processing", "legendFormat": "processing"},
+        {"refId": "B", "expr": "llamacpp:requests_deferred", "legendFormat": "deferred"},
+        {"refId": "C", "expr": "llamacpp:n_busy_slots_per_decode", "legendFormat": "busy slots/decode"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "stepAfter", "lineWidth": 2, "spanNulls": true}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}}
+    },
+    {
+      "id": 200,
+      "type": "timeseries",
+      "title": "GPU utilization & power",
+      "gridPos": {"x": 0, "y": 13, "w": 12, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "DCGM_FI_DEV_GPU_UTIL", "legendFormat": "util %"},
+        {"refId": "B", "expr": "DCGM_FI_DEV_POWER_USAGE", "legendFormat": "power W"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "spanNulls": true, "axisPlacement": "auto"}}, "overrides": [{"matcher": {"id": "byName", "options": "power W"}, "properties": [{"id": "custom.axisPlacement", "value": "right"}, {"id": "unit", "value": "watt"}]}, {"matcher": {"id": "byName", "options": "util %"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "min", "value": 0}, {"id": "max", "value": 100}]}]},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}}
+    },
+    {
+      "id": 201,
+      "type": "timeseries",
+      "title": "GPU temp & SM clock",
+      "gridPos": {"x": 12, "y": 13, "w": 12, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "DCGM_FI_DEV_GPU_TEMP", "legendFormat": "GPU temp °C"},
+        {"refId": "B", "expr": "DCGM_FI_DEV_MEMORY_TEMP", "legendFormat": "MEM temp °C"},
+        {"refId": "C", "expr": "DCGM_FI_DEV_SM_CLOCK", "legendFormat": "SM clock MHz"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"drawStyle": "line", "fillOpacity": 5, "lineInterpolation": "smooth", "lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "SM clock MHz"}, "properties": [{"id": "custom.axisPlacement", "value": "right"}, {"id": "custom.axisSoftMin", "value": 0}, {"id": "custom.axisSoftMax", "value": 3000}, {"id": "unit", "value": "rotmhz"}]}, {"matcher": {"id": "byRegexp", "options": "temp"}, "properties": [{"id": "unit", "value": "celsius"}]}]},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}}
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Token rates (1m avg, log)",
+      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "rate(llamacpp:tokens_predicted_total[1m])", "legendFormat": "predicted"},
+        {"refId": "B", "expr": "rate(llamacpp:prompt_tokens_total[1m])", "legendFormat": "prompt"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "spanNulls": true, "scaleDistribution": {"type": "log", "log": 10}}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}}
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Tokens per decode call",
+      "gridPos": {"x": 12, "y": 20, "w": 12, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "rate(llamacpp:tokens_predicted_total[1m]) / clamp_min(rate(llamacpp:n_decode_total[1m]), 0.001)", "legendFormat": "tokens / decode"},
+        {"refId": "B", "expr": "rate(llamacpp:n_decode_total[1m])", "legendFormat": "decode calls/s"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 2, "custom": {"drawStyle": "line", "fillOpacity": 5, "lineInterpolation": "smooth", "lineWidth": 2, "spanNulls": true}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}}
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["llama-server", "qwen3-coder-next", "gpu"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "llama-server (qwen3-coder-next)",
+  "uid": "llama-server-main",
+  "version": 3,
+  "weekStart": ""
+}
