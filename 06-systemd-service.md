@@ -60,6 +60,14 @@ load-on-startup = false
 model           = /opt/llm/models/ornstein36-27B/Qwen3.6-27B-MTP-NSC-ACE-SABER-Ornstein-Q6_K.gguf
 jinja           = true
 load-on-startup = false
+
+; ---- Model 4: clients request "model": "ornstein36-35b-a3b" ----
+; MoE sibling of Model 3, also embedded-template (jinja). It ships a working
+; MTP head; the speculative-decoding tuning for it lives in 8.11.
+[ornstein36-35b-a3b]
+model           = /opt/llm/models/ornstein36-35b-a3b/ornstein3.6-35B-A3B-NSC-ACE-SABER-MTP-Q8_0.gguf
+jinja           = true
+load-on-startup = false
 ```
 
 Notes on the format:
@@ -177,7 +185,7 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/models | jq '.data[] | {id, status: .status.value}'
 ```
 
-You should see all three models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`), with the startup model `loaded` and the others `unloaded`.
+You should see all four models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`, `ornstein36-35b-a3b`), with the startup model `loaded` and the others `unloaded`.
 
 Route a request to a specific model with the `"model"` field:
 

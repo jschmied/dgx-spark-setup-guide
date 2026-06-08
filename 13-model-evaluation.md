@@ -13,30 +13,30 @@ Results of the [page 12](12-model-coding-test.md) coding test — two tasks (Go 
 | Sampling (identical for all) | `temperature 0.2`, `top_p 0.9`, non-streaming (`max_tokens` 16000 for Task A, 20000 for Task B) |
 | Task A | generic thread-safe TTL+LRU cache in Go — verdict `go vet` + `go test -race` (own + neutral + cross-run) |
 | Task B | Spring Boot 3.3 + Hibernate/JPA + Mockito + JUnit 5 transfer module — verdict `mvn test` + neutral Mockito suite |
-| Models | `qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B` (local, served by the router); **Sonnet 4.6 †** added later |
+| Models | `qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`, `ornstein36-35b-a3b` (local, served by the router); **Sonnet 4.6 †** added later |
 | Samples | 1 per model per task (see caveats) |
 
 > **† Sonnet 4.6 methodology caveat.** Sonnet was run as a **one-shot generator** (no tools, no iteration — `tool_uses: 0`) but through the **Claude Code agent harness** (its own system prompt) at **default sampling**, whereas the local models got a bare chat completion at `temperature 0.2`. The task, extraction, and objective verdict are identical, so treat the cross-vendor comparison as **indicative, not controlled**.
 
-**Headline:** of the four, three get the *business logic* right and differ only on whether the **delivered artifact** builds and passes; the fourth (`ornstein36-27B`) **never delivered Task A at all**. `qwen36-35b-a3b` and `Sonnet 4.6` ship building, self-consistent projects on both tasks; `qwen3-coder-next` has sound production logic but ships a broken artifact in both (Go: `Close` panic; Java: test sources don't compile); `ornstein36-27B` ships a clean Spring project (Task B) but on the Go task its reasoning pass **runs away and never emits code** (a degenerate repetition/CoT loop at both standardized and recommended sampling). `qwen3-coder-next` is far the cheapest/fastest. `ornstein36-27B` is also by far the **slowest** (dense model, ~19 t/s even with MTP — see [page 8 §8.10](08-performance-tuning.md)).
+**Headline:** across five models the *business logic* was almost always correct; models diverged on whether the **delivered artifact** builds and passes. `qwen36-35b-a3b` and `Sonnet 4.6` ship building, self-consistent projects on **both** tasks. `qwen3-coder-next` has sound production logic but ships a broken artifact in both (Go: `Close` panic; Java: test sources don't compile). The two **Ornstein merges split in opposite directions**: `ornstein36-27B` (dense) ships a clean Spring project but **never delivers the Go task** (runaway reasoning loop at both standardized and recommended sampling), while `ornstein36-35b-a3b` (MoE) produces the **best Go result of any model** yet ships Spring unit tests that contradict its own service (`mvn test` red). On speed: `ornstein36-35b-a3b` is the **fastest** model on the box (~70–75 t/s with MTP), `qwen3-coder-next` the cheapest, and `ornstein36-27B` by far the **slowest** (dense, ~19 t/s even with MTP — see [page 8 §8.10–8.11](08-performance-tuning.md)).
 
 ## 13.2 Task A — Go cache: scorecard
 
-| Check | qwen3-coder-next | qwen36-35b-a3b | ornstein36-27B | Sonnet 4.6 † |
-|---|---|---|---|---|
-| Compiles + `go vet` clean | ✅ | ✅ | ❌ **no code emitted** | ✅ |
-| **Neutral suite** `go test -race` | ❌ **panics on test 1** | ✅ **all pass** | ❌ **no deliverable** | ✅ **all pass** |
-| Own suite `go test -race` | ❌ FAIL (1 panic + 2 assertions) | ✅ PASS | ❌ no deliverable | ⚠️ **16/17** (1 timing test) |
-| `Close()` idempotent (rule 5) | ❌ `close of closed channel` | ✅ closed-channel guard | — (never reached) | ✅ **`sync.Once`** (+ concurrent-close test) |
-| O(1) LRU | ✅ `container/list` | ✅ hand-rolled DLL | — | ✅ `container/list` |
-| Get-expired no-promote (rule 3) | ✅ | ✅ | — | ✅ |
-| Lazy + janitor expiry | ✅ | ✅ | — | ✅ logic ok (see note) |
-| `-race` clean concurrency | untestable (panic aborts binary) | ✅ | — | ✅ |
-| Assumptions + complexity deliverable | ❌ omitted | ✅ thorough, documented | ❌ never finished | ✅ thorough, documented |
-| Output | 4,011 tokens, no reasoning, fast | 14,315 tokens (mostly reasoning), 355 s | **16,000 tok @0.2 / 24,000 @0.6 — 100 % reasoning, 0 content**; 12.5 / 20.5 min | ~14,600 tokens |
-| Test suite | larger (327 lines) but ≥2 **wrong** assertions | 159 lines, correct | none (looped before emitting) | 17 tests, 1 self-inconsistent (timing) |
+| Check | qwen3-coder-next | qwen36-35b-a3b | ornstein36-27B | ornstein36-35b-a3b | Sonnet 4.6 † |
+|---|---|---|---|---|---|
+| Compiles + `go vet` clean | ✅ | ✅ | ❌ **no code emitted** | ✅ | ✅ |
+| **Neutral suite** `go test -race` | ❌ **panics on test 1** | ✅ **all pass** | ❌ **no deliverable** | ✅ **all pass** | ✅ **all pass** |
+| Own suite `go test -race` | ❌ FAIL (1 panic + 2 assertions) | ✅ PASS | ❌ no deliverable | ✅ **PASS** | ⚠️ **16/17** (1 timing test) |
+| `Close()` idempotent (rule 5) | ❌ `close of closed channel` | ✅ closed-channel guard | — (never reached) | ✅ **`sync.Once`** | ✅ **`sync.Once`** (+ concurrent-close test) |
+| O(1) LRU | ✅ `container/list` | ✅ hand-rolled DLL | — | ✅ hand-rolled DLL | ✅ `container/list` |
+| Get-expired no-promote (rule 3) | ✅ | ✅ | — | ✅ | ✅ |
+| Lazy + janitor expiry | ✅ | ✅ | — | ✅ | ✅ logic ok (see note) |
+| `-race` clean concurrency | untestable (panic aborts binary) | ✅ | — | ✅ | ✅ |
+| Assumptions + complexity deliverable | ❌ omitted | ✅ thorough, documented | ❌ never finished | ✅ thorough, documented | ✅ thorough, documented |
+| Output | 4,011 tokens, no reasoning, fast | 14,315 tokens (mostly reasoning), 355 s | **16,000 tok @0.2 / 24,000 @0.6 — 100 % reasoning, 0 content**; 12.5 / 20.5 min | 14,778 tokens (reasoning), 196 s | ~14,600 tokens |
+| Test suite | larger (327 lines) but ≥2 **wrong** assertions | 159 lines, correct | none (looped before emitting) | 169 lines, correct | 17 tests, 1 self-inconsistent (timing) |
 
-**Winner: `qwen36-35b-a3b`** (only one whose own suite is fully green). `Sonnet 4.6` is logically correct with the most robust `Close`, but its delivered `go test` is red on one self-inconsistent timing test (§13.5). `qwen3-coder-next` wins on speed/cost. **`ornstein36-27B` does not finish** — its reasoning pass never terminates into a code answer (§13.5).
+**Winner: `qwen36-35b-a3b` and `ornstein36-35b-a3b`** — both have a fully green own suite *and* neutral suite. `ornstein36-35b-a3b` matches `Sonnet 4.6`'s airtight `sync.Once` `Close` while also passing its own tests, and is the **fastest** to produce it (196 s at ~70 t/s). `Sonnet 4.6` is logically correct but its delivered `go test` is red on one self-inconsistent timing test (§13.5). `qwen3-coder-next` wins on speed/cost. **`ornstein36-27B` does not finish** — its reasoning never terminates into a code answer (§13.5).
 
 ## 13.3 Task A: the decisive defect
 
@@ -76,22 +76,24 @@ So the genuine, unambiguous implementation defect is the **`Close()` panic** —
 
 **ornstein36-27B** (27B dense, Q6, reasoning) — **did not produce a deliverable.** Its thinking pass never terminates into a final answer. At the standardized `temperature 0.2` it fell into a verbatim repetition loop, emitting the same fragment (`**One Edge Case:** Set key A (update)… Correct.`) until the 16,000-token budget ran out — `finish_reason: length`, `content` empty. A diagnostic re-run at the model card's recommended `temperature 0.6 / top_p 0.95 / top_k 20` with a 24,000-token budget failed the same way: not a verbatim loop this time but runaway, self-second-guessing CoT (it even wrote candidate code *inside* the thinking channel) that still never closed `</think>`, so `content` was again empty. Two configs, ~33 min of GPU time, zero delivered code. This is a real instruction-following defect of this merge on this task, not a budget problem — an infinite loop doesn't finish with more tokens. (Note it cleared **Task B** cleanly, so the failure is task-specific, not total — see §13.7.)
 
-**Sonnet 4.6 †** — the cleanest `Close` of the three *that delivered* (`sync.Once`, plus it wrote its own concurrent-close test); correct `container/list` LRU, correct expiry/LRU/stats; passes the neutral suite race-clean and documents `capacity==0 = unbounded`. Its **one own-suite failure is self-inflicted**: it clamps the janitor interval to a 1 s minimum, but `TestJanitorRemovesExpired` only waits 200 ms — so its own test and its own impl disagree on timing (the janitor logic itself is fine; entries also expire lazily). Net: production-correct, but the delivered `go test` is red on that one timing test — a milder version of the same "self-inconsistent test" failure mode coder-next showed.
+**ornstein36-35b-a3b** (35B-A3B MoE, Q8, reasoning) — the **MoE sibling delivers where the dense one didn't**, and excellently: it terminated its reasoning cleanly (no loop), passed `go vet`, its **own** suite, and the **neutral** suite all race-clean. It used the airtight `sync.Once` for `Close` (matching Sonnet), a hand-rolled O(1) doubly-linked list, **documented** its `capacity<=0 = store nothing` choice, and delivered a thorough assumptions + complexity write-up (it even noted the janitor's O(N) scan and the NTP-clock-drift caveat). Fastest of the reasoning models to produce it (196 s, ~70 t/s with MTP). On Task A it is a co-winner — and a sharp contrast to its dense same-family namesake, which couldn't deliver at all.
+
+**Sonnet 4.6 †** — the cleanest `Close` of the models *that delivered* (`sync.Once`, plus it wrote its own concurrent-close test); correct `container/list` LRU, correct expiry/LRU/stats; passes the neutral suite race-clean and documents `capacity==0 = unbounded`. Its **one own-suite failure is self-inflicted**: it clamps the janitor interval to a 1 s minimum, but `TestJanitorRemovesExpired` only waits 200 ms — so its own test and its own impl disagree on timing (the janitor logic itself is fine; entries also expire lazily). Net: production-correct, but the delivered `go test` is red on that one timing test — a milder version of the same "self-inconsistent test" failure mode coder-next showed.
 
 ## 13.6 Task B — Spring stack: scorecard
 
-| Check | qwen3-coder-next | qwen36-35b-a3b | ornstein36-27B | Sonnet 4.6 † |
-|---|---|---|---|---|
-| Deliverable `mvn test` | ❌ **does not compile** (test sources) | ✅ **BUILD SUCCESS — 7/7** | ✅ **BUILD SUCCESS — 7/7** | ✅ **BUILD SUCCESS — 12/12** |
-| — Mockito unit tests | — (compile fail) | ✅ 5/5 | ✅ 5/5 | ✅ 8/8 |
-| — `@DataJpaTest` (real Hibernate+H2) | — | ✅ 2/2 (`@Version` increment) | ✅ 2/2 (`@Version` increment) | ✅ 4/4 (`@Version` increment **+ =0 on insert**) |
-| **Neutral** Mockito suite vs *production* code | ✅ **5/5** | ✅ **5/5** | ✅ **5/5** (acc() adapted to 3-arg ctor) | ✅ **5/5** |
-| Self-consistent (entity API matches its own tests) | ❌ test calls `Account.setId()` it never defined | ✅ `setId` + `getVersion` present | ✅ own tests compile & pass; `Account(id,owner,balance)` ctor | ✅ sets id via reflection (clean entity) |
-| Mockito strict-stub discipline | n/a (didn't compile) | ✅ documented + correct | ✅ documented + correct | ✅ correct (AssertJ + ArgumentCaptor) |
-| Spec adherence | Spring Boot 3.3.2, skipped file labels | Spring Boot 3.3.5, all files + assumptions | Spring Boot 3.3.0, all files + assumptions | Spring Boot 3.3.4, all files + assumptions |
-| Output | 3,034 tokens, no reasoning, 86 s | 8,408 tokens (reasoning), 199 s | 10,013 tokens (reasoning), 429 s | ~13,500 tokens |
+| Check | qwen3-coder-next | qwen36-35b-a3b | ornstein36-27B | ornstein36-35b-a3b | Sonnet 4.6 † |
+|---|---|---|---|---|---|
+| Deliverable `mvn test` | ❌ **does not compile** (test sources) | ✅ **BUILD SUCCESS — 7/7** | ✅ **BUILD SUCCESS — 7/7** | ❌ **FAIL — own tests 2/7** (compiles) | ✅ **BUILD SUCCESS — 12/12** |
+| — Mockito unit tests | — (compile fail) | ✅ 5/5 | ✅ 5/5 | ⚠️ 3/5 (2 self-inconsistent) | ✅ 8/8 |
+| — `@DataJpaTest` (real Hibernate+H2) | — | ✅ 2/2 (`@Version` increment) | ✅ 2/2 (`@Version` increment) | ✅ 2/2 (`@Version` increment) | ✅ 4/4 (`@Version` increment **+ =0 on insert**) |
+| **Neutral** Mockito suite vs *production* code | ✅ **5/5** | ✅ **5/5** | ✅ **5/5** (acc() adapted to 3-arg ctor) | ✅ **5/5** | ✅ **5/5** |
+| Self-consistent (entity API matches its own tests) | ❌ test calls `Account.setId()` it never defined | ✅ `setId` + `getVersion` present | ✅ own tests compile & pass; `Account(id,owner,balance)` ctor | ❌ tests assume short-circuit lookup; service looks up both eagerly | ✅ sets id via reflection (clean entity) |
+| Mockito strict-stub discipline | n/a (didn't compile) | ✅ documented + correct | ✅ documented + correct | ⚠️ a failing test trips `verifyNoMoreInteractions` on the 2nd lookup | ✅ correct (AssertJ + ArgumentCaptor) |
+| Spec adherence | Spring Boot 3.3.2, skipped file labels | Spring Boot 3.3.5, all files + assumptions | Spring Boot 3.3.0, all files + assumptions | Spring Boot 3.3.5, all files + assumptions | Spring Boot 3.3.4, all files + assumptions |
+| Output | 3,034 tokens, no reasoning, 86 s | 8,408 tokens (reasoning), 199 s | 10,013 tokens (reasoning), 429 s | 9,759 tokens (reasoning), 126 s | ~13,500 tokens |
 
-**Winner: `Sonnet 4.6` / `qwen36-35b-a3b`** — both build and pass; Sonnet's suite is the most thorough (12 tests, incl. version-on-insert, null-amount, both unknown-account directions). **`ornstein36-27B` also builds green (7/7) with correct logic** — a strong showing that makes its Task A no-show all the more striking. `qwen3-coder-next` is the only one that doesn't compile.
+**Winner: `Sonnet 4.6` / `qwen36-35b-a3b`** — both build and pass; Sonnet's suite is the most thorough (12 tests, incl. version-on-insert, null-amount, both unknown-account directions). **`ornstein36-27B` also builds green (7/7).** `ornstein36-35b-a3b` and `qwen3-coder-next` both fail `mvn test` despite correct production logic (neutral 5/5) — coder-next doesn't compile; ornstein-35B compiles but ships unit tests that contradict its own service.
 
 ## 13.7 Task B: what happened
 
@@ -106,23 +108,26 @@ The difference is the *delivered artifact*:
 
 - **ornstein36-27B** — here it **delivered**, and well: `mvn test` BUILD SUCCESS 7/7 (5 Mockito + 2 `@DataJpaTest`), real Hibernate on H2 with the `@Version` increment asserted across a flush/round-trip, `BigDecimal.compareTo` throughout, explicit `save(from)`/`save(to)`, strict-stub-clean unit tests, and a genuinely good assumptions write-up (it explicitly called out strict stubs, `@Version`, and BigDecimal scale). Its only deviation: an `Account(Long id, String owner, BigDecimal balance)` constructor instead of the 2-arg one the neutral suite assumes — a valid choice the prompt didn't pin down, so the neutral `acc()` helper was adapted by one line (passing `null` id), exactly the kind of entity-shape accommodation Sonnet's reflection trick handles. Neutral suite then 5/5. Slowest to produce it (429 s at ~19 t/s), but correct.
 
-Same shape as Task A for coder-next: fast with correct core logic but a non-compiling/self-inconsistent test artifact; qwen36, Sonnet **and ornstein** reason through it and ship green builds, at ~3–4× the tokens. The outlier is **ornstein's split personality across tasks**: a clean, careful Spring deliverable here, yet a total non-delivery on the Go task (§13.5) — same model, same sampling, same session.
+- **ornstein36-35b-a3b** — production logic correct (neutral 5/5) but its **own unit tests fail (2/7), so `mvn test` is red.** It compiles cleanly (unlike coder-next); the failure is a self-inconsistency. Its `TransferService` looks up *both* accounts up front (`findById(fromId)` **and** `findById(toId)`) before any check — a fine, arguably better design — but its tests assume short-circuit/lazy lookup: `testInsufficientFunds` stubs only account 1, so the eager second lookup returns empty and throws `AccountNotFoundException` before the balance check (the test expected `InsufficientFundsException`); `testUnknownAccount`'s `verifyNoMoreInteractions` trips on that same second lookup. Same family failure mode as Task A's dense sibling and as coder-next: the *delivered tests* don't match the model's own code. (It still got `compareTo`, explicit `save`, `@Version`-increment assertion, and a clean `@DataJpaTest` right.)
+
+Shape across the field on Task B: coder-next is fast with correct core logic but a non-compiling test artifact; **ornstein-35B compiles with correct logic but self-contradicting tests**; qwen36 and Sonnet reason through it and ship green builds, at ~3–4× the tokens. The standout oddity is the **two Ornstein merges diverging**: the dense 27B aced Task B but no-showed Task A, while the MoE 35B aced Task A but shipped broken tests on Task B — same family, opposite failure surfaces.
 
 ## 13.8 Recommendation (across both tasks)
 
 - **Correctness-critical / edge-case-heavy delivery, local/offline** → `qwen36-35b-a3b`. It shipped building, passing, self-consistent code on both tasks. Accept the latency and token cost.
 - **Best raw quality if a frontier API is acceptable** → `Sonnet 4.6 †` produced the most thorough Java suite and the most robust Go `Close`; its only blemish was one self-inconsistent Go timing test.
 - **High-throughput / interactive coding, scaffolding, refactors** → `qwen3-coder-next` for speed — but **add a compile/test pass**: on both tasks its production logic was right while its delivered tests were broken.
+- **`ornstein36-35b-a3b` → promising but verify every deliverable.** It is the **fastest model on the box** (~70–75 t/s with MTP, page 8 §8.11) and produced the best Go result of any model (own + neutral green, `sync.Once` Close). But on the Spring task it shipped unit tests that contradict its own service, so `mvn test` was red despite correct logic. Strong candidate for high-quality local generation **with a mandatory compile/test gate** — the same discipline coder-next needs.
 - **`ornstein36-27B` → not recommended as a coding workhorse.** It produced an excellent Spring deliverable but failed to deliver the Go task at all (non-terminating reasoning, at two sampling configs), and it is the slowest model on the box (dense, ~19 t/s even with MTP). The Task-A loop is a reliability red flag for unattended/agentic use — a model that can silently burn a full token budget without emitting an answer is hard to depend on. Keep it for cases where you specifically want this merge's style on prose-shaped or framework-scaffolding work, with a budget cap and an output check.
 
-This mirrors the throughput data on [page 8](08-performance-tuning.md): qwen36 is faster per token but spends far more tokens (reasoning); coder-next is the cheaper path when its answer is correct — and a quick `go test`/`mvn test` catches the cases where it isn't; ornstein is the slowest and the least predictable. Reserve `Sonnet 4.6` for when output quality matters more than keeping inference on-box.
+This mirrors the throughput data on [page 8](08-performance-tuning.md): `ornstein36-35b-a3b` leads on speed, qwen36 is faster per token but spends far more tokens (reasoning); coder-next is the cheaper path when its answer is correct — and a quick `go test`/`mvn test` catches the cases where it isn't; the dense ornstein is the slowest and least predictable. Reserve `Sonnet 4.6` for when output quality matters more than keeping inference on-box.
 
 ## 13.9 Caveats
 
 - **Single sample per model per task** at `temperature 0.2` — indicative, not statistical. A firm ranking needs 3–5 samples each (page 12 §12.9). This matters most for `ornstein36-27B`'s Task-A failure: it reproduced across two sampling configs (0.2 and the card's 0.6) and is a deterministic-looking loop rather than unlucky variance, but a single prompt is still one data point.
-- Two tasks already reduce single-task bias. Three of four models **agree** across tasks; `ornstein36-27B` is the counterexample (clean Task B, no-delivery Task A) — the clearest argument in this whole evaluation for running **more than one task** before trusting a model.
+- Two tasks already reduce single-task bias — and the **two Ornstein merges are the strongest argument in this whole evaluation for running more than one task.** They diverge in *opposite* directions: the dense 27B nailed Task B but never delivered Task A; the MoE 35B nailed Task A but shipped self-contradicting tests on Task B. Either task alone would have ranked them completely differently.
 - Both tasks reward careful lifecycle/edge-case reasoning, which favours the reasoning models. A different shape of task (algorithmic puzzle, large refactor, debugging) could shift the result.
-- Cross-task consistency is the strongest signal here: the *same* failure mode (correct logic, broken delivered tests) showed up for coder-next in both Go and Java — and, more mildly, for Sonnet on Go. The opposite — a model that aces one task and fails to even respond on another — is exactly what ornstein demonstrates.
+- Cross-task consistency is the strongest signal here: the *same* failure mode (correct logic, broken delivered tests) showed up for coder-next in both Go and Java, for ornstein-35B on Java, for the dense ornstein as an outright non-delivery, and — more mildly — for Sonnet on Go. Only `qwen36-35b-a3b` shipped green on both. The recurring lesson: **production logic was almost always right; the delivered tests were where models broke.**
 - **† Sonnet 4.6 is not apples-to-apples** (see §13.1): different harness/system prompt and default sampling vs the local models' `temperature 0.2` chat completion, and it is a frontier API model, not a local GGUF. Same task and verdict, but treat the cross-vendor ranking as indicative.
 
 ## 13.10 Adding a model

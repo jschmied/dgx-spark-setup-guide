@@ -41,10 +41,11 @@ Admin laptop  ──ssh key──▶  GB10 box (SSH, ufw deny-by-default)
                             │
 LAN client  ───HTTP+API key─▶  llama-server router (127.0.0.1:8080)
                             │       routes on the "model" field
-                            ├── qwen3-coder-next  ─┐
-                            ├── qwen36-35b-a3b     ─┤
-                            └── ornstein36-27B     ─┴─▶ one resident
-                                                       at a time on GB10 GPU
+                            ├── qwen3-coder-next   ─┐
+                            ├── qwen36-35b-a3b      ─┤
+                            ├── ornstein36-27B      ─┤
+                            └── ornstein36-35b-a3b  ─┴─▶ one resident
+                                                        at a time on GB10 GPU
 ```
 
 LAN clients reach the `llama-server` router via SSH tunnel or a same-host proxy. The router itself never binds to a public interface, and only one model is resident at a time (`--models-max 1`).
