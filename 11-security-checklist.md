@@ -1,6 +1,6 @@
 # 11. Security checklist
 
-[← Operations](10-operations.md) · [Index](README.md)
+[← Operations](10-operations.md) · [Index](README.md) · [Next: Coding test →](12-model-coding-test.md)
 
 Final pass before declaring the box production-ready. Tick each item or have a documented reason for skipping it.
 
@@ -81,4 +81,4 @@ Final pass before declaring the box production-ready. Tick each item or have a d
 
 ---
 
-[← Operations](10-operations.md) · [Index](README.md)
+[← Operations](10-operations.md) · [Index](README.md) · [Next: Coding test →](12-model-coding-test.md)

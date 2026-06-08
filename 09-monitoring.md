@@ -138,11 +138,13 @@ scrape_configs:
         labels: { model: qwen3-coder-next, service: qwen3-coder-next }
       - targets: ['127.0.0.1:8080']
         labels: { model: qwen36-35b-a3b,  service: qwen36-35b-a3b }
+      - targets: ['127.0.0.1:8080']
+        labels: { model: ornstein36-27B,  service: ornstein36-27B }
     relabel_configs:
       # turn the per-target `model` label into the ?model= query param
       - source_labels: [model]
         target_label: __param_model
-      # both targets share 127.0.0.1:8080; give them distinct instance labels
+      # all targets share 127.0.0.1:8080; give them distinct instance labels
       - source_labels: [model]
         target_label: instance
 
@@ -221,11 +223,12 @@ curl -sS 'http://127.0.0.1:9090/api/v1/targets?state=active' \
   | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.labels.instance)\t\(.health)"'
 ```
 
-Expected output (the swapped-out model reads `down` — that's normal, see 9.4):
+Expected output (only the resident model reads `up`; the swapped-out ones read `down` — that's normal, see 9.4):
 
 ```
 llama-server    qwen3-coder-next    up
 llama-server    qwen36-35b-a3b      down
+llama-server    ornstein36-27B      down
 dcgm            gb10                up
 prometheus      127.0.0.1:9090      up
 ```
