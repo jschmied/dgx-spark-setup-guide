@@ -130,7 +130,7 @@ repeat-penalty      = 1.0
 
 These sampler keys are server-side **defaults** for that model; a client can still override per-request. The only one that differs from the tuned `[*]` here is `repeat-penalty` (1.0 vs the global 1.05) — the rest are pinned for clarity so the model's behaviour doesn't drift if you later retune `[*]`.
 
-A third model, the Qwen3.6-27B "Ornstein" merge (`ornstein36-27B`), shows two more per-model patterns: the **other** template pattern, and **MTP self-speculation**. Its embedded chat template is correct, so instead of an external `chat-template-file` you just turn Jinja on for it. It is also a *dense* model (slow to decode — see 8.10), so it's the one model here that benefits from its built-in MTP head as a draft. Reuse the same Qwen3.6 sampling and add the two `spec-*` keys:
+A third model, the Qwen3.6-27B "Ornstein" merge (`ornstein36-27B`), shows two more per-model patterns: the **other** template pattern, and **MTP self-speculation**. Its embedded chat template is correct, so instead of an external `chat-template-file` you just turn Jinja on for it. It is also a *dense* model (slow to decode — see 8.10), so it's the one dense model that benefits from its built-in MTP head as a draft. Note its sampling: this merge **must run at `temp = 1.0`** (its embedded recommendation) — at `temp 0.6` (and 0.2) it falls into reasoning-repetition loops and emits nothing (see page 13). Add the two `spec-*` keys for MTP:
 
 ```ini
 [ornstein36-27B]
@@ -138,7 +138,7 @@ model            = /opt/llm/models/ornstein36-27B/Qwen3.6-27B-MTP-NSC-ACE-SABER-
 jinja            = true
 spec-type        = draft-mtp   ; use the model's own MTP head as its draft
 spec-draft-n-max = 3           ; draft depth; 3 is the sweet spot here (see 8.10)
-temp             = 0.6
+temp             = 1.0         ; embedded rec; lower temps make this merge loop
 top-p            = 0.95
 top-k            = 20
 min-p            = 0.0
@@ -164,6 +164,19 @@ repeat-penalty   = 1.0
 ```
 
 It is the fastest model on the box (~74–85 t/s) and needs no speculation; see 8.12.
+
+**Don't let a model silently inherit the wrong sampling.** The `[*]` defaults (`temp 0.6`, etc.) are tuned for the Qwen3.6 *reasoning* models. `qwen3-coder-next` is a non-thinking coder and wants the Qwen3-Coder card values instead — pin them rather than inheriting `[*]`:
+
+```ini
+[qwen3-coder-next]
+model           = /opt/llm/models/qwen3-coder-next/Qwen3-Coder-Next-UD-Q4_K_XL.gguf
+temp            = 0.7
+top-p           = 0.8          ; tighter than the reasoning models' 0.95
+top-k           = 20
+repeat-penalty  = 1.05
+```
+
+A quick way to find the author-intended values for any GGUF is the embedded `general.sampling.*` metadata (e.g. `temp`, `top_k`, `top_p`) — read it before deciding what to override. That audit is what set Gemma to `temp 1.0` and the dense Ornstein to `temp 1.0` (it loops lower), and gave the coder model the values above.
 
 Most flags transfer cleanly to other GGUFs. Four things worth pinning per-model rather than globally:
 
