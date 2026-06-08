@@ -54,7 +54,7 @@ ls -lh build/bin/llama-server build/bin/llama-cli build/bin/llama-gguf
 ## 3.5 Updating later
 
 ```bash
-sudo systemctl stop MODEL_NAME
+sudo systemctl stop llama-router
 
 cd /opt/llm/runtime/llama.cpp
 git pull
@@ -65,10 +65,10 @@ cmake -B build \
 
 cmake --build build --config Release -j"$(nproc)"
 
-sudo systemctl start MODEL_NAME
+sudo systemctl start llama-router
 ```
 
-(The systemd unit `MODEL_NAME.service` is defined on page 6.)
+(The router systemd unit `llama-router.service` and its model preset are defined on page 6. Updating the binary doesn't touch the preset, so your model definitions carry over.)
 
 ---
 
