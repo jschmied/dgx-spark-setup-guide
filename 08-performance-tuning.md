@@ -106,7 +106,7 @@ The server prefilled **33× fewer tokens** the second time, dropping prefill tim
 | Option | Why not |
 |---|---|
 | **External draft model / speculative decoding** | llama.cpp returns `"speculative decoding not supported by this context"` for the `qwen3next` arch. Even on standard `qwen3moe` siblings, benchmarks find net slowdown at batch=1 due to MoE expert-routing union overhead. |
-| **MTP (Multi-Token Prediction)** | **Adopted on the one model that ships the head** (Ornstein, see 8.8/8.10); unavailable on the other two because they have no head. **Qwen3-Coder-Next** (`qwen3next`): no MTP tensors, and llama.cpp's MTP path isn't wired for the arch. **Qwen3.6-35B-A3B** (`qwen35moe`): the GGUF's tensor table is only `blk.0`–`blk.39` with no `nextn.*`/`mtp.*` tensors and no `num_nextn_predict_layers` key — confirmed plain single-token decode (~54.5 t/s, see 8.9). **Qwen3.6-27B Ornstein** (`qwen35`): ships the head (`nextn_predict_layers = 1`, `blk.*.nextn.*`), and build **b9502 (6ddc9430b)** *does* support it — enabled with `spec-type = draft-mtp` for a lossless ~2× decode (9 → ~19–21 t/s, see 8.10). It must be set explicitly: without it the server logs `common_speculative_init: no implementations specified for speculative decoding` and the head sits unused. (The same build still logs `fused Gated Delta Net (chunked) not supported` for this arch, which caps *prefill*, not decode.) |
+| **MTP (Multi-Token Prediction)** | **Adopted on both models that ship the head** (the two Ornstein merges — see 8.8/8.10/8.11); unavailable on the other two because they have no head. **Qwen3-Coder-Next** (`qwen3next`): no MTP tensors, and llama.cpp's MTP path isn't wired for the arch. **Qwen3.6-35B-A3B** (`qwen35moe`, the *non*-Ornstein one): tensor table is only `blk.0`–`blk.39` with no `nextn.*`/`mtp.*` tensors — confirmed plain single-token decode (~54.5 t/s, see 8.9). **Ornstein 27B** (`qwen35`, dense) and **Ornstein 35B-A3B** (`qwen35moe`, MoE): both ship the head (`nextn_predict_layers = 1`, `blk.*.nextn.*`), and build **b9502 (6ddc9430b)** supports it — enabled with `spec-type = draft-mtp` (lossless). Gain scales with weight-streaming per token: ~2× on the dense 27B (9 → ~19 t/s, 8.10) but only ~+30 % on the 3 B-active MoE (~57 → ~75 t/s, 8.11). Must be set explicitly: without it the server logs `common_speculative_init: no implementations specified for speculative decoding` and the head sits unused. (Both also log `fused Gated Delta Net (chunked) not supported` for these archs, which caps *prefill*, not decode.) |
 | **`--cache-type-k/v q4_0`** | Breaks processing on Qwen3-Coder-Next (model gives degenerate output). Stays at `q8_0`. |
 | **Lowering `--ctx-size` from 131072** | Use-case decision. If most prompts stay under 32 K, lowering this frees memory for more prompt-cache pool. |
 | **NVFP4 quant** | Would leverage `BLACKWELL_NATIVE_FP4=1`. Requires a Qwen3-Coder-Next NVFP4 GGUF (not yet published as of writing). |
@@ -227,6 +227,24 @@ This is a **dense** model: out of the box it decodes at **~9 t/s**, ~6× slower 
 **Other lever — smaller quant.** Decode scales with bytes/token, so a Q4_K_M (~15 GB) would raise even the *baseline* ceiling to ~16–18 t/s, and MTP would stack on top — at some quality cost and a re-download. Q6 + MTP is the better default unless you specifically need it faster.
 
 **Bottom line:** Ornstein is dense and memory-bound, but `spec-type = draft-mtp` (n-max 3) gives a free, lossless ~2× to ~19–21 t/s — very usable. The MoE models are still faster by construction; reach for Ornstein when you want *its* behaviour.
+
+## 8.11 Measured: Qwen3.6-35B-A3B Ornstein (Q8, **MoE**) — MTP on a model that's already fast
+
+The MoE sibling (`ornstein36-35b-a3b`, arch `qwen35moe`, 256 experts / 8 active ≈ 3 B/token, Q8_0, with an MTP head) is a different story from the dense 27B: it's **already the fastest model on the box** before any speculation, and MTP adds a smaller — but real — gain. Same harness as 8.9/8.10.
+
+| Config | Decode | Prefill (1801 tok) |
+|---|---|---|
+| baseline (no MTP) | ~57 t/s (very stable) | ~2100 t/s |
+| **MTP `n-max=3`** | **~75 t/s** (range 64–90, content-dependent) | ~1900 t/s |
+| MTP `n-max=2` | ~72 t/s (range 70–77) | ~1970 t/s |
+
+**Why the MTP gain is smaller here (~+30 %) than on the dense 27B (~2×).** MTP pays off in proportion to how much weight-streaming each token costs. The dense model streams ~22 GB/token, so committing several tokens per stream is a huge win. This MoE activates only ~3 B params (~3–4 GB) per token, so each token is already cheap — there's much less to amortise, and the draft+verify overhead eats into the gain. Net is still positive (~57 → ~75 t/s) and lossless, so it's worth enabling, but don't expect the dense model's doubling.
+
+**Sweet spot / variance.** `n-max=3` (the default, and what's configured) has the highest average and ceiling; `n-max=2` is slightly more consistent. The run-to-run spread (64–90 t/s) is acceptance-rate variance — how often the drafted tokens match what the model would have produced depends on the content being generated. Both clearly beat baseline; the choice between 2 and 3 is within noise.
+
+This model's config mirrors `qwen36-35b-a3b`'s sampling (8.8) plus `jinja = true` (its embedded template is correct, so no external `chat-template-file`) and the two `spec-*` MTP keys. Like the dense Ornstein it logs `fused Gated Delta Net (chunked) not supported` (hybrid attention, prefill only) — but at ~2100 t/s prefill that's not a practical concern here.
+
+**Bottom line:** `ornstein36-35b-a3b` is the throughput leader on this box (~75 t/s with MTP, vs qwen36's ~54.5 and the dense Ornstein's ~19). MTP is a modest, free top-up rather than the transformative win it is on the dense model. (For *coding quality* it's a mixed bag — strong on Go, self-inconsistent tests on the Spring task — see [page 13](13-model-evaluation.md).)
 
 ---
 
