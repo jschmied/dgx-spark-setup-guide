@@ -25,8 +25,10 @@ Final pass before declaring the box production-ready. Tick each item or have a d
 - [ ] One API key per consumer; no shared "team key"
 - [ ] `/etc/llama-server/api_keys.txt`: mode **640**, owner **root:SERVICE_USER**
   (so `SERVICE_USER` can read it; **not** 600 root:root)
-- [ ] `/etc/llama-server/MODEL_NAME.env`: mode **600**, owner **root:root**
-- [ ] systemd unit has `LimitMEMLOCK=infinity` if `--mlock` is set
+- [ ] `/etc/llama-server/models.ini`: mode **640**, owner **root:SERVICE_USER**
+  (the router runs as `SERVICE_USER` and must read the preset)
+- [ ] `/etc/llama-server/router.env`: mode **600**, owner **root:root**
+- [ ] systemd unit has `LimitMEMLOCK=infinity` if `mlock = true` is in the preset
 - [ ] systemd unit has sandboxing flags (`NoNewPrivileges`, `PrivateTmp`, `ProtectSystem`, `ProtectHome`, `ReadWritePaths`)
 - [ ] Service auto-restarts on failure (`Restart=always`)
 
@@ -60,7 +62,7 @@ Final pass before declaring the box production-ready. Tick each item or have a d
 ## Operational hygiene
 
 - [ ] Backup of `/etc/llama-server/api_keys.txt` exists, encrypted, off-box
-- [ ] systemd unit backed up (`MODEL_NAME.service.bak` from page 8)
+- [ ] systemd unit and model preset backed up (`llama-router.service.bak`, `models.ini.bak` from page 8)
 - [ ] Documented rollback procedure (page 10)
 - [ ] One known-good llama.cpp commit pinned somewhere in case `git pull` regresses
 - [ ] Monitoring dashboard bookmarked by everyone who'll be on-call

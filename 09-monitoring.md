@@ -14,11 +14,12 @@ Everything is **localhost-only**. You reach Grafana via an SSH tunnel.
 
 ## 9.1 Prerequisites
 
-- Page 8 enabled `--metrics` on `llama-server`. Confirm:
+- The preset (page 6/8) sets `metrics = true`, so each model instance exposes `/metrics`. **In router mode `/metrics` is per-model:** you must pass `?model=<id>`, and the endpoint still requires the API key. Pass `&autoload=false` so a metrics scrape never *loads* a model by itself. Confirm against the model that's currently loaded:
   ```bash
   curl -H "Authorization: Bearer sk-alice-REPLACE_ME" \
-       http://127.0.0.1:8080/metrics | head -20
+       'http://127.0.0.1:8080/metrics?model=qwen3-coder-next&autoload=false' | head -20
   ```
+  (Without `?model=` the router returns `400 model name is missing from the request`. For a model that's swapped out, with `autoload=false` you get `400 model is not loaded` — that's expected, see 9.4.)
 - Docker + Docker Compose installed on the box. (The vendor image typically includes them. `docker --version && docker compose version` to verify.)
 - Docker can pass the GPU through to containers. Test:
   ```bash
@@ -122,15 +123,28 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
+  # One job, one target per model. Router mode requires the ?model= param,
+  # so we carry it as a per-target label and copy it into __param_model.
+  # autoload=false prevents a scrape from loading a swapped-out model.
   - job_name: llama-server
     metrics_path: /metrics
-    static_configs:
-      - targets: ['127.0.0.1:8080']
-        labels:
-          service: MODEL_NAME
+    params:
+      autoload: ['false']
     authorization:
       type: Bearer
-      credentials: sk-USER-REPLACE_ME
+      credentials: sk-prometheus-REPLACE_ME
+    static_configs:
+      - targets: ['127.0.0.1:8080']
+        labels: { model: qwen3-coder-next, service: qwen3-coder-next }
+      - targets: ['127.0.0.1:8080']
+        labels: { model: qwen36-35b-a3b,  service: qwen36-35b-a3b }
+    relabel_configs:
+      # turn the per-target `model` label into the ?model= query param
+      - source_labels: [model]
+        target_label: __param_model
+      # both targets share 127.0.0.1:8080; give them distinct instance labels
+      - source_labels: [model]
+        target_label: instance
 
   - job_name: dcgm
     static_configs:
@@ -149,8 +163,10 @@ The `credentials:` line is the bearer key Prometheus uses to scrape `llama-serve
 key="sk-prometheus-$(openssl rand -hex 24)"
 echo "$key" | sudo tee -a /etc/llama-server/api_keys.txt >/dev/null
 echo "Use this in prometheus.yml: $key"
-sudo systemctl restart MODEL_NAME
+sudo systemctl restart llama-router
 ```
+
+> **Swap mode and `up`.** With `--models-max 1` only one model is loaded at a time, so the scrape for the **swapped-out** model returns `400` and Prometheus shows `up{job="llama-server", instance="<that-model>"} == 0`. That is **expected**, not an outage — it just means the model isn't resident. The `job="llama-server"` label is preserved, so dashboard panels that filter on it keep working; per-model series are distinguished by the `instance` / `service` labels. See 9.11 for an alert rule that accounts for this.
 
 ## 9.5 Grafana provisioning
 
@@ -202,15 +218,16 @@ All three containers should be `Up`. Verify Prometheus is scraping all three tar
 
 ```bash
 curl -sS 'http://127.0.0.1:9090/api/v1/targets?state=active' \
-  | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.health)"'
+  | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.labels.instance)\t\(.health)"'
 ```
 
-Expected output:
+Expected output (the swapped-out model reads `down` — that's normal, see 9.4):
 
 ```
-llama-server    up
-dcgm            up
-prometheus      up
+llama-server    qwen3-coder-next    up
+llama-server    qwen36-35b-a3b      down
+dcgm            gb10                up
+prometheus      127.0.0.1:9090      up
 ```
 
 ## 9.7 Access Grafana
@@ -292,7 +309,7 @@ Configure these in Grafana (Alerting → Alert rules):
 
 | Rule | Trigger |
 |---|---|
-| Service down | `up{job="llama-server"} == 0` for 30 s |
+| Router down / no model loaded | `count(up{job="llama-server"} == 1) == 0` for 2 min — fires when the router is down or **no** model is resident (don't alert on a single `up == 0`: that's just a swapped-out model) |
 | Sustained queueing | `llamacpp:requests_deferred > 0` for 1 min |
 | GPU temp high | `DCGM_FI_DEV_GPU_TEMP > 80` for 1 min |
 | GPU fault | `DCGM_FI_DEV_XID_ERRORS > 0` |

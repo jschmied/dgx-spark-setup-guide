@@ -21,10 +21,14 @@ The unified-memory architecture has a big implication for tuning: the model weig
 ```
 Vendor base image (Ubuntu + NVIDIA driver + CUDA)
   └── llama.cpp built with -DGGML_CUDA=ON                    ← page 3
-      └── llama-server (systemd, non-root, localhost-only)   ← page 6
-          ├── GGUF model loaded with --n-gpu-layers 999      ← page 4
+      └── llama-server in router mode                        ← page 6
+          (systemd, non-root, localhost-only, one port)
+          ├── models defined in a preset .ini file          ← page 6
+          │   (GGUFs on the GPU with --n-gpu-layers 999)     ← page 4
+          ├── --models-max 1: one model resident, swap on    ← page 6
+          │   demand by the "model" field in each request
           ├── --api-key-file with per-consumer bearer keys   ← page 5
-          └── --metrics → Prometheus → Grafana               ← page 9
+          └── per-model /metrics → Prometheus → Grafana      ← page 9
 
 Optional layer for public exposure:
   Cloudflare Tunnel + Cloudflare Access (edge auth)          ← page 7
@@ -35,12 +39,14 @@ Optional layer for public exposure:
 ```
 Admin laptop  ──ssh key──▶  GB10 box (SSH, ufw deny-by-default)
                             │
-LAN client  ───HTTP+API key─▶  llama-server (127.0.0.1:8080)
-                            │
-                            └── Qwen3-Coder-Next-GGUF on GB10 GPU
+LAN client  ───HTTP+API key─▶  llama-server router (127.0.0.1:8080)
+                            │       routes on the "model" field
+                            ├── qwen3-coder-next  ─┐
+                            └── qwen36-35b-a3b    ─┴─▶ one resident
+                                                      at a time on GB10 GPU
 ```
 
-LAN clients reach `llama-server` via SSH tunnel or a same-host proxy. The model server itself never binds to a public interface.
+LAN clients reach the `llama-server` router via SSH tunnel or a same-host proxy. The router itself never binds to a public interface, and only one model is resident at a time (`--models-max 1`).
 
 ## Reference architecture (public deployment, optional)
 
