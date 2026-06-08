@@ -52,17 +52,26 @@ load-on-startup = true
 [qwen36-35b-a3b]
 model           = /opt/llm/models/qwen36-35b-a3b/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf
 load-on-startup = false
+
+; ---- Model 3: clients request "model": "ornstein36-27B" ----
+; A model whose embedded chat template is correct: enable it with jinja = true
+; rather than pointing at an external chat-template-file (contrast Model 2).
+[ornstein36-27B]
+model           = /opt/llm/models/ornstein36-27B/Qwen3.6-27B-MTP-NSC-ACE-SABER-Ornstein-Q6_K.gguf
+jinja           = true
+load-on-startup = false
 ```
 
 Notes on the format:
 
 - The `[*]` section is **global**: its keys are passed to every model instance. A key set in a model section overrides the global one.
-- A flag that takes no value (`mlock`, `cont-batching`, `metrics`, …) is written `= true`.
+- A flag that takes no value (`mlock`, `cont-batching`, `metrics`, `jinja`, …) is written `= true`.
+- `jinja = true` makes a model use its **own embedded** chat template (Model 3). Use `chat-template-file` instead when the embedded one is broken and you need to override it (Model 2). Both are per-model.
 - `load-on-startup` and `stop-timeout` are **preset-only** keys (not CLI flags). With `--models-max 1`, mark exactly **one** model `load-on-startup = true`; the others load on first request.
 - `--metrics` lives **in the preset**, not on the unit — it's the child instances that expose `/metrics`, and the router proxies it. Page 9 relies on this.
 - Host, port, API key and model alias are **controlled by the router** and ignored if you put them here — set them on the unit (6.4) instead.
 
-> **Memory budget — why `--models-max 1`.** On the 128 GB GB10 the model weights, the KV cache and page cache all share one pool. The Q4 coder model is ~50 GB and the Q8 35B is ~36 GB; with KV cache and headroom you cannot safely hold both resident at once. `--models-max 1` makes the router unload the current model before loading the next. If all your models are small enough to coexist (and you've done the arithmetic), raise it — but the default for this guide is swap.
+> **Memory budget — why `--models-max 1`.** On the 128 GB GB10 the model weights, the KV cache and page cache all share one pool. The Q4 coder model is ~50 GB, the Q8 35B is ~36 GB and the Q6 27B is ~22 GB; with KV cache and headroom you cannot safely hold the large ones resident together. `--models-max 1` makes the router unload the current model before loading the next. If all your models are small enough to coexist (and you've done the arithmetic), raise it — but the default for this guide is swap.
 
 Lock the file down. The service runs as `SERVICE_USER`, which must be able to read it:
 
@@ -168,7 +177,7 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/models | jq '.data[] | {id, status: .status.value}'
 ```
 
-You should see both `qwen3-coder-next` and `qwen36-35b-a3b`, with the startup model `loaded` and the other `unloaded`.
+You should see all three models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`), with the startup model `loaded` and the others `unloaded`.
 
 Route a request to a specific model with the `"model"` field:
 

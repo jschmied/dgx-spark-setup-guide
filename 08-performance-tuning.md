@@ -106,7 +106,7 @@ The server prefilled **33× fewer tokens** the second time, dropping prefill tim
 | Option | Why not |
 |---|---|
 | **External draft model / speculative decoding** | llama.cpp returns `"speculative decoding not supported by this context"` for the `qwen3next` arch. Even on standard `qwen3moe` siblings, benchmarks find net slowdown at batch=1 due to MoE expert-routing union overhead. |
-| **MTP (Multi-Token Prediction)** | Neither served GGUF ships the MTP head, so it's off on both. **Qwen3-Coder-Next** (`qwen3next`): no MTP tensors, and llama.cpp's MTP path is wired for `qwen3moe`. **Qwen3.6-35B-A3B** (`qwen35moe`): the GGUF's tensor table is only `blk.0`–`blk.39` with no `nextn.*`/`mtp.*` tensors and no `num_nextn_predict_layers` key, and the running instance has no `spec-type`/`model-draft` flags — confirmed plain single-token decode (~54.5 t/s, see 8.9). Enabling MTP would need both an MTP-head GGUF *and* `spec-type = draft-mtp` in that model's preset section (plus `qwen35moe` support in the build). Watch for an MTP-variant GGUF. |
+| **MTP (Multi-Token Prediction)** | **Adopted on the one model that ships the head** (Ornstein, see 8.8/8.10); unavailable on the other two because they have no head. **Qwen3-Coder-Next** (`qwen3next`): no MTP tensors, and llama.cpp's MTP path isn't wired for the arch. **Qwen3.6-35B-A3B** (`qwen35moe`): the GGUF's tensor table is only `blk.0`–`blk.39` with no `nextn.*`/`mtp.*` tensors and no `num_nextn_predict_layers` key — confirmed plain single-token decode (~54.5 t/s, see 8.9). **Qwen3.6-27B Ornstein** (`qwen35`): ships the head (`nextn_predict_layers = 1`, `blk.*.nextn.*`), and build **b9502 (6ddc9430b)** *does* support it — enabled with `spec-type = draft-mtp` for a lossless ~2× decode (9 → ~19–21 t/s, see 8.10). It must be set explicitly: without it the server logs `common_speculative_init: no implementations specified for speculative decoding` and the head sits unused. (The same build still logs `fused Gated Delta Net (chunked) not supported` for this arch, which caps *prefill*, not decode.) |
 | **`--cache-type-k/v q4_0`** | Breaks processing on Qwen3-Coder-Next (model gives degenerate output). Stays at `q8_0`. |
 | **Lowering `--ctx-size` from 131072** | Use-case decision. If most prompts stay under 32 K, lowering this frees memory for more prompt-cache pool. |
 | **NVFP4 quant** | Would leverage `BLACKWELL_NATIVE_FP4=1`. Requires a Qwen3-Coder-Next NVFP4 GGUF (not yet published as of writing). |
@@ -129,6 +129,26 @@ repeat-penalty      = 1.0
 ```
 
 These sampler keys are server-side **defaults** for that model; a client can still override per-request. The only one that differs from the tuned `[*]` here is `repeat-penalty` (1.0 vs the global 1.05) — the rest are pinned for clarity so the model's behaviour doesn't drift if you later retune `[*]`.
+
+A third model, the Qwen3.6-27B "Ornstein" merge (`ornstein36-27B`), shows two more per-model patterns: the **other** template pattern, and **MTP self-speculation**. Its embedded chat template is correct, so instead of an external `chat-template-file` you just turn Jinja on for it. It is also a *dense* model (slow to decode — see 8.10), so it's the one model here that benefits from its built-in MTP head as a draft. Reuse the same Qwen3.6 sampling and add the two `spec-*` keys:
+
+```ini
+[ornstein36-27B]
+model            = /opt/llm/models/ornstein36-27B/Qwen3.6-27B-MTP-NSC-ACE-SABER-Ornstein-Q6_K.gguf
+jinja            = true
+spec-type        = draft-mtp   ; use the model's own MTP head as its draft
+spec-draft-n-max = 3           ; draft depth; 3 is the sweet spot here (see 8.10)
+temp             = 0.6
+top-p            = 0.95
+top-k            = 20
+min-p            = 0.0
+presence-penalty = 0.0
+repeat-penalty   = 1.0
+```
+
+`spec-type = draft-mtp` tells the child to build a speculative draft context from the model's **own** embedded MTP head (`nextn_predict_layers`) — no separate draft model, ~160 MiB extra. The head proposes up to `spec-draft-n-max` tokens per step and the full model verifies them in one pass; accepted tokens are free. It is **lossless** (the verifier preserves the model's output distribution). On this box it roughly **doubles** decode (9 → ~19 t/s); details and the depth sweep are in 8.10. Confirm it's active after a restart with `journalctl -u llama-router | grep draft-mtp` (look for `adding speculative implementation 'draft-mtp'`).
+
+This Q6_K GGUF ships an MTP head (`nextn_predict_layers = 1`, tensors `blk.*.nextn.*`) — unlike the two models in 8.7 — and the `spec-type = draft-mtp` keys above turn it on, roughly doubling decode. (Without those keys the server logs `common_speculative_init: no implementations specified for speculative decoding` and the head sits unused — it must be enabled explicitly.) The model is also dense, so even with MTP it's slower than the MoE models; see 8.10 for the measurements, the MTP depth sweep, and the bandwidth analysis, plus the MTP row in 8.7.
 
 Most flags transfer cleanly to other GGUFs. Four things worth pinning per-model rather than globally:
 
@@ -174,7 +194,39 @@ Both numbers are **higher than the 80B coder** (~1000 t/s prefill, ~50 t/s gen):
 
 A repeated prefix collapses prefill **~17×** (1287 of 1291 tokens served from cache). As in 8.6, the wall-clock win scales with `prefill_tokens / total_tokens` — largest for short completions over a long shared context.
 
-**Bottom line:** Qwen3.6-35B-A3B runs comfortably on the same tuned `[*]` config; no model-specific performance flags were needed beyond the sampling/template overrides in 8.8. It is the faster of the two models on this box for both prefill and single-stream generation.
+**Bottom line:** Qwen3.6-35B-A3B runs comfortably on the same tuned `[*]` config; no model-specific performance flags were needed beyond the sampling/template overrides in 8.8. It is the faster of the two MoE/coder models on this box for both prefill and single-stream generation.
+
+## 8.10 Measured: Qwen3.6-27B Ornstein (Q6, **dense**) — MTP doubles a bandwidth-bound model
+
+This is a **dense** model: out of the box it decodes at **~9 t/s**, ~6× slower than the 35B MoE. Turning on its built-in MTP head (`spec-type = draft-mtp`, 8.8) **roughly doubles that to ~19–21 t/s**. Same box, same router, measured via `/completion` with `ignore_eos:true`, warm-up discarded.
+
+| Metric | Ornstein 27B — no MTP | Ornstein 27B — **MTP `n-max=3`** | Qwen3.6-35B-A3B (Q8, MoE) |
+|---|---|---|---|
+| Generation | ~9.1 t/s | **~19–21 t/s** (2.0–2.3×) | ~54.5 t/s |
+| Prefill (1801-token prompt) | ~690 t/s | ~690 t/s (unchanged) | ~2080 t/s |
+| GPU during decode | 96 % util, ~38 W | 96 % util | 95 % util, ~32 W |
+
+**Why the *baseline* is ~9 t/s — memory bandwidth, not compute.** The GGUF's FFN tensors are `blk.*.ffn_{gate,up,down}` with **no `_exps`** — it is **dense**, so every token streams the whole ~22.4 GB of weights from memory. The 35B is MoE (`*.ffn_*_exps`) and activates only ~3 B params (~3–4 GB) per token. On the GB10's ~250–273 GB/s unified memory the hard ceiling for a 22.4 GB dense model is `BW / size` ≈ **11–12 t/s**; we measure 9.1 (~80 % of ceiling, normal). The 96 % util at only ~38 W is the giveaway: the GPU is **stalled on memory reads, not doing FLOPs** (a compute-bound run would pull 80–140 W). No `[*]` flag moves this wall — `parallel`, `flash-attn`, `mlock`, `ubatch` etc. don't reduce bytes-streamed-per-token.
+
+**Why MTP breaks the wall.** MTP self-speculation drafts several tokens from the model's own next-token head, then verifies them in **one** forward pass — so one weight-stream from memory can commit multiple tokens instead of one. That directly attacks the bandwidth limit. On build **b9502 (6ddc9430b)** it is supported and enabled with `spec-type = draft-mtp` (no separate draft model, ~160 MiB extra context). At load you'll see `adding speculative implementation 'draft-mtp'` and `speculative decoding context initialized`; during generation the child logs `draft-mtp` acceptance statistics (~57 % of drafted tokens accepted on code-like prompts here). It is **lossless** — the verifier preserves the model's output distribution, so quality is identical to plain decoding.
+
+**Draft-depth sweep (`spec-draft-n-max`), single stream:**
+
+| `n-max` | Decode | Note |
+|---|---|---|
+| off | 9.1 t/s | dense baseline |
+| 2 | 17.2 t/s | |
+| **3** | **21.3 t/s** | **best — the default** |
+| 4 | 18.7 t/s | acceptance drops, wasted draft compute |
+| 5 | 19.9 t/s | |
+
+`n-max=3` wins: deeper drafts propose more tokens but get rejected more often, and the rejected ones are pure overhead. (Through the live router with the full `ctx-size 262144` config the same setting lands at ~18.6 t/s vs the 21.3 measured on a lean scratch context — same ~2× win.)
+
+**Prefill stays ~690 t/s** (MTP only helps decode). It's below the MoE's ~2080 partly from dense compute and partly the hybrid attention: arch `qwen35` is a Gated Delta Net / SSM hybrid (`qwen35.ssm.*`, full attention only every 4th layer — `full_attention_interval = 4`), and on b9502 the server logs `fused Gated Delta Net (chunked) not supported, set to disabled`, so prefill takes a slower scan. A future build with that fused kernel should lift prefill; watch for it.
+
+**Other lever — smaller quant.** Decode scales with bytes/token, so a Q4_K_M (~15 GB) would raise even the *baseline* ceiling to ~16–18 t/s, and MTP would stack on top — at some quality cost and a re-download. Q6 + MTP is the better default unless you specifically need it faster.
+
+**Bottom line:** Ornstein is dense and memory-bound, but `spec-type = draft-mtp` (n-max 3) gives a free, lossless ~2× to ~19–21 t/s — very usable. The MoE models are still faster by construction; reach for Ornstein when you want *its* behaviour.
 
 ---
 

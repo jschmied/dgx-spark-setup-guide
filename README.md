@@ -28,6 +28,8 @@ The reference workload is **`unsloth/Qwen3-Coder-Next-GGUF`** served with **`lla
 | 9 | [Monitoring (Prometheus + Grafana + DCGM)](09-monitoring.md) | Stack via Docker Compose, provisioned dashboard, what GB10 does and doesn't expose |
 | 10 | [Operations](10-operations.md) | Start/stop, logs, API key rotation, updating `llama.cpp` and the model |
 | 11 | [Security checklist](11-security-checklist.md) | Final hardening summary by layer |
+| 12 | [Standardized coding test](12-model-coding-test.md) | Reproducible harness to compare any served model's coding ability — two tasks: Go concurrency (`go test -race`) and a Spring Boot/Hibernate/Mockito/JUnit5 stack (`mvn test`) |
+| 13 | [Model evaluation](13-model-evaluation.md) | Results across both tasks: qwen3-coder-next vs qwen36-35b-a3b vs ornstein36-27B vs Sonnet 4.6, with a template for the next model |
 
 ## Conventions
 
