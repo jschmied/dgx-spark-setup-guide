@@ -29,7 +29,7 @@ The reference workload is **`unsloth/Qwen3-Coder-Next-GGUF`** served with **`lla
 | 10 | [Operations](10-operations.md) | Start/stop, logs, API key rotation, updating `llama.cpp` and the model |
 | 11 | [Security checklist](11-security-checklist.md) | Final hardening summary by layer |
 | 12 | [Standardized coding test](12-model-coding-test.md) | Reproducible harness to compare any served model's coding ability — two tasks: Go concurrency (`go test -race`) and a Spring Boot/Hibernate/Mockito/JUnit5 stack (`mvn test`) |
-| 13 | [Model evaluation](13-model-evaluation.md) | Results across both tasks: qwen3-coder-next vs qwen36-35b-a3b vs ornstein36-27B vs ornstein36-35b-a3b vs Sonnet 4.6, with a template for the next model |
+| 13 | [Model evaluation](13-model-evaluation.md) | Results across both tasks: qwen3-coder-next, qwen36-35b-a3b, ornstein36-27B, ornstein36-35b-a3b, gemma-4-26B-A4B, Sonnet 4.6, with a template for the next model |
 
 ## Conventions
 

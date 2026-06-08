@@ -68,6 +68,15 @@ load-on-startup = false
 model           = /opt/llm/models/ornstein36-35b-a3b/ornstein3.6-35B-A3B-NSC-ACE-SABER-MTP-Q8_0.gguf
 jinja           = true
 load-on-startup = false
+
+; ---- Model 5: clients request "model": "gemma-4-26B-A4B" ----
+; A different vendor/arch (gemma4 MoE, Q4 QAT). Embedded template (jinja),
+; but NO MTP head, so no spec-type. Its own sampling differs from the Qwen
+; [*] defaults — see 8.12; it needs temp ~1.0 (temp 0.2 makes it loop).
+[gemma-4-26B-A4B]
+model           = /opt/llm/models/gemma-4-26B-A4B/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf
+jinja           = true
+load-on-startup = false
 ```
 
 Notes on the format:
@@ -185,7 +194,7 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/models | jq '.data[] | {id, status: .status.value}'
 ```
 
-You should see all four models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`, `ornstein36-35b-a3b`), with the startup model `loaded` and the others `unloaded`.
+You should see all five models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`, `ornstein36-35b-a3b`, `gemma-4-26B-A4B`), with the startup model `loaded` and the others `unloaded`.
 
 Route a request to a specific model with the `"model"` field:
 

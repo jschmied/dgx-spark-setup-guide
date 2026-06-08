@@ -44,7 +44,8 @@ LAN client  ───HTTP+API key─▶  llama-server router (127.0.0.1:8080)
                             ├── qwen3-coder-next   ─┐
                             ├── qwen36-35b-a3b      ─┤
                             ├── ornstein36-27B      ─┤
-                            └── ornstein36-35b-a3b  ─┴─▶ one resident
+                            ├── ornstein36-35b-a3b  ─┤
+                            └── gemma-4-26B-A4B     ─┴─▶ one resident
                                                         at a time on GB10 GPU
 ```
 
