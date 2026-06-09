@@ -1,0 +1,27 @@
+Implement a production-quality, generic, thread-safe in-memory cache in Go (1.22+), as a single cache.go plus cache_test.go. No third-party dependencies.
+
+Public API — match exactly:
+type Cache[K comparable, V any] struct { /* ... */ }
+func New[K comparable, V any](capacity int, defaultTTL time.Duration) *Cache[K, V]
+func (c *Cache[K, V]) Get(key K) (V, bool)
+func (c *Cache[K, V]) Set(key K, value V)
+func (c *Cache[K, V]) SetWithTTL(key K, value V, ttl time.Duration)
+func (c *Cache[K, V]) Delete(key K)
+func (c *Cache[K, V]) Len() int
+func (c *Cache[K, V]) Stats() (hits, misses, evictions uint64)
+func (c *Cache[K, V]) Close()
+
+Semantics — follow precisely:
+1. capacity is the max number of live entries. Adding a new key beyond capacity evicts the least-recently-used live entry and increments evictions.
+2. defaultTTL <= 0 means entries never expire by default. In SetWithTTL, ttl <= 0 means that entry never expires; ttl > 0 means absolute expiry at now+ttl.
+3. Get on a missing OR expired key returns the zero value + false, counts a miss, and must NOT promote LRU and must NOT return the expired value. Get on a live key returns value + true, counts a hit, and promotes it to most-recently-used.
+4. Set/SetWithTTL on an existing key updates the value, resets its TTL, and promotes to MRU (not an eviction).
+5. Expired entries are reclaimed two ways: lazily on access, AND by a background janitor goroutine on a sensible interval. Close() stops the janitor, is safe to call multiple times (subsequent calls are no-ops), and leaks no goroutine.
+6. All operations are safe under concurrent use by many goroutines; Get/Set are O(1).
+
+Deliverables:
+- cache.go and cache_test.go.
+- Tests covering: basic get/set, LRU eviction order, TTL lazy expiry, janitor expiry, update-resets-TTL-and-LRU, stats correctness, capacity == 0 behavior, and a concurrency test that passes under `go test -race`.
+- State your assumptions and the time/space complexity.
+
+Idiomatic Go, no busy-waiting, minimal lock contention, no goroutine leaks. Put cache.go in one fenced ```go code block and cache_test.go in a separate fenced ```go code block, each immediately preceded by a line naming the file.

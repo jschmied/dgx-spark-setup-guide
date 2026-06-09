@@ -275,7 +275,7 @@ The MoE sibling (`ornstein36-35b-a3b`, arch `qwen35moe`, 256 experts / 8 active 
 
 This model's config mirrors `qwen36-35b-a3b`'s sampling (8.8) plus `jinja = true` (its embedded template is correct, so no external `chat-template-file`) and the two `spec-*` MTP keys. Like the dense Ornstein it logs `fused Gated Delta Net (chunked) not supported` (hybrid attention, prefill only) — but at ~2100 t/s prefill that's not a practical concern here.
 
-**Bottom line:** `ornstein36-35b-a3b` is the fastest of the *Qwen-family* models on this box (~75 t/s with MTP, vs qwen36's ~54.5 and the dense Ornstein's ~19) — though the smaller Gemma 4 (8.12) edges it overall (and now also gains a little from MTP, via a separate assistant draft). MTP here is a modest, free top-up rather than the transformative win it is on the dense model. (For *coding quality* it's a mixed bag — strong on Go, self-inconsistent tests on the Spring task — see [page 13](13-model-evaluation.md).)
+**Bottom line:** `ornstein36-35b-a3b` is the fastest of the *Qwen-family* models on this box (~75 t/s with MTP, vs qwen36's ~54.5 and the dense Ornstein's ~19) — though the smaller Gemma 4 (8.12) edges it overall (and now also gains a little from MTP, via a separate assistant draft). MTP here is a modest, free top-up rather than the transformative win it is on the dense model. (For *coding quality* it's **volatile on Go** — a different compile bug on most samples at its recommended temp — but production-correct on the Spring task with occasionally self-inconsistent delivered tests; see [page 13](13-model-evaluation.md).)
 
 ## 8.12 Measured: Gemma 4 26B-A4B (Q4 QAT, **MoE**) — fastest on the box, MTP via a separate assistant
 
@@ -301,7 +301,7 @@ A different vendor and architecture (`gemma4`, supported as of build **b9502**):
 - **Gemma's own sampling**, not the Qwen `[*]` defaults: `temp = 1.0`, `top-k = 64`, `top-p = 0.95`. This matters: at low temperature Gemma 4 falls into **degenerate repetition loops** — a known Gemma trait. Run it at ~1.0. The per-model section pins these so a client can't accidentally drive it cold.
 - Loads with an automatic `tokenizer.ggml.add_bos_token → true` override (logged at startup) and uses Gemma's sliding-window attention; `flash-attn on` and `cache-type q8_0` from `[*]` work unchanged.
 
-**Bottom line:** Gemma 4 26B-A4B is the **fastest model on the box** (~74–85 t/s baseline, ~96 t/s on code with MTP, ~2800 t/s prefill) and the lightest (~14 GB). MTP via its separate assistant draft is a modest, lossless top-up for code (worth the 816 MB on a coding box; skip it if you mostly generate prose). Its one operational gotcha is sampling — keep `temp` near 1.0. (Coding quality: strong, with sampling and self-consistency caveats — see [page 13](13-model-evaluation.md).)
+**Bottom line:** Gemma 4 26B-A4B is the **fastest model on the box** (~74–85 t/s baseline, ~96 t/s on code with MTP, ~2800 t/s prefill) and the lightest (~14 GB). MTP via its separate assistant draft is a modest, lossless top-up for code (worth the 816 MB on a coding box; skip it if you mostly generate prose). Its one operational gotcha is sampling — keep `temp` near 1.0. (Coding quality: the most reliable *Java* deliverable of the local models, but **noisy on Go** at its required `temp 1.0`; pin sampling and gate Go output — see [page 13](13-model-evaluation.md).)
 
 ---
 

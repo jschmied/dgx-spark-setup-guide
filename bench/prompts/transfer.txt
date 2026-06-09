@@ -1,0 +1,24 @@
+Build a small but production-quality Spring Boot (3.3.x, Java 17) money-transfer module as a single Maven project that compiles and whose tests pass with `mvn test`. No code outside the stack: Spring Boot, Spring Data JPA / Hibernate, H2 (test runtime), JUnit 5, Mockito. Use base package com.example.bank.
+
+Domain & rules:
+- JPA @Entity Account: Long id (generated), String owner (not null), BigDecimal balance (not null), and a @Version field for optimistic locking. Money is always BigDecimal — never double.
+- Spring Data interface AccountRepository extends JpaRepository<Account, Long> with a derived query List<Account> findByOwner(String owner).
+- TransferService with a @Transactional method: void transfer(Long fromId, Long toId, BigDecimal amount). Rules, each enforced:
+  1. amount must be non-null and strictly positive, else throw IllegalArgumentException.
+  2. fromId and toId must differ, else IllegalArgumentException.
+  3. both accounts must exist, else throw a custom AccountNotFoundException (extends RuntimeException) naming the missing id.
+  4. the source balance must be >= amount, else throw a custom InsufficientFundsException (extends RuntimeException).
+  5. on success, debit the source and credit the destination and persist both. Use BigDecimal.compareTo for comparisons, not equals.
+
+Deliverables (each file in its OWN fenced ```java (or ```xml) code block, immediately preceded by a line giving its path):
+- pom.xml — single project, Spring Boot 3.3.x parent, starters spring-boot-starter-data-jpa and spring-boot-starter-test, H2 with test scope, Java 17.
+- src/main/java/com/example/bank/BankApplication.java — @SpringBootApplication.
+- src/main/java/com/example/bank/Account.java
+- src/main/java/com/example/bank/AccountRepository.java
+- src/main/java/com/example/bank/TransferService.java
+- src/main/java/com/example/bank/AccountNotFoundException.java
+- src/main/java/com/example/bank/InsufficientFundsException.java
+- src/test/java/com/example/bank/TransferServiceTest.java — pure unit test with Mockito: @ExtendWith(MockitoExtension.class), @Mock the repository, @InjectMocks the service. Cover: successful transfer updates both balances and persists; insufficient funds throws and persists nothing; unknown account throws; non-positive amount throws; same-account throws. Verify repository interactions and assert no unnecessary stubbing (keep it compatible with Mockito strict stubs).
+- src/test/java/com/example/bank/AccountRepositoryDataJpaTest.java — a @DataJpaTest integration test running real Hibernate on H2: persist accounts and assert findByOwner returns the right rows, and assert the @Version value increments after an update+flush.
+
+Constraints: must build and pass with `mvn test` offline-friendly (only the named dependencies). Idiomatic Spring. State any assumptions briefly at the end.
