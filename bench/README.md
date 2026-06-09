@@ -31,12 +31,14 @@ Current map (`temp / top_p / top_k / repeat / min_p`; `top_p=1.0` = nucleus off)
 | `qwen3-coder-next`   | 0.7 | 0.8  | 20 | 1.05 | —   |
 | `qwen36-35b-a3b`     | 0.6 | 0.95 | 20 | —    | —   |
 | `ornstein36-27B`     | 1.0 | 0.95 | 20 | —    | —   |
-| `ornstein36-35b-a3b` | 0.6 | 0.95 | 20 | —    | —   |
+| `ornstein36-35b-a3b` | 0.3 | off  | 20 | —    | 0.1 |
 | `gemma-4-26B-A4B`    | 1.0 | off  | 64 | —    | 0.1 |
 
-Gemma uses **min-p 0.1 with top-p disabled** — it took Go production-correctness
-from 1/4 to 4/4 vs top-p (see page 14). Override any model for an experiment with
-`BENCH_FORCE_TEMP` / `BENCH_FORCE_TOPP` / `BENCH_FORCE_MINP`.
+Gemma and ornstein-35b use **min-p with top-p disabled** — it fixed their Go
+variance (gemma 1/4→4/4 at temp 1.0; ornstein-35b 1/4→4/4 at temp 0.3; see
+page 14). Override any model for an experiment with `BENCH_FORCE_TEMP` /
+`BENCH_FORCE_TOPP` / `BENCH_FORCE_TOPK` / `BENCH_FORCE_MINP`, e.g. the sweep in
+`sweep-java.sh`.
 
 ## Prerequisites
 

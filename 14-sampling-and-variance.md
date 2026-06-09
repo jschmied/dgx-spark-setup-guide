@@ -50,16 +50,39 @@ That is why Gemma's deployed sampling is **`temp 1.0 / top-k 64 / min-p 0.1`, to
 
 min-p clearly fixed Gemma. To see whether it is a general cure for the recommended-temp Go variance, the same change (top-p off, `min-p 0.1`, each model's own temperature) was run N=4 on the next-most-volatile model:
 
-`ornstein36-35b-a3b` was the most volatile model on Go (1/4 at top-p, a different bug each sample). Run again with **min-p 0.1, top-p off** at its own `temp 0.6`:
+`ornstein36-35b-a3b` was the most volatile model on Go (1/4 at top-p, a different bug each sample), so it got a full sweep — and unlike Gemma, min-p alone wasn't enough; **temperature was the other half.**
+
+First pass, min-p at its recommended `temp 0.6` and at `temp 1.0`:
 
 | `ornstein36-35b-a3b` (N=4) | Go neutral | Java neutral |
 |---|---|---|
-| top-p 0.95 (temp 0.6) | 1/4 | 4/4 |
-| **min-p 0.1, top-p off** (temp 0.6) | **3/4** | **2/4** |
+| top-p 0.95 (temp 0.6, original) | 1/4 | 4/4 |
+| min-p 0.1, top-p off (temp 0.6) | 3/4 | 2/4 |
+| min-p 0.05, top-k 40 (temp 1.0) | 2/4 | 3/4 |
 
-min-p **helped Go** (1/4 → 3/4 — the remaining failure was a generics `missing type constraint`) but **hurt Java** (4/4 → 2/4): two samples shipped an `InsufficientFundsException` that uses `BigDecimal` without importing it (`cannot find symbol`). So min-p is **not a universal cure** — it transformed Gemma (Go 1/4 → 4/4, Java untouched at 4/4) but only partly helped this model and traded away Java reliability. Two caveats: N=4 is small, and this ran at `temp 0.6` (Gemma's win was at `temp 1.0`), so temperature and min-p interact.
+min-p helped Go but with a Go↔Java seesaw and no clear winner — and min-p **0.05** was distinctly worse on Java than **0.1** (a 10-shot Java sweep confirmed it: min-p 0.1 passed 6/6 across temps 0.2–1.0, min-p 0.05 only 1/3, the looser tail letting a bug through). So min-p was pinned at 0.1; the remaining variable was temperature.
 
-**Takeaway:** min-p is a real lever for tail-sampling variance, but its effect is **model-specific — test it per model, don't blanket-apply.** Gemma adopted it (a clear win on its required `temp 1.0`); `ornstein36-35b-a3b` keeps its top-p config (its Java was cleaner there, and it isn't the recommended pick anyway — page 13). The general rule stands regardless of sampling: **gate every deliverable on `go build` / `mvn test`.**
+A **Go temperature sweep** (top-k 20, min-p 0.1, N=3 each) showed a clean trend — *lower is better*:
+
+| temp (top-k 20, min-p 0.1) | Go neutral |
+|---|---|
+| 0.3 | 3/3 |
+| 0.4 | 2/3 |
+| 0.5 | 1/3 |
+| 0.6 | 2/3 |
+
+Confirming the two best at **N=4 on both tasks**:
+
+| config | Go neutral | Java neutral |
+|---|---|---|
+| temp 0.2, top-k 20, min-p 0.1 | **4/4** | 2/4 |
+| **temp 0.3, top-k 20, min-p 0.1** | **4/4** | **3/4** |
+
+**Sweet spot: `temp 0.3 / top-k 20 / min-p 0.1` (top-p off)** — Go **1/4 → 4/4**, Java 3/4. That is the model's deployed config now.
+
+**The one residual Java failure is not a sampling problem.** Across *every* config — even temp 0.2 — roughly one Java sample in three or four ships an `InsufficientFundsException` that uses `BigDecimal` without importing it (`cannot find symbol`). It is a **sampling-resistant model defect**, a one-line missing import that no temperature or truncation reliably removes — and that a `mvn test` catches in seconds. This is the cleanest illustration of the page's closing rule: **tune sampling for the bugs sampling causes, and gate the build for the bugs it doesn't.**
+
+**Takeaway:** min-p is a real lever, but model-specific and often paired with the right temperature. Gemma needed only min-p (at its required `temp 1.0`); `ornstein36-35b-a3b` needed min-p **and** a low temperature (0.3). Sweep per model — and always **gate every deliverable on `go build` / `mvn test`.**
 
 ## 14.6 The harness and the playbook
 
@@ -68,15 +91,16 @@ Everything here is reproducible from [`bench/`](bench/):
 - **Multi-sample runner** — `./run-samples.sh <model> <N> both` reports pass-rates, not a single ✅/❌.
 - **Content-based Go extraction** — `cache.go` = the block with `func New`/`type Cache`; `cache_test.go` = the block with `func Test`. Robust to models that emit extra fenced blocks.
 - **Entity-shape-agnostic neutral Java suite** — reflection-based `acc()` (§14.3).
-- **Experiment overrides** — `BENCH_FORCE_TEMP`, `BENCH_FORCE_TOPP` (set `1.0` to disable nucleus), `BENCH_FORCE_MINP`, e.g.
+- **Single-shot sampling sweep** — `./sweep-java.sh <model>` runs one Java shot per config across a temp/top-k/min-p grid (how §14.5 was mapped).
+- **Experiment overrides** — `BENCH_FORCE_TEMP`, `BENCH_FORCE_TOPP` (set `1.0` to disable nucleus), `BENCH_FORCE_TOPK`, `BENCH_FORCE_MINP`, e.g.
   ```bash
-  BENCH_FORCE_TOPP=1.0 BENCH_FORCE_MINP=0.1 ./run-samples.sh <model> 4 both
+  BENCH_FORCE_TEMP=0.3 BENCH_FORCE_TOPP=1.0 BENCH_FORCE_TOPK=20 BENCH_FORCE_MINP=0.1 ./run-samples.sh <model> 4 both
   ```
 
 **Playbook when a model "can't code":**
 1. Check it isn't *looping* — a low temperature (or a low-temp-sensitive model) emits no code. Raise temperature / use the card's value.
 2. If it loops at the recommended temperature, that model needs `temp ≈ 1.0` (Gemma, dense Ornstein).
-3. If it delivers but with a *different bug each run*, it's tail-sampling noise — try **min-p 0.1 with top-p off** before concluding anything.
+3. If it delivers but with a *different bug each run*, it's tail-sampling noise — try **min-p 0.1 with top-p off**, and if that isn't enough, **sweep temperature** (lower is usually better for deterministic code: `ornstein36-35b-a3b` needed both — min-p 0.1 *and* temp 0.3). Use min-p 0.1, not 0.05 — 0.05's looser tail still leaks bugs.
 4. Always grade on multiple samples and gate the deliverable on `go build` / `mvn test`. The production logic is usually right; the delivered tests are where models break.
 
 ---

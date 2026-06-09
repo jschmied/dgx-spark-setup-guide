@@ -34,13 +34,14 @@ resolve_key() {
 # --- Per-model recommended sampling -----------------------------------------
 # Echo: temp top_p top_k repeat_penalty min_p
 #   repeat_penalty 0 = omit; min_p 0 = omit; top_p 1.0 = nucleus disabled.
-# gemma uses min-p 0.1 with top-p disabled (4/4 Go vs 1/4 with top-p; see page 14).
+# gemma + ornstein-35b use min-p (top-p disabled) — it fixed their Go variance
+# (gemma 1/4->4/4; ornstein-35b 1/4->4/4 at temp 0.3). See page 14.
 sampling_for() {
   case "$1" in
     qwen3-coder-next)    echo "0.7 0.8  20 1.05 0"   ;;
     qwen36-35b-a3b)      echo "0.6 0.95 20 0    0"   ;;
     ornstein36-27B)      echo "1.0 0.95 20 0    0"   ;;
-    ornstein36-35b-a3b)  echo "0.6 0.95 20 0    0"   ;;
+    ornstein36-35b-a3b)  echo "0.3 1.0  20 0    0.1" ;;
     gemma-4-26B-A4B)     echo "1.0 1.0  64 0    0.1" ;;
     *)                   echo "${BENCH_TEMP:-0.7} ${BENCH_TOPP:-0.95} ${BENCH_TOPK:-40} 0 0" ;;
   esac
@@ -54,9 +55,10 @@ call_model() {
   local temp topp topk rep minp
   read -r temp topp topk rep minp <<<"$(sampling_for "$model")"
   minp="${minp:-0}"
-  # experiment overrides: temperature, top_p (set 1.0 to disable nucleus), min_p
+  # experiment overrides: temperature, top_p (set 1.0 to disable nucleus), top_k, min_p
   [ -n "${BENCH_FORCE_TEMP:-}" ] && temp="$BENCH_FORCE_TEMP"
   [ -n "${BENCH_FORCE_TOPP:-}" ] && topp="$BENCH_FORCE_TOPP"
+  [ -n "${BENCH_FORCE_TOPK:-}" ] && topk="$BENCH_FORCE_TOPK"
   [ -n "${BENCH_FORCE_MINP:-}" ] && minp="$BENCH_FORCE_MINP"
   echo ">>> $model  temp=$temp top_p=$topp top_k=$topk min_p=$minp repeat=$rep  max_tokens=$maxtok" >&2
   local body
