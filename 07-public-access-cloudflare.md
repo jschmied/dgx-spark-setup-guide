@@ -97,7 +97,6 @@ curl "$LLM_BASE_URL/chat/completions" \
   -d '{
     "model": "qwen3-coder-next",
     "messages": [{"role": "user", "content": "Write a Spring Boot REST controller with one GET endpoint."}],
-    "temperature": 0.2,
     "max_tokens": 1024
   }' | jq
 ```
@@ -118,7 +117,7 @@ resp = client.chat.completions.create(
     model="qwen3-coder-next",
     messages=[{"role": "user",
                "content": "Write a Java method that validates an email address."}],
-    temperature=0.2, max_tokens=512,
+    max_tokens=512,   # no temperature: let the server use the model's recommended sampling (page 8 §8.8)
 )
 print(resp.choices[0].message.content)
 ```

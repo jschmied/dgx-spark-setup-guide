@@ -70,9 +70,10 @@ jinja           = true
 load-on-startup = false
 
 ; ---- Model 5: clients request "model": "gemma-4-26B-A4B" ----
-; A different vendor/arch (gemma4 MoE, Q4 QAT). Embedded template (jinja),
-; but NO MTP head, so no spec-type. Its own sampling differs from the Qwen
-; [*] defaults — see 8.12; it needs temp ~1.0 (temp 0.2 makes it loop).
+; A different vendor/arch (gemma4 MoE, Q4 QAT). Embedded template (jinja).
+; No embedded MTP head, but it ships a separate assistant draft model used for
+; MTP (spec-type + spec-draft-model — see 8.12). Its own sampling differs from
+; the Qwen [*] defaults — see 8.12; it needs temp ~1.0 (low temp makes it loop).
 [gemma-4-26B-A4B]
 model           = /opt/llm/models/gemma-4-26B-A4B/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf
 jinja           = true
@@ -205,7 +206,6 @@ curl http://127.0.0.1:8080/v1/chat/completions \
   -d '{
     "model": "qwen3-coder-next",
     "messages": [{"role": "user", "content": "Write a minimal Java hello world program."}],
-    "temperature": 0.2,
     "max_tokens": 256
   }' | jq -r '.choices[0].message.content'
 ```

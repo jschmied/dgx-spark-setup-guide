@@ -53,10 +53,11 @@ curl http://127.0.0.1:8080/v1/chat/completions \
   -d '{
     "model": "qwen3-coder-next",
     "messages": [{"role": "user", "content": "Write a minimal Java hello world program."}],
-    "temperature": 0.2,
     "max_tokens": 256
   }' | jq -r '.choices[0].message.content'
 ```
+
+> **Don't pin a `temperature` in the request.** Omitting it lets the server apply each model's *recommended* sampling from the preset (page 8 §8.8) — which is what you want, because the right temperature is model-specific (some models loop at low temp, others want it). A hardcoded value like `temperature: 0.2` overrides that for *every* model and can misrepresent or even break one (see page 13).
 
 If you get a code response, the runtime stack is good. Now stop the manual server with `Ctrl+C` — we'll add API keys before exposing it to anything.
 
