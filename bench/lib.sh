@@ -32,15 +32,17 @@ resolve_key() {
 }
 
 # --- Per-model recommended sampling -----------------------------------------
-# Echo: temp top_p top_k repeat_penalty  (repeat_penalty 0 = omit)
+# Echo: temp top_p top_k repeat_penalty min_p
+#   repeat_penalty 0 = omit; min_p 0 = omit; top_p 1.0 = nucleus disabled.
+# gemma uses min-p 0.1 with top-p disabled (4/4 Go vs 1/4 with top-p; see page 14).
 sampling_for() {
   case "$1" in
-    qwen3-coder-next)    echo "0.7 0.8  20 1.05" ;;
-    qwen36-35b-a3b)      echo "0.6 0.95 20 0"    ;;
-    ornstein36-27B)      echo "1.0 0.95 20 0"    ;;
-    ornstein36-35b-a3b)  echo "0.6 0.95 20 0"    ;;
-    gemma-4-26B-A4B)     echo "1.0 0.95 64 0"    ;;
-    *)                   echo "${BENCH_TEMP:-0.7} ${BENCH_TOPP:-0.95} ${BENCH_TOPK:-40} 0" ;;
+    qwen3-coder-next)    echo "0.7 0.8  20 1.05 0"   ;;
+    qwen36-35b-a3b)      echo "0.6 0.95 20 0    0"   ;;
+    ornstein36-27B)      echo "1.0 0.95 20 0    0"   ;;
+    ornstein36-35b-a3b)  echo "0.6 0.95 20 0    0"   ;;
+    gemma-4-26B-A4B)     echo "1.0 1.0  64 0    0.1" ;;
+    *)                   echo "${BENCH_TEMP:-0.7} ${BENCH_TOPP:-0.95} ${BENCH_TOPK:-40} 0 0" ;;
   esac
 }
 
@@ -49,15 +51,22 @@ sampling_for() {
 call_model() {
   local model="$1" prompt="$2" maxtok="$3" out="$4"
   local key; key="$(resolve_key)" || return 1
-  read -r temp topp topk rep <<<"$(sampling_for "$model")"
-  echo ">>> $model  temp=$temp top_p=$topp top_k=$topk repeat=$rep  max_tokens=$maxtok" >&2
+  local temp topp topk rep minp
+  read -r temp topp topk rep minp <<<"$(sampling_for "$model")"
+  minp="${minp:-0}"
+  # experiment overrides: temperature, top_p (set 1.0 to disable nucleus), min_p
+  [ -n "${BENCH_FORCE_TEMP:-}" ] && temp="$BENCH_FORCE_TEMP"
+  [ -n "${BENCH_FORCE_TOPP:-}" ] && topp="$BENCH_FORCE_TOPP"
+  [ -n "${BENCH_FORCE_MINP:-}" ] && minp="$BENCH_FORCE_MINP"
+  echo ">>> $model  temp=$temp top_p=$topp top_k=$topk min_p=$minp repeat=$rep  max_tokens=$maxtok" >&2
   local body
   body=$(jq -n --rawfile p "$prompt" --arg m "$model" \
     --argjson temp "$temp" --argjson topp "$topp" --argjson topk "$topk" \
-    --argjson rep "$rep" --argjson mt "$maxtok" '
+    --argjson rep "$rep" --argjson minp "$minp" --argjson mt "$maxtok" '
     {model:$m, messages:[{role:"user",content:$p}],
      temperature:$temp, top_p:$topp, top_k:$topk, max_tokens:$mt, stream:false}
-    + (if $rep > 0 then {repeat_penalty:$rep} else {} end)')
+    + (if $rep  > 0 then {repeat_penalty:$rep} else {} end)
+    + (if $minp > 0 then {min_p:$minp} else {} end)')
   # Pass the key via a --config fd (process substitution) so it never appears
   # in the process list / argv. Only the prompt body goes on the command line.
   curl -s --max-time 2400 "$HOST/v1/chat/completions" \

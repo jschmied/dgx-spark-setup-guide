@@ -9,7 +9,7 @@ cd "$(dirname "$0")"; source ./lib.sh
 MODEL="${1:?usage: run-samples.sh <model-id> <N> [go|java|both]}"
 N="${2:?N}"
 WHICH="${3:-both}"
-mkdir -p results .work
+mkdir -p "$RESULTS_DIR" .work
 export GOFLAGS=-mod=mod GOCACHE="${GOCACHE:-/tmp/gocache}" GOPATH="${GOPATH:-/tmp/gopath}"
 export JAVA_HOME="${JAVA_HOME:-$(ls -d /usr/lib/jvm/java-17-openjdk-* 2>/dev/null | head -1)}"
 
@@ -33,7 +33,7 @@ extract_go() {
 }
 
 go_sample() {
-  local i="$1" out="results/go_${MODEL}_s${i}.json" md=".work/go_${MODEL}_s${i}.md"
+  local i="$1" out="$RESULTS_DIR/go_${MODEL}_s${i}.json" md=".work/go_${MODEL}_s${i}.md"
   local src=".work/go_${MODEL}_s${i}" neu=".work/go_${MODEL}_s${i}_n"
   call_model "$MODEL" "$BENCH_DIR/prompts/cache.txt" 26000 "$out" >/dev/null 2>&1
   jq -r '.choices[0].message.content' "$out" > "$md"
@@ -52,7 +52,7 @@ go_sample() {
 }
 
 java_sample() {
-  local i="$1" out="results/java_${MODEL}_s${i}.json"
+  local i="$1" out="$RESULTS_DIR/java_${MODEL}_s${i}.json"
   local proj=".work/java_${MODEL}_s${i}" neu=".work/java_${MODEL}_s${i}_n"
   call_model "$MODEL" "$BENCH_DIR/prompts/transfer.txt" 24000 "$out" >/dev/null 2>&1
   rm -rf "$proj"; mkdir -p "$proj"

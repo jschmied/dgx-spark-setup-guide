@@ -24,15 +24,19 @@ A fixed temperature is fair for comparison but misrepresents models whose
 architecture expects a different operating point (Gemma 4 and the dense Ornstein
 loop at low temp; they deliver at temp ≈ 1.0).
 
-Current map (`temp / top_p / top_k / repeat_penalty`):
+Current map (`temp / top_p / top_k / repeat / min_p`; `top_p=1.0` = nucleus off):
 
-| Model | temp | top_p | top_k | repeat |
-|---|---|---|---|---|
-| `qwen3-coder-next`   | 0.7 | 0.8  | 20 | 1.05 |
-| `qwen36-35b-a3b`     | 0.6 | 0.95 | 20 | —    |
-| `ornstein36-27B`     | 1.0 | 0.95 | 20 | —    |
-| `ornstein36-35b-a3b` | 0.6 | 0.95 | 20 | —    |
-| `gemma-4-26B-A4B`    | 1.0 | 0.95 | 64 | —    |
+| Model | temp | top_p | top_k | repeat | min_p |
+|---|---|---|---|---|---|
+| `qwen3-coder-next`   | 0.7 | 0.8  | 20 | 1.05 | —   |
+| `qwen36-35b-a3b`     | 0.6 | 0.95 | 20 | —    | —   |
+| `ornstein36-27B`     | 1.0 | 0.95 | 20 | —    | —   |
+| `ornstein36-35b-a3b` | 0.6 | 0.95 | 20 | —    | —   |
+| `gemma-4-26B-A4B`    | 1.0 | off  | 64 | —    | 0.1 |
+
+Gemma uses **min-p 0.1 with top-p disabled** — it took Go production-correctness
+from 1/4 to 4/4 vs top-p (see page 14). Override any model for an experiment with
+`BENCH_FORCE_TEMP` / `BENCH_FORCE_TOPP` / `BENCH_FORCE_MINP`.
 
 ## Prerequisites
 

@@ -150,7 +150,7 @@ repeat-penalty   = 1.0
 
 This Q6_K GGUF ships an MTP head (`nextn_predict_layers = 1`, tensors `blk.*.nextn.*`) — unlike the two models in 8.7 — and the `spec-type = draft-mtp` keys above turn it on, roughly doubling decode. (Without those keys the server logs `common_speculative_init: no implementations specified for speculative decoding` and the head sits unused — it must be enabled explicitly.) The model is also dense, so even with MTP it's slower than the MoE models; see 8.10 for the measurements, the MTP depth sweep, and the bandwidth analysis, plus the MTP row in 8.7.
 
-A fifth model, **Gemma 4 26B-A4B** (`gemma-4-26B-A4B`), shows a different-vendor pattern: embedded template (`jinja = true`), its **own** sampling rather than the Qwen `[*]` defaults, and a **third MTP variant** — a *separate* assistant draft model rather than an embedded head (see below). Gemma needs `temp ≈ 1.0` — at low temperature it loops (8.12) — so pin its sampling per-model:
+A fifth model, **Gemma 4 26B-A4B** (`gemma-4-26B-A4B`), shows a different-vendor pattern: embedded template (`jinja = true`), its **own** sampling rather than the Qwen `[*]` defaults (and notably **min-p instead of top-p** — see below), and a **third MTP variant** — a *separate* assistant draft model rather than an embedded head. Gemma needs `temp ≈ 1.0` — at low temperature it loops (8.12) — so pin its sampling per-model:
 
 ```ini
 [gemma-4-26B-A4B]
@@ -161,10 +161,12 @@ spec-draft-n-max = 3
 jinja            = true
 temp             = 1.0
 top-k            = 64
-top-p            = 0.95
-min-p            = 0.0
+top-p            = 1.0          ; nucleus disabled — min-p is used instead
+min-p            = 0.1          ; truncates the long tail; 4/4 vs 1/4 Go (page 14)
 repeat-penalty   = 1.0
 ```
+
+**Why min-p, not top-p, for Gemma.** At `temp 1.0 / top-p 0.95` Gemma's Go code was production-correct only 1 in 4 samples (a different rare-token bug each time); at `temp 1.0 / min-p 0.1` (top-p off) it is **4/4**, with Java still perfect and no loops. `min_p` keeps only tokens with probability ≥ 10 % of the most-likely token, adaptively cutting the tail that caused the failures — without the repetition loops a blanket low temperature triggers. Full experiment on [page 14](14-sampling-and-variance.md).
 
 Gemma 4's MTP is **not** an embedded head like the Ornstein merges — it ships a small separate **assistant** GGUF (`gemma-4-26B-A4B-it-assistant-F16.gguf`, ~816 MB) that serves as the draft, so you point `spec-draft-model` at it rather than relying on `nextn.*` tensors inside the main GGUF. This needs build **b9571+** (Gemma 4 MTP landed after b9502 — PRs #23398/#24282). The win is real but smaller and content-dependent than the dense Ornstein's: ~+12 % average decode on code (up to +32 % when drafts accept well), ~−5 % on free-form prose — see 8.12. It is the fastest model on the box either way (~74–85 t/s baseline).
 
@@ -298,10 +300,10 @@ A different vendor and architecture (`gemma4`, supported as of build **b9502**):
 **Config differences from the Qwen models** (see its preset section in 8.8/6.2):
 - **`jinja = true`** — embedded template is correct; no external `chat-template-file`.
 - **MTP via a separate assistant** — `spec-type = draft-mtp` **plus** `spec-draft-model = …assistant-F16.gguf` (the Ornstein merges need only `spec-type`, drafting from their embedded head). Needs build b9571+. Confirm after a restart with `journalctl -u llama-router | grep draft-mtp` (look for `loading draft model '…assistant…'` and `adding speculative implementation 'draft-mtp'`).
-- **Gemma's own sampling**, not the Qwen `[*]` defaults: `temp = 1.0`, `top-k = 64`, `top-p = 0.95`. This matters: at low temperature Gemma 4 falls into **degenerate repetition loops** — a known Gemma trait. Run it at ~1.0. The per-model section pins these so a client can't accidentally drive it cold.
+- **Gemma's own sampling**, not the Qwen `[*]` defaults: `temp = 1.0`, `top-k = 64`, and **`min-p = 0.1` with top-p disabled**. Two things matter here: at low temperature Gemma 4 falls into **degenerate repetition loops** (a known Gemma trait — run it at ~1.0), and at `temp 1.0` plain top-p leaves a long tail that wrecked its Go code (1/4 correct); **min-p 0.1 fixed that to 4/4** (page 14). The per-model section pins these so a client can't accidentally drive it cold.
 - Loads with an automatic `tokenizer.ggml.add_bos_token → true` override (logged at startup) and uses Gemma's sliding-window attention; `flash-attn on` and `cache-type q8_0` from `[*]` work unchanged.
 
-**Bottom line:** Gemma 4 26B-A4B is the **fastest model on the box** (~74–85 t/s baseline, ~96 t/s on code with MTP, ~2800 t/s prefill) and the lightest (~14 GB). MTP via its separate assistant draft is a modest, lossless top-up for code (worth the 816 MB on a coding box; skip it if you mostly generate prose). Its one operational gotcha is sampling — keep `temp` near 1.0. (Coding quality: the most reliable *Java* deliverable of the local models, but **noisy on Go** at its required `temp 1.0`; pin sampling and gate Go output — see [page 13](13-model-evaluation.md).)
+**Bottom line:** Gemma 4 26B-A4B is the **fastest model on the box** (~74–85 t/s baseline, ~96 t/s on code with MTP, ~2800 t/s prefill) and the lightest (~14 GB). MTP via its separate assistant draft is a modest, lossless top-up for code (worth the 816 MB on a coding box; skip it if you mostly generate prose). Its one operational gotcha is sampling — `temp ≈ 1.0` with **min-p 0.1 (top-p off)**. (Coding quality with that sampling: production-correct on both tasks — Go **4/4**, Java 4/4 — the best local default; see [page 13](13-model-evaluation.md) and the sampling story on [page 14](14-sampling-and-variance.md).)
 
 ---
 
