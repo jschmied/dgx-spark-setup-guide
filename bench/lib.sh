@@ -43,6 +43,7 @@ sampling_for() {
     ornstein36-27B)      echo "1.0 0.95 20 0    0"   ;;
     ornstein36-35b-a3b)  echo "0.3 1.0  20 0    0.1" ;;
     gemma-4-26B-A4B)     echo "1.0 1.0  64 0    0.1" ;;
+    qwopus36-35b-a3b)    echo "0.6 0.95 20 0    0"   ;;
     *)                   echo "${BENCH_TEMP:-0.7} ${BENCH_TOPP:-0.95} ${BENCH_TOPK:-40} 0 0" ;;
   esac
 }
