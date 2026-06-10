@@ -78,6 +78,16 @@ load-on-startup = false
 model           = /opt/llm/models/gemma-4-26B-A4B/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf
 jinja           = true
 load-on-startup = false
+
+; ---- Model 6: clients request "model": "qwopus36-35b-a3b" ----
+; Jackrong "Qwopus3.6" — a Qwen3.6 35B-A3B MoE finetune (qwen35moe, 256
+; experts / 8 active, 41 blocks), Q4_K_M is ~21 GB. Embedded template (jinja).
+; Like Model 4 it ships a working MTP head (nextn_predict_layers = 1), so the
+; speculative-decoding tuning in 8.11 applies.
+[qwopus36-35b-a3b]
+model           = /opt/llm/models/qwopus3.6-35b-a3b/Qwopus3.6-35B-A3B-v1-MTP-Q4_K_M.gguf
+jinja           = true
+load-on-startup = false
 ```
 
 Notes on the format:
@@ -195,7 +205,7 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/models | jq '.data[] | {id, status: .status.value}'
 ```
 
-You should see all five models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`, `ornstein36-35b-a3b`, `gemma-4-26B-A4B`), with the startup model `loaded` and the others `unloaded`.
+You should see all six models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`, `ornstein36-35b-a3b`, `gemma-4-26B-A4B`, `qwopus36-35b-a3b`), with the startup model `loaded` and the others `unloaded`.
 
 Route a request to a specific model with the `"model"` field:
 

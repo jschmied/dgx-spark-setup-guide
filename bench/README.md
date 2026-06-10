@@ -33,6 +33,7 @@ Current map (`temp / top_p / top_k / repeat / min_p`; `top_p=1.0` = nucleus off)
 | `ornstein36-27B`     | 1.0 | 0.95 | 20 | —    | —   |
 | `ornstein36-35b-a3b` | 0.3 | off  | 20 | —    | 0.1 |
 | `gemma-4-26B-A4B`    | 1.0 | off  | 64 | —    | 0.1 |
+| `qwopus36-35b-a3b`   | 0.6 | 0.95 | 20 | —    | —   |
 
 Gemma and ornstein-35b use **min-p with top-p disabled** — it fixed their Go
 variance (gemma 1/4→4/4 at temp 1.0; ornstein-35b 1/4→4/4 at temp 0.3; see

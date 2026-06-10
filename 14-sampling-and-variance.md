@@ -82,7 +82,17 @@ Confirming the two best at **N=4 on both tasks**:
 
 **The one residual Java failure is not a sampling problem.** Across *every* config — even temp 0.2 — roughly one Java sample in three or four ships an `InsufficientFundsException` that uses `BigDecimal` without importing it (`cannot find symbol`). It is a **sampling-resistant model defect**, a one-line missing import that no temperature or truncation reliably removes — and that a `mvn test` catches in seconds. This is the cleanest illustration of the page's closing rule: **tune sampling for the bugs sampling causes, and gate the build for the bugs it doesn't.**
 
-**Takeaway:** min-p is a real lever, but model-specific and often paired with the right temperature. Gemma needed only min-p (at its required `temp 1.0`); `ornstein36-35b-a3b` needed min-p **and** a low temperature (0.3). Sweep per model — and always **gate every deliverable on `go build` / `mvn test`.**
+**A counter-example where min-p does *not* generalize: `qwopus36-35b-a3b`.** A *separate* Qwen3.6-35B-A3B finetune (Jackrong's "Qwopus", Q4_K_M) — the **same `qwen35moe` arch** as `ornstein36-35b-a3b`, so the natural assumption was that the sibling's `temp 0.3 / min-p 0.1` sweet spot would transfer. It does not. Three configs, N=4 on both tasks:
+
+| `qwopus36-35b-a3b` (N=4) | Go neutral | Java neutral | Failure character |
+|---|---|---|---|
+| **temp 0.6 / top-p 0.95** (Qwen3.6 default) | **1/4** | **4/4** | real attempts: 1 non-delivery, a `syntax error: unexpected &&`, an `e.Value` capitalization bug |
+| temp 0.3 / min-p 0.1, top-p off (sibling's sweet spot) | 1/4 | 4/4 | **3/4 looped** to the 26k-token cap emitting *no code* (own tests 2/4 → 0/4) |
+| temp 0.6 / min-p 0.1, top-p off | 0/4 | 3/4 | worse on both — min-p didn't tame the tail, and one Java sample regressed |
+
+So for Qwopus the plain Qwen3.6 default (`temp 0.6 / top-p 0.95`) is the **best of the three**: lowering temperature to 0.3 pushes it into the *reasoning-loop / non-delivery* failure (the Gemma/dense-Ornstein trap of §14.1, not the Ornstein-35b cure), and adding min-p at 0.6 helps nothing and nicks Java. Go stays a coin-flip-at-best (1/4) under every config tried — a model whose Go weakness is **not** a sampling artifact you can tune away; gate it on `go build`. The lesson sharpens §14.5's: **same base model and same architecture do not predict the operating point** — Qwopus and ornstein-35b are both `qwen35moe` Qwen3.6 finetunes yet want opposite temperatures. Sweep each model from scratch.
+
+**Takeaway:** min-p is a real lever, but model-specific and often paired with the right temperature — and sometimes it helps nothing. Gemma needed only min-p (at its required `temp 1.0`); `ornstein36-35b-a3b` needed min-p **and** a low temperature (0.3); its same-arch cousin `qwopus36-35b-a3b` wanted **neither** (low temp made it loop) and kept the plain default. Sweep per model — and always **gate every deliverable on `go build` / `mvn test`.**
 
 ## 14.6 The harness and the playbook
 
