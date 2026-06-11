@@ -180,6 +180,54 @@ If a change (new llama.cpp build, new flags, new model) regresses performance or
 2. **Service starts but is slower** — compare dashboards before/after. The `Throughput (tokens/sec, log)` panel from page 9 is the most direct regression indicator.
 3. **GPU fell back** — XID errors on the dashboard, or memory pressure visible in `free -h`. Check `mlock = true` is in the preset's `[*]` section and `LimitMEMLOCK=infinity` is set on the unit.
 
+## 10.9 WiFi drops overnight and won't come back (mt7925e / NetworkManager)
+
+**Symptom:** the box is reachable over WiFi during the day, but after an idle night the WLAN is down and only reconnects once you log in at the console. The DGX Spark / GX10 ships a MediaTek `mt7925e` adapter; this is a known interaction between its power-save mode and NetworkManager's secret handling.
+
+**What's actually happening** (read it in the journal):
+
+```bash
+journalctl --since "24 hours ago" -u NetworkManager | grep -iE "disconnect|need-auth|no-secrets|no agents"
+journalctl --since "24 hours ago" -k | grep -iE "mt7925|deauth|disassoc|PREV_AUTH_NOT_VALID|Connection to AP"
+```
+
+The failure has two layers:
+
+1. **Trigger** — with WiFi power-save **on**, a transient roam/idle drop (e.g. between two band-steered APs broadcasting the same SSID on 2.4 and 5 GHz) causes a 4-way handshake timeout (`disassociated … Reason 2=PREV_AUTH_NOT_VALID`).
+2. **Why it stays down all night** — NetworkManager treats the handshake failure as a possibly-wrong key and asks a *secret agent* for new credentials. That agent only runs inside a logged-in desktop session, so headless overnight you get `no secrets: No agents were available` → the profile goes to `failed (no-secrets)` and stops retrying. Logging in makes an agent available and it reconnects with the **same stored key** — proving the key was fine all along.
+
+**Fix — disable power-save (removes the trigger):**
+
+```bash
+printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.d/wifi-powersave-off.conf
+sudo systemctl restart NetworkManager
+iw dev WIFI_IFACE get power_save            # expect: Power save: off
+```
+
+`wifi.powersave` values: `2` = disable, `3` = enable. Drop-ins in `conf.d` merge alphabetically, so a `wifi-powersave-off.conf` overrides a vendor `default-wifi-powersave-on.conf`. Find `WIFI_IFACE` with `nmcli device | grep wifi` (e.g. `wlP9s9`).
+
+**Fix — make reconnection independent of any login session:**
+
+```bash
+sudo nmcli connection modify WIFI_CONN \
+  802-11-wireless-security.psk-flags 0 \
+  connection.autoconnect yes \
+  connection.autoconnect-retries 0
+```
+
+- `psk-flags 0` keeps the PSK in the system store so NM never needs a desktop agent to reconnect.
+- `autoconnect-retries 0` means **retry forever** instead of giving up after the default limit.
+
+Replace `WIFI_CONN` with the connection name from `nmcli connection show`.
+
+**Optional — stop the roam churn** by pinning to the stronger BSSID:
+
+```bash
+sudo nmcli connection modify WIFI_CONN 802-11-wireless.bssid AA:BB:CC:DD:EE:FF
+```
+
+> For a server role, prefer **wired Ethernet** as the always-up path and treat WiFi as backup — the wired link suffers neither roaming nor session-dependent reauth. The real test of the WiFi fix is the next idle morning; re-check the journal commands above and confirm there's no `no-secrets` failure.
+
 ---
 
 [← Monitoring](09-monitoring.md) · [Index](README.md) · [Next: Security checklist →](11-security-checklist.md)
