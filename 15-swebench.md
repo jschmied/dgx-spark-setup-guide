@@ -119,6 +119,34 @@ A single-instance smoke test passed the whole pipeline on this box:
 
 So `qwen3-coder-next` on the page-6 router can drive mini-SWE-agent against real SWE-bench instances and produce harness-verified fixes. This validates **function**, not a leaderboard number — run a sized `--slice` (then the full subset) for a real score.
 
+## 15.8 The aarch64 reality: image coverage decides everything
+
+The fix in §15.4 makes the tooling *ask* for arm64 images, but it can't conjure ones that don't exist. **Prebuilt arm64 image coverage is partial, and that — not model quality — is the binding constraint on this box.** Measured:
+
+| Dataset | arm64 images | note |
+|---|---|---|
+| SWE-bench **Lite** (Python) | **52 / 300 (17 %)** | concentrated in django (27) + sympy (19); matplotlib/pytest/pylint/pydata/mwaskom/pallets have **zero** |
+| SWE-bench **Multilingual** Java (druid, lucene, gson, javaparser, lombok, rxjava) | **0 / 43 (0 %)** | x86_64-only |
+
+Instances without an arm64 image fail at `docker run` with **exit 125** (rollout never starts → empty patch) or a harness error. So **always pre-scan and filter** before a run:
+
+```bash
+# probe each instance id; keep the ones that have an arm64 image
+docker manifest inspect docker.io/swebench/sweb.eval.arm64.<id-with __→_1776_>:latest
+```
+
+A practical consequence: a "5-model comparison on Lite slice 0:5" mostly measures *image availability* — 3 of those 5 instances have no arm64 image, so every model scores empty on them. Filter to the arm64-runnable set first, and remember a local Lite run is effectively a **django/sympy** benchmark.
+
+### What we tried and rejected
+
+- **qemu emulation** (run the x86_64 images under `binfmt`/`tonistiigi/binfmt --install amd64`). It *works* — full end-to-end Java rollout + score succeeded — but the rollout is **~30 min/instance** (the agent's shell commands over a large repo under emulation) vs ~10–12 min native. Too slow for anything but a one-off. **We removed it** (`tonistiigi/binfmt --uninstall qemu-x86_64`) so x86 images now fail fast instead of silently emulating.
+- **Building arm64 images ourselves** (`prepare_images --namespace none --tag latest --env_image_tag latest`, with `make_test_spec` taught to honor host arch / `SWEBENCH_ARCH`). Viable in principle, but **for Java it does not yield a native image**: the SWE-bench `sweb.base.java.*` base is amd64-pinned, so the build produces an **amd64** image (slow, under emulation) that scoring rejects on an arm64-tag/amd64-content mismatch. For **Python** the arm64 base exists, so self-building *could* extend Lite past the 17 % prebuilt — that's the one place this lever pays off (not yet done here).
+
+### Recommendation
+
+- **Python, local:** run the arm64-runnable Lite subset natively. Optionally self-build more arm64 Python images to widen coverage.
+- **Java / full coverage / leaderboard numbers:** don't do it on this box. Move **rollouts to x86** (Modal sandboxes via `swerex_modal`, with the model reached over the page-7 Cloudflare tunnel) and/or score with **`sb-cli`** in the cloud. The local box stays best for arm64 Python plus the bespoke page-12 Java harness.
+
 ---
 
 [← Sampling & variance](14-sampling-and-variance.md) · [Index](README.md)

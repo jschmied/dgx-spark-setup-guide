@@ -31,7 +31,7 @@ The reference workload is **`unsloth/Qwen3-Coder-Next-GGUF`** served with **`lla
 | 12 | [Standardized coding test](12-model-coding-test.md) | Reproducible harness to compare any served model's coding ability — two tasks: Go concurrency (`go test -race`) and a Spring Boot/Hibernate/Mockito/JUnit5 stack (`mvn test`) |
 | 13 | [Model evaluation](13-model-evaluation.md) | Latest results across both tasks (qwen3-coder-next, qwen36-35b-a3b, ornstein36-27B, ornstein36-35b-a3b, gemma-4-26B-A4B, qwopus36-35b-a3b, Sonnet 4.6) — clean scorecards + recommendation |
 | 14 | [Sampling & variance](14-sampling-and-variance.md) | How the eval was tuned: the fixed-temp mistake, recommended-temp variance, the neutral-suite fix, and the top-p → min-p win that took Gemma's Go from 1/4 to 4/4 |
-| 15 | [SWE-bench (mini-SWE-agent)](15-swebench.md) | Standardized real-issue eval against the local router: install, OpenAI-compatible wiring, the aarch64 image-arch fixes (+ idempotent re-patcher), rollouts → `preds.json`, and harness scoring (verified `resolved` on this box) |
+| 15 | [SWE-bench (mini-SWE-agent)](15-swebench.md) | Standardized real-issue eval against the local router: install, OpenAI-compatible wiring, the aarch64 image-arch fixes (+ idempotent re-patcher), rollouts → `preds.json`, harness scoring, and the aarch64 reality — arm64 image coverage (Lite 17 %, Java 0 %), why emulation and self-built arm64 don't pay off, and when to use x86/cloud |
 
 ## Conventions
 
