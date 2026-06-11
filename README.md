@@ -26,7 +26,7 @@ The reference workload is **`unsloth/Qwen3-Coder-Next-GGUF`** served with **`lla
 | 7 | [Public access via Cloudflare Tunnel](07-public-access-cloudflare.md) | `cloudflared`, edge auth, end-to-end client test (optional) |
 | 8 | [Performance tuning](08-performance-tuning.md) | `--mlock`, `--kv-unified`, `--ubatch-size`, `--parallel`, prompt cache reuse, with measured benchmarks |
 | 9 | [Monitoring (Prometheus + Grafana + DCGM)](09-monitoring.md) | Stack via Docker Compose, provisioned dashboard, what GB10 does and doesn't expose |
-| 10 | [Operations](10-operations.md) | Start/stop, logs, API key rotation, updating `llama.cpp` and the model |
+| 10 | [Operations](10-operations.md) | Start/stop, logs, API key rotation, updating `llama.cpp` and the model, WiFi-drops troubleshooting |
 | 11 | [Security checklist](11-security-checklist.md) | Final hardening summary by layer |
 | 12 | [Standardized coding test](12-model-coding-test.md) | Reproducible harness to compare any served model's coding ability — two tasks: Go concurrency (`go test -race`) and a Spring Boot/Hibernate/Mockito/JUnit5 stack (`mvn test`) |
 | 13 | [Model evaluation](13-model-evaluation.md) | Latest results across both tasks (qwen3-coder-next, qwen36-35b-a3b, ornstein36-27B, ornstein36-35b-a3b, gemma-4-26B-A4B, qwopus36-35b-a3b, Sonnet 4.6) — clean scorecards + recommendation |

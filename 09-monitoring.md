@@ -144,6 +144,8 @@ scrape_configs:
         labels: { model: ornstein36-35b-a3b, service: ornstein36-35b-a3b }
       - targets: ['127.0.0.1:8080']
         labels: { model: gemma-4-26B-A4B, service: gemma-4-26B-A4B }
+      - targets: ['127.0.0.1:8080']
+        labels: { model: qwopus36-35b-a3b, service: qwopus36-35b-a3b }
     relabel_configs:
       # turn the per-target `model` label into the ?model= query param
       - source_labels: [model]
