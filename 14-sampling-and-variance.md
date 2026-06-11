@@ -1,6 +1,6 @@
 # 14. Sampling & variance: how the eval was tuned
 
-[← Model evaluation](13-model-evaluation.md) · [Index](README.md)
+[← Model evaluation](13-model-evaluation.md) · [Index](README.md) · [Next: SWE-bench →](15-swebench.md)
 
 [Page 13](13-model-evaluation.md) reports the *results*. This page is the messy part behind them: the sampling mistakes, the run-to-run variance, the harness bugs, and the experiments that led to each model's deployed sampling. If you only want the scorecard, stay on page 13. Read this when a model "can't code" — because the cause is usually **sampling, not capability**.
 
@@ -116,4 +116,4 @@ Everything here is reproducible from [`bench/`](bench/):
 
 ---
 
-[← Model evaluation](13-model-evaluation.md) · [Index](README.md)
+[← Model evaluation](13-model-evaluation.md) · [Index](README.md) · [Next: SWE-bench →](15-swebench.md)
