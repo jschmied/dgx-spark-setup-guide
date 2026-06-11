@@ -318,6 +318,14 @@ A third `qwen35moe` model (Jackrong's `qwopus36-35b-a3b`, a separate Qwen3.6-35B
 
 **Bottom line:** `spec-type = draft-mtp` (n-max 3) is a free, lossless ~+20 % here — keep it on. For *coding quality* this model is **production-correct on Java (4/4) but weak and sampling-noisy on Go (1/4 at best)**, and unlike the others neither min-p nor a low temperature helps — its tuning story is on [page 13](13-model-evaluation.md)/[page 14](14-sampling-and-variance.md).
 
+> **⚠️ Context > native needs YaRN — qwopus specifically.** Unlike the base Qwen3.6-35B-A3B and the Ornstein merges (native 256K — `ctx-size = 262144` works as-is, add YaRN only above 256K), **Jackrong's qwopus finetune is native ~32K**. Serving it at `ctx-size = 262144` *without* rope-scaling silently breaks past ~32K: a long prompt hits `failed to find free space in the KV cache` → `Context size has been exceeded` (its `draft-mtp` draft context adds KV pressure, so it bites first). The short-prompt evals above never reach it, but **agent workloads do** (e.g. a coding-agent conversation easily exceeds 50K tokens). Fix — add to qwopus's preset section:
+> ```ini
+> rope-scaling     = yarn
+> rope-scale       = 8
+> yarn-orig-ctx    = 32768
+> ```
+> Confirm at load (`journalctl -u llama-router | grep -i yarn`) and validate in your real workload — the scale factor may need tuning. Do **not** blanket-apply YaRN to the native-256K models; it slightly degrades short-context quality for no gain.
+
 ---
 
 [← Public access](07-public-access-cloudflare.md) · [Index](README.md) · [Next: Monitoring →](09-monitoring.md)
