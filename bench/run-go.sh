@@ -7,7 +7,7 @@ set -uo pipefail
 cd "$(dirname "$0")"; source ./lib.sh
 
 MODEL="${1:?usage: run-go.sh <model-id> [max_tokens]}"
-MAXTOK="${2:-26000}"   # generous: dense reasoning models (ornstein-27B) emit ~19k tok at temp 1.0
+MAXTOK="${2:-26000}"   # generous: reasoning models emit many thousands of tokens before code
 mkdir -p "$RESULTS_DIR" "$WORK_DIR"
 OUT="$RESULTS_DIR/go_${MODEL}.json"
 MD="$WORK_DIR/go_${MODEL}.md"

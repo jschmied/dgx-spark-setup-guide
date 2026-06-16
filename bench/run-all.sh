@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 MODELS=("$@")
 if [[ ${#MODELS[@]} -eq 0 ]]; then
-  MODELS=(qwen3-coder-next qwen36-35b-a3b ornstein36-27B ornstein36-35b-a3b gemma-4-26B-A4B)
+  MODELS=(qwen3-coder-next qwen36-35b-a3b gemma-4-26B-A4B gemma-4-31B)
 fi
 
 for m in "${MODELS[@]}"; do

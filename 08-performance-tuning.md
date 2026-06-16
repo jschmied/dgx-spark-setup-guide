@@ -106,7 +106,7 @@ The server prefilled **33× fewer tokens** the second time, dropping prefill tim
 | Option | Why not |
 |---|---|
 | **External draft model / speculative decoding** | llama.cpp returns `"speculative decoding not supported by this context"` for the `qwen3next` arch. Even on standard `qwen3moe` siblings, benchmarks find net slowdown at batch=1 due to MoE expert-routing union overhead. |
-| **MTP (Multi-Token Prediction)** | **Adopted on four of six models**: the two Ornstein merges and Qwopus3.6 (embedded head — see 8.8/8.10/8.11/8.13) and Gemma 4 (separate assistant draft — see 8.8/8.12). The other two (qwen3-coder-next, qwen36-35b-a3b) have no MTP path. **Qwen3-Coder-Next** (`qwen3next`): no MTP tensors, and llama.cpp's MTP path isn't wired for the arch. **Qwen3.6-35B-A3B** (`qwen35moe`, the *non*-Ornstein one): tensor table is only `blk.0`–`blk.39` with no `nextn.*`/`mtp.*` tensors — confirmed plain single-token decode (~54.5 t/s, see 8.9). **Ornstein 27B** (`qwen35`, dense) and **Ornstein 35B-A3B** (`qwen35moe`, MoE): both ship an embedded head (`nextn_predict_layers = 1`, `blk.*.nextn.*`), supported since build **b9502 (6ddc9430b)** — enabled with `spec-type = draft-mtp` (lossless). **Qwopus3.6 35B-A3B** (`qwen35moe`, a separate Qwen3.6 finetune, Q4_K_M) ships the same embedded head (`nextn_predict_layers = 1`) and is enabled the same way — ~+20 % decode (8.13). **Gemma 4 26B-A4B** (`gemma4`, MoE): no embedded head, but ships a small separate **assistant** GGUF used as the draft — enabled with `spec-type = draft-mtp` + `spec-draft-model = …assistant-F16.gguf`, supported since build **b9571** (PRs #23398/#24282). Gain scales with weight-streaming per token: ~2× on the dense 27B (9 → ~19 t/s, 8.10), ~+30 % on the 3 B-active Q8 Ornstein MoE (~57 → ~75 t/s, 8.11), ~+20 % on the same-arch but Q4 Qwopus MoE (76 → 91 t/s, 8.13), and only ~+12 % avg / up to +32 % on code (−5 % on prose) for the already-cheap 4 B-active Gemma (8.12). Must be set explicitly: without it the server logs `common_speculative_init: no implementations specified for speculative decoding` and the draft sits unused. (The Ornstein archs also log `fused Gated Delta Net (chunked) not supported`, which caps *prefill*, not decode.) |
+| **MTP (Multi-Token Prediction)** | **Adopted on three of five models**: the dense Qwen3.6-27B base (`qwen36-27b`, embedded head — see 8.8) and both Gemma 4 models (`gemma-4-26B-A4B` / `gemma-4-31B`, separate draft — see 8.8/8.10). The other two (qwen3-coder-next, qwen36-35b-a3b) have no MTP path. **Qwen3-Coder-Next** (`qwen3next`): no MTP tensors, and llama.cpp's MTP path isn't wired for the arch. **Qwen3.6-35B-A3B** (`qwen35moe`): tensor table is only `blk.0`–`blk.39` with no `nextn.*`/`mtp.*` tensors — confirmed plain single-token decode (~54.5 t/s, see 8.9). **Qwen3.6-27B** (`qwen35`, dense, `qwen36-27b`): ships an embedded head (`nextn_predict_layers = 1`, `blk.*.nextn.*`), supported since build **b9502 (6ddc9430b)** — enabled with `spec-type = draft-mtp` (lossless). **Gemma 4** (`gemma4`, MoE — both 26B-A4B and 31B): no embedded head, but ships a small separate draft GGUF — enabled with `spec-type = draft-mtp` + `spec-draft-model = …it-Q8_0-MTP.gguf`, supported since build **b9571** (PRs #23398/#24282). Gain scales with weight-streaming per token: ~2× on the dense 27B (`qwen36-27b`, ~9 → ~20–22 t/s with MTP), and ~+25 % on the 1800-token synthetic (75 → 94 t/s, higher on well-accepted code) for the already-cheap 4 B-active Gemma 26B (8.10). Must be set explicitly: without it the server logs `common_speculative_init: no implementations specified for speculative decoding` and the draft sits unused. |
 | **`--cache-type-k/v q4_0`** | Breaks processing on Qwen3-Coder-Next (model gives degenerate output). Stays at `q8_0`. |
 | **Lowering `--ctx-size` from 131072** | Use-case decision. If most prompts stay under 32 K, lowering this frees memory for more prompt-cache pool. |
 | **NVFP4 quant** | Would leverage `BLACKWELL_NATIVE_FP4=1`. Requires a Qwen3-Coder-Next NVFP4 GGUF (not yet published as of writing). |
@@ -130,15 +130,16 @@ repeat-penalty      = 1.0
 
 These sampler keys are server-side **defaults** for that model; a client can still override per-request. The only one that differs from the tuned `[*]` here is `repeat-penalty` (1.0 vs the global 1.05) — the rest are pinned for clarity so the model's behaviour doesn't drift if you later retune `[*]`.
 
-A third model, the Qwen3.6-27B "Ornstein" merge (`ornstein36-27B`), shows two more per-model patterns: the **other** template pattern, and **MTP self-speculation**. Its embedded chat template is correct, so instead of an external `chat-template-file` you just turn Jinja on for it. It is also a *dense* model (slow to decode — see 8.10), so it's the one dense model that benefits from its built-in MTP head as a draft. Note its sampling: this merge **must run at `temp = 1.0`** (its embedded recommendation) — at `temp 0.6` (and 0.2) it falls into reasoning-repetition loops and emits nothing (see page 13). Add the two `spec-*` keys for MTP:
+A third model, **`qwen36-27b`** — the plain **Qwen3.6-27B** (unsloth `Qwen3.6-27B-MTP-GGUF`, `UD-Q5_K_XL`, ~19 GB) — shows two more per-model patterns: the **other** template pattern, and **MTP self-speculation**. Its embedded chat template is correct, so instead of an external `chat-template-file` you just turn Jinja on for it. It is a *dense* `qwen35` model (slow to decode — every token streams the full ~19 GB of weights), so it's the one model here that benefits from its built-in MTP head as its own draft. Note its sampling: it **must run at `temp = 1.0`** (vendor recommendation) — at `temp 0.6`/`0.2` this arch falls into reasoning-repetition loops and emits nothing. It runs at the full native 256 K, so it also gets `ctx-size`. Add the two `spec-*` keys for MTP:
 
 ```ini
-[ornstein36-27B]
-model            = /opt/llm/models/ornstein36-27B/Qwen3.6-27B-MTP-NSC-ACE-SABER-Ornstein-Q6_K.gguf
+[qwen36-27b]
+model            = /opt/llm/models/qwen36-27b/Qwen3.6-27B-UD-Q5_K_XL.gguf
+ctx-size         = 262144
 jinja            = true
-spec-type        = draft-mtp   ; use the model's own MTP head as its draft
-spec-draft-n-max = 3           ; draft depth; 3 is the sweet spot here (see 8.10)
-temp             = 1.0         ; embedded rec; lower temps make this merge loop
+spec-type        = draft-mtp   ; use the model's own embedded MTP head as its draft
+spec-draft-n-max = 3           ; draft depth; 3 is the sweet spot on this box
+temp             = 1.0         ; vendor sampling; lower temps loop
 top-p            = 0.95
 top-k            = 20
 min-p            = 0.0
@@ -146,29 +147,28 @@ presence-penalty = 0.0
 repeat-penalty   = 1.0
 ```
 
-`spec-type = draft-mtp` tells the child to build a speculative draft context from the model's **own** embedded MTP head (`nextn_predict_layers`) — no separate draft model, ~160 MiB extra. The head proposes up to `spec-draft-n-max` tokens per step and the full model verifies them in one pass; accepted tokens are free. It is **lossless** (the verifier preserves the model's output distribution). On this box it roughly **doubles** decode (9 → ~19 t/s); details and the depth sweep are in 8.10. Confirm it's active after a restart with `journalctl -u llama-router | grep draft-mtp` (look for `adding speculative implementation 'draft-mtp'`).
+`spec-type = draft-mtp` tells the child to build a speculative draft context from the model's **own** embedded MTP head (`nextn_predict_layers`) — no separate draft model, ~160 MiB extra. The head proposes up to `spec-draft-n-max` tokens per step and the full model verifies them in one pass; accepted tokens are free and **lossless** (the verifier preserves the model's output distribution). This Q5 GGUF ships the head (`nextn_predict_layers = 1`, tensors `blk.*.nextn.*`) — unlike the two models in 8.7 — and the keys above turn it on. (Without them the server logs `common_speculative_init: no implementations specified for speculative decoding` and the head sits unused — it must be enabled explicitly.) Confirm it's active after a restart with `journalctl -u llama-router | grep draft-mtp` (look for `adding speculative implementation 'draft-mtp'`).
 
-This Q6_K GGUF ships an MTP head (`nextn_predict_layers = 1`, tensors `blk.*.nextn.*`) — unlike the two models in 8.7 — and the `spec-type = draft-mtp` keys above turn it on, roughly doubling decode. (Without those keys the server logs `common_speculative_init: no implementations specified for speculative decoding` and the head sits unused — it must be enabled explicitly.) The model is also dense, so even with MTP it's slower than the MoE models; see 8.10 for the measurements, the MTP depth sweep, and the bandwidth analysis, plus the MTP row in 8.7.
+Measured on this box (b9641, FP4 build): MTP loads cleanly (`adding speculative implementation 'draft-mtp'`, `n_embd = 5120`, ~2.3 GB MTP context) with **65–85 % draft acceptance**, decoding **~20–22 t/s** — roughly **2× the MTP-off baseline** estimated at ~9 t/s (a 19 GB dense model against this box's ~250–273 GB/s unified memory; MTP commits several tokens per weight-stream, which is what breaks that bandwidth wall). MTP only helps decode; prefill is unaffected. Not yet on the page 13/14 coding scorecards.
 
-A fifth model, **Gemma 4 26B-A4B** (`gemma-4-26B-A4B`), shows a different-vendor pattern: embedded template (`jinja = true`), its **own** sampling rather than the Qwen `[*]` defaults (and notably **min-p instead of top-p** — see below), and a **third MTP variant** — a *separate* assistant draft model rather than an embedded head. Gemma needs `temp ≈ 1.0` — at low temperature it loops (8.12) — so pin its sampling per-model:
+A fourth model, **Gemma 4 26B-A4B** (`gemma-4-26B-A4B`), shows a different-vendor pattern: embedded template (`jinja = true`), its **own** sampling rather than the Qwen `[*]` defaults (and notably **min-p instead of top-p** — see below), and the **other MTP variant** — a *separate* draft model rather than an embedded head. Gemma needs `temp ≈ 1.0` — at low temperature it loops (8.10) — so pin its sampling per-model:
 
 ```ini
 [gemma-4-26B-A4B]
 model            = /opt/llm/models/gemma-4-26B-A4B/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf
 spec-type        = draft-mtp
-spec-draft-model = /opt/llm/models/gemma-4-26B-A4B/gemma-4-26B-A4B-it-assistant-F16.gguf
+spec-draft-model = /opt/llm/models/gemma-4-26B-A4B/gemma-4-26B-A4B-it-Q8_0-MTP.gguf
 spec-draft-n-max = 3
 jinja            = true
-temp             = 1.0
+temp             = 1.0          ; Google's recommended Gemma 4 defaults
 top-k            = 64
-top-p            = 1.0          ; nucleus disabled — min-p is used instead
-min-p            = 0.1          ; truncates the long tail; 4/4 vs 1/4 Go (page 14)
+top-p            = 0.95
 repeat-penalty   = 1.0
 ```
 
 **Why min-p, not top-p, for Gemma.** At `temp 1.0 / top-p 0.95` Gemma's Go code was production-correct only 1 in 4 samples (a different rare-token bug each time); at `temp 1.0 / min-p 0.1` (top-p off) it is **4/4**, with Java still perfect and no loops. `min_p` keeps only tokens with probability ≥ 10 % of the most-likely token, adaptively cutting the tail that caused the failures — without the repetition loops a blanket low temperature triggers. Full experiment on [page 14](14-sampling-and-variance.md).
 
-Gemma 4's MTP is **not** an embedded head like the Ornstein merges — it ships a small separate **assistant** GGUF (`gemma-4-26B-A4B-it-assistant-F16.gguf`, ~816 MB) that serves as the draft, so you point `spec-draft-model` at it rather than relying on `nextn.*` tensors inside the main GGUF. This needs build **b9571+** (Gemma 4 MTP landed after b9502 — PRs #23398/#24282). The win is real but smaller and content-dependent than the dense Ornstein's: ~+12 % average decode on code (up to +32 % when drafts accept well), ~−5 % on free-form prose — see 8.12. It is the fastest model on the box either way (~74–85 t/s baseline).
+Gemma 4's MTP is **not** an embedded head like `qwen36-27b`'s — it ships a small separate draft GGUF (`gemma-4-26B-A4B-it-Q8_0-MTP.gguf`, ~440 MB — a Q8_0 of Google's F16 assistant draft, swapped in 2026-06-16) that serves as the draft, so you point `spec-draft-model` at it rather than relying on `nextn.*` tensors inside the main GGUF. This needs build **b9571+** (Gemma 4 MTP landed after b9502 — PRs #23398/#24282). The win is real but content-dependent: **+25 % decode on the 1800-token synthetic** (75 → 94 t/s, 61 % accept), higher on well-accepted code (~86 % accept), roughly flat on free-form prose — see 8.10. It is the fastest model on the box either way (~75 t/s baseline).
 
 **Don't let a model silently inherit the wrong sampling.** The `[*]` defaults (`temp 0.6`, etc.) are tuned for the Qwen3.6 *reasoning* models. `qwen3-coder-next` is a non-thinking coder and wants the Qwen3-Coder card values instead — pin them rather than inheriting `[*]`:
 
@@ -181,7 +181,7 @@ top-k           = 20
 repeat-penalty  = 1.05
 ```
 
-A quick way to find the author-intended values for any GGUF is the embedded `general.sampling.*` metadata (e.g. `temp`, `top_k`, `top_p`) — read it before deciding what to override. That audit is what set Gemma to `temp 1.0` and the dense Ornstein to `temp 1.0` (it loops lower), and gave the coder model the values above.
+A quick way to find the author-intended values for any GGUF is the embedded `general.sampling.*` metadata (e.g. `temp`, `top_k`, `top_p`) — read it before deciding what to override. That audit is what set Gemma to `temp 1.0` and the dense `qwen36-27b` to `temp 1.0` (it loops lower), and gave the coder model the values above.
 
 Most flags transfer cleanly to other GGUFs. Four things worth pinning per-model rather than globally:
 
@@ -229,102 +229,38 @@ A repeated prefix collapses prefill **~17×** (1287 of 1291 tokens served from c
 
 **Bottom line:** Qwen3.6-35B-A3B runs comfortably on the same tuned `[*]` config; no model-specific performance flags were needed beyond the sampling/template overrides in 8.8. It is the faster of the two MoE/coder models on this box for both prefill and single-stream generation.
 
-## 8.10 Measured: Qwen3.6-27B Ornstein (Q6, **dense**) — MTP doubles a bandwidth-bound model
+## 8.10 Measured: Gemma 4 (26B-A4B and 31B, Q4 QAT, **MoE**) — fastest on the box, MTP via a separate draft
 
-This is a **dense** model: out of the box it decodes at **~9 t/s**, ~6× slower than the 35B MoE. Turning on its built-in MTP head (`spec-type = draft-mtp`, 8.8) **roughly doubles that to ~19–21 t/s**. Same box, same router, measured via `/completion` with `ignore_eos:true`, warm-up discarded.
+A different vendor and architecture (`gemma4`, supported as of build **b9502**): MoE with 128 experts / 8 active (~4 B/token), unsloth QAT Q4_K_XL (~14 GB). It is the **throughput leader** even before speculation. It has **no embedded MTP head**, but Gemma 4 ships a small separate draft model — and as of build **b9571** llama.cpp can use it for MTP self-speculation. Same harness as 8.9.
 
-| Metric | Ornstein 27B — no MTP | Ornstein 27B — **MTP `n-max=3`** | Qwen3.6-35B-A3B (Q8, MoE) |
-|---|---|---|---|
-| Generation | ~9.1 t/s | **~19–21 t/s** (2.0–2.3×) | ~54.5 t/s |
-| Prefill (1801-token prompt) | ~690 t/s | ~690 t/s (unchanged) | ~2080 t/s |
-| GPU during decode | 96 % util, ~38 W | 96 % util | 95 % util, ~32 W |
-
-**Why the *baseline* is ~9 t/s — memory bandwidth, not compute.** The GGUF's FFN tensors are `blk.*.ffn_{gate,up,down}` with **no `_exps`** — it is **dense**, so every token streams the whole ~22.4 GB of weights from memory. The 35B is MoE (`*.ffn_*_exps`) and activates only ~3 B params (~3–4 GB) per token. On the GB10's ~250–273 GB/s unified memory the hard ceiling for a 22.4 GB dense model is `BW / size` ≈ **11–12 t/s**; we measure 9.1 (~80 % of ceiling, normal). The 96 % util at only ~38 W is the giveaway: the GPU is **stalled on memory reads, not doing FLOPs** (a compute-bound run would pull 80–140 W). No `[*]` flag moves this wall — `parallel`, `flash-attn`, `mlock`, `ubatch` etc. don't reduce bytes-streamed-per-token.
-
-**Why MTP breaks the wall.** MTP self-speculation drafts several tokens from the model's own next-token head, then verifies them in **one** forward pass — so one weight-stream from memory can commit multiple tokens instead of one. That directly attacks the bandwidth limit. On build **b9502 (6ddc9430b)** it is supported and enabled with `spec-type = draft-mtp` (no separate draft model, ~160 MiB extra context). At load you'll see `adding speculative implementation 'draft-mtp'` and `speculative decoding context initialized`; during generation the child logs `draft-mtp` acceptance statistics (~57 % of drafted tokens accepted on code-like prompts here). It is **lossless** — the verifier preserves the model's output distribution, so quality is identical to plain decoding.
-
-**Draft-depth sweep (`spec-draft-n-max`), single stream:**
-
-| `n-max` | Decode | Note |
+| Metric | Baseline (no MTP) | **MTP (Q8_0-MTP draft, n-max=3)** |
 |---|---|---|
-| off | 9.1 t/s | dense baseline |
-| 2 | 17.2 t/s | |
-| **3** | **21.3 t/s** | **best — the default** |
-| 4 | 18.7 t/s | acceptance drops, wasted draft compute |
-| 5 | 19.9 t/s | |
-
-`n-max=3` wins: deeper drafts propose more tokens but get rejected more often, and the rejected ones are pure overhead. (Through the live router with the full `ctx-size 262144` config the same setting lands at ~18.6 t/s vs the 21.3 measured on a lean scratch context — same ~2× win.)
-
-**Prefill stays ~690 t/s** (MTP only helps decode). It's below the MoE's ~2080 partly from dense compute and partly the hybrid attention: arch `qwen35` is a Gated Delta Net / SSM hybrid (`qwen35.ssm.*`, full attention only every 4th layer — `full_attention_interval = 4`), and on b9502 the server logs `fused Gated Delta Net (chunked) not supported, set to disabled`, so prefill takes a slower scan. A future build with that fused kernel should lift prefill; watch for it.
-
-**Other lever — smaller quant.** Decode scales with bytes/token, so a Q4_K_M (~15 GB) would raise even the *baseline* ceiling to ~16–18 t/s, and MTP would stack on top — at some quality cost and a re-download. Q6 + MTP is the better default unless you specifically need it faster.
-
-**Bottom line:** Ornstein is dense and memory-bound, but `spec-type = draft-mtp` (n-max 3) gives a free, lossless ~2× to ~19–21 t/s — very usable. The MoE models are still faster by construction; reach for Ornstein when you want *its* behaviour.
-
-## 8.11 Measured: Qwen3.6-35B-A3B Ornstein (Q8, **MoE**) — MTP on a model that's already fast
-
-The MoE sibling (`ornstein36-35b-a3b`, arch `qwen35moe`, 256 experts / 8 active ≈ 3 B/token, Q8_0, with an MTP head) is a different story from the dense 27B: it's **already the fastest model on the box** before any speculation, and MTP adds a smaller — but real — gain. Same harness as 8.9/8.10.
-
-| Config | Decode | Prefill (1801 tok) |
-|---|---|---|
-| baseline (no MTP) | ~57 t/s (very stable) | ~2100 t/s |
-| **MTP `n-max=3`** | **~75 t/s** (range 64–90, content-dependent) | ~1900 t/s |
-| MTP `n-max=2` | ~72 t/s (range 70–77) | ~1970 t/s |
-
-**Why the MTP gain is smaller here (~+30 %) than on the dense 27B (~2×).** MTP pays off in proportion to how much weight-streaming each token costs. The dense model streams ~22 GB/token, so committing several tokens per stream is a huge win. This MoE activates only ~3 B params (~3–4 GB) per token, so each token is already cheap — there's much less to amortise, and the draft+verify overhead eats into the gain. Net is still positive (~57 → ~75 t/s) and lossless, so it's worth enabling, but don't expect the dense model's doubling.
-
-**Sweet spot / variance.** `n-max=3` (the default, and what's configured) has the highest average and ceiling; `n-max=2` is slightly more consistent. The run-to-run spread (64–90 t/s) is acceptance-rate variance — how often the drafted tokens match what the model would have produced depends on the content being generated. Both clearly beat baseline; the choice between 2 and 3 is within noise.
-
-This model's config uses `jinja = true` (its embedded template is correct, so no external `chat-template-file`), the two `spec-*` MTP keys, and — after a sampling sweep — **`temp 0.3 / top-k 20 / min-p 0.1` with top-p disabled** rather than the Qwen reasoning defaults. That sweep took its Go coding reliability from 1/4 to 4/4 (Java 3/4); the full story is on [page 14](14-sampling-and-variance.md). Like the dense Ornstein it logs `fused Gated Delta Net (chunked) not supported` (hybrid attention, prefill only) — but at ~2100 t/s prefill that's not a practical concern here.
-
-**Bottom line:** `ornstein36-35b-a3b` is the fastest of the *Qwen-family* models on this box (~75 t/s with MTP, vs qwen36's ~54.5 and the dense Ornstein's ~19) — though the smaller Gemma 4 (8.12) edges it overall (and now also gains a little from MTP, via a separate assistant draft). MTP here is a modest, free top-up rather than the transformative win it is on the dense model. (For *coding quality* it's **volatile on Go** — a different compile bug on most samples at its recommended temp — but production-correct on the Spring task with occasionally self-inconsistent delivered tests; see [page 13](13-model-evaluation.md).)
-
-## 8.12 Measured: Gemma 4 26B-A4B (Q4 QAT, **MoE**) — fastest on the box, MTP via a separate assistant
-
-A different vendor and architecture (`gemma4`, supported as of build **b9502**): MoE with 128 experts / 8 active (~4 B/token), unsloth QAT Q4_K_XL (~14 GB). It is the **throughput leader** even before speculation. Unlike the Ornstein merges it has **no embedded MTP head**, but Gemma 4 ships a small separate **assistant** draft model — and as of build **b9571** llama.cpp can use it for MTP self-speculation. Same harness as 8.9–8.11.
-
-| Metric | Baseline (no MTP) | **MTP (assistant draft, n-max=3)** |
-|---|---|---|
-| Generation — code (short ctx) | ~85 t/s | **~96 t/s avg, up to 114** (+12 % avg, +32 % peak) |
-| Generation — prose (short ctx) | ~85 t/s | ~81 t/s (−5 %) |
-| Generation (1800-token ctx) | ~74 t/s | — |
-| Prefill (1801 tok) | ~2800 t/s | ~300–420 t/s¹ |
+| Generation (1800-token synthetic ctx) | ~75 t/s | **~94 t/s** (+25 %, 61 % draft accept) |
+| Prefill (1801 tok) | ~2950 t/s | ~2770 t/s (MTP-neutral; small dip is cross-restart noise) |
 | GPU during decode | 94 % util, ~36 W | 94 % util, ~36 W |
 
-¹ Prefill in the MTP column is from the short-prompt benchmark harness, not the 1801-token sweep — not directly comparable; MTP affects decode, not prefill throughput.
+The 1800-token row is a clean baseline-vs-MTP toggle on the same `bench/throughput.sh` harness (build b9641, **Q8_0-MTP draft**, 2026-06-16). On the more predictable page-13 coding prompts the draft accepts **~86 %** (vs 61 % on this synthetic), so the code-path gain runs higher than the +25 % shown here; free-form prose accepts worst and nets roughly flat-to-slightly-negative as before. Lossless either way.
 
-**Why it's the fastest** despite being the most numerous-expert MoE: only ~4 B params active per token *and* a 4-bit quant, so each token streams the fewest bytes of any model here (~14 GB total, far less active). It's still memory-bandwidth bound (94 % util at 36 W — the usual signature), just with the least to move. Beats the Q8 MoEs (qwen36 54.5, ornstein-35B 57 baseline / ~75 with MTP) and trounces the dense 27B (~9–19).
+**Why it's the fastest** despite being the most numerous-expert MoE: only ~4 B params active per token *and* a 4-bit quant, so each token streams the fewest bytes of any model here (~14 GB total, far less active). It's still memory-bandwidth bound (94 % util at 36 W — the usual signature), just with the least to move. Beats the Q8 MoE (qwen36-35b-a3b ~54.5) and trounces the dense 27B (`qwen36-27b`, ~9 baseline / ~20–22 with MTP).
 
-**Why the MTP gain is small and content-dependent.** Gemma's draft is a *separate* 816 MB assistant model, not an embedded head, and the main model already activates only ~4 B params per token — so each token is cheap and there's little weight-streaming to amortise (same reason the Ornstein MoE gains less than the dense 27B, 8.11). When the draft accepts well (predictable code) you get up to +32 %; on less predictable prose the draft+verify overhead isn't hidden and it costs ~5 %. It is **lossless** either way. Net positive for a coding-focused box, so it's enabled — at the cost of +816 MB resident for the draft.
+**Why the MTP gain is content-dependent.** Gemma's draft is a *separate* model (the `it-Q8_0-MTP` build, ~440 MB resident — a Q8_0 of the original F16 assistant draft, swapped in 2026-06-16 at half the footprint), not an embedded head, and the main model already activates only ~4 B params per token — so each token is cheap and there's less weight-streaming to amortise than on the dense 27B. When the draft accepts well (predictable code, ~86 %) the gain is largest; on less predictable prose the draft+verify overhead isn't fully hidden and it nets roughly flat. It is **lossless** either way. Net positive for a coding-focused box, so it's enabled — at the cost of +440 MB resident for the draft.
 
 **Config differences from the Qwen models** (see its preset section in 8.8/6.2):
 - **`jinja = true`** — embedded template is correct; no external `chat-template-file`.
-- **MTP via a separate assistant** — `spec-type = draft-mtp` **plus** `spec-draft-model = …assistant-F16.gguf` (the Ornstein merges need only `spec-type`, drafting from their embedded head). Needs build b9571+. Confirm after a restart with `journalctl -u llama-router | grep draft-mtp` (look for `loading draft model '…assistant…'` and `adding speculative implementation 'draft-mtp'`).
+- **MTP via a separate draft model** — `spec-type = draft-mtp` **plus** `spec-draft-model = …it-Q8_0-MTP.gguf` (`qwen36-27b` needs only `spec-type`, drafting from its embedded head). Needs build b9571+. Confirm after a restart with `journalctl -u llama-router | grep draft-mtp` (look for `loading draft model '…Q8_0-MTP…'` and `adding speculative implementation 'draft-mtp'`). *(Draft swapped from the original `assistant-F16.gguf` to the smaller `Q8_0-MTP.gguf` build on 2026-06-16 — ~440 MB vs ~815 MB resident, re-benched on this draft: +25 % decode on the 1800-token synthetic at 61 % accept, ~86 % accept on coding prompts.)*
 - **Gemma's own sampling**, not the Qwen `[*]` defaults: `temp = 1.0`, `top-k = 64`, and **`min-p = 0.1` with top-p disabled**. Two things matter here: at low temperature Gemma 4 falls into **degenerate repetition loops** (a known Gemma trait — run it at ~1.0), and at `temp 1.0` plain top-p leaves a long tail that wrecked its Go code (1/4 correct); **min-p 0.1 fixed that to 4/4** (page 14). The per-model section pins these so a client can't accidentally drive it cold.
 - Loads with an automatic `tokenizer.ggml.add_bos_token → true` override (logged at startup) and uses Gemma's sliding-window attention; `flash-attn on` and `cache-type q8_0` from `[*]` work unchanged.
 
-**Bottom line:** Gemma 4 26B-A4B is the **fastest model on the box** (~74–85 t/s baseline, ~96 t/s on code with MTP, ~2800 t/s prefill) and the lightest (~14 GB). MTP via its separate assistant draft is a modest, lossless top-up for code (worth the 816 MB on a coding box; skip it if you mostly generate prose). Its one operational gotcha is sampling — `temp ≈ 1.0` with **min-p 0.1 (top-p off)**. (Coding quality with that sampling: production-correct on both tasks — Go **4/4**, Java 4/4 — the best local default; see [page 13](13-model-evaluation.md) and the sampling story on [page 14](14-sampling-and-variance.md).)
+**Bottom line:** Gemma 4 26B-A4B is the **fastest model on the box** (~75 t/s baseline, ~94 t/s with MTP on the 1800-token synthetic / higher on well-accepted code, ~2800 t/s prefill) and the lightest (~14 GB). MTP via its separate Q8_0-MTP draft is a lossless top-up for code (worth the ~440 MB on a coding box; skip it if you mostly generate prose). Its one operational gotcha is sampling — `temp ≈ 1.0` with **min-p 0.1 (top-p off)**. (Coding quality with that sampling: production-correct on both tasks — Go **4/4**, Java 4/4 — the best local default; see [page 13](13-model-evaluation.md) and the sampling story on [page 14](14-sampling-and-variance.md).)
 
-## 8.13 Measured: Qwopus3.6 35B-A3B (Q4_K_M, **MoE**) — embedded MTP on a light quant
+### Sibling: Gemma 4 31B (QAT Q4_K_XL, ~17 GB) — a *reasoning* variant
 
-A third `qwen35moe` model (Jackrong's `qwopus36-35b-a3b`, a separate Qwen3.6-35B-A3B finetune, 256 experts / 8 active ≈ 3 B/token), but at **Q4_K_M (~21 GB)** rather than the Ornstein sibling's Q8. Like the Ornstein MoE it ships a working embedded MTP head (`nextn_predict_layers = 1`), enabled with just `spec-type = draft-mtp`. Same harness as 8.9–8.12 (native `/completion`, `ignore_eos`, 1601-token prompt, `n_predict 512`, warm-up discarded, paired across clean restarts).
+Gemma 4 also ships a larger **31B** (`gemma-4-31B`), set up identically to the 26B: `gemma4` arch, embedded template (`jinja = true`), and the same separate-draft MTP (its own `gemma-4-31B-it-Q8_0-MTP.gguf`, ~515 MB, ~440 MB resident; `spec-type = draft-mtp` + `spec-draft-model`). Two differences matter operationally:
 
-| Config | Decode | Prefill (1601 tok) |
-|---|---|---|
-| baseline (no MTP) | ~76 t/s | ~2540 t/s |
-| **MTP `n-max=3`** | **~91 t/s** (+20 %) | ~2375 t/s |
+- **It is a reasoning model.** Unlike the 26B-A4B, the 31B emits a thinking block into `reasoning_content` before its final `content`. Clients need a generous `max_tokens` (a small budget returns empty `content` because generation was cut off mid-thought), and the chat layer must read `reasoning_content`/`content` accordingly.
+- **Sampling** is Google's defaults *without* min-p: `temp = 1.0`, `top-p = 0.95`, `top-k = 64`.
 
-**It is the fastest Qwen-family model on the box** — the Q4 quant streams fewer bytes/token than the Q8 Ornstein MoE, so even its *baseline* (~76 t/s) beats the Q8 sibling's MTP-on figure (~75 t/s), and with MTP it reaches ~91 t/s (behind only Gemma's ~96 on code). **Draft acceptance is high on real content** — ~65 % on the synthetic throughput prompt but ~**86 %** across the page-13 coding/reasoning eval (136 455 / 158 195 drafted tokens), so the +20 % is conservative for actual coding workloads. As with the other MoEs the gain is smaller than the dense 27B's ~2×: only ~3 B params stream per token, so each token is already cheap and there's little weight-streaming for the draft to amortise (the 8.11 reasoning, more so at Q4). Prefill is unaffected by MTP (the small dip is cross-restart noise, confirmed by toggling). Throughput is reproducible via [`bench/throughput.sh`](bench/throughput.sh).
-
-**Bottom line:** `spec-type = draft-mtp` (n-max 3) is a free, lossless ~+20 % here — keep it on. For *coding quality* this model is **production-correct on Java (4/4) but weak and sampling-noisy on Go (1/4 at best)**, and unlike the others neither min-p nor a low temperature helps — its tuning story is on [page 13](13-model-evaluation.md)/[page 14](14-sampling-and-variance.md).
-
-> **⚠️ Context > native needs YaRN — qwopus specifically.** Unlike the base Qwen3.6-35B-A3B and the Ornstein merges (native 256K — `ctx-size = 262144` works as-is, add YaRN only above 256K), **Jackrong's qwopus finetune is native ~32K**. Serving it at `ctx-size = 262144` *without* rope-scaling silently breaks past ~32K: a long prompt hits `failed to find free space in the KV cache` → `Context size has been exceeded` (its `draft-mtp` draft context adds KV pressure, so it bites first). The short-prompt evals above never reach it, but **agent workloads do** (e.g. a coding-agent conversation easily exceeds 50K tokens). Fix — add to qwopus's preset section:
-> ```ini
-> rope-scaling     = yarn
-> rope-scale       = 8
-> yarn-orig-ctx    = 32768
-> ```
-> Confirm at load (`journalctl -u llama-router | grep -i yarn`) and validate in your real workload — the scale factor may need tuning. Do **not** blanket-apply YaRN to the native-256K models; it slightly degrades short-context quality for no gain.
+Throughput on this box isn't separately benchmarked yet, but the MTP draft loads cleanly (`adding speculative implementation 'draft-mtp'`) with high acceptance (1.0 on a trivial prompt, ~0.86 on a short coding prompt). On the page-13 coding bench (4 samples/task at its sampling) it scores **Go 3/4, Java 4/4** on the neutral suite — the one Go miss was a trivial unused-variable compile error, and on Java its *production* code is 4/4 though its *own delivered tests* are often self-inconsistent (they under-count a legitimate second `save()`); see [page 13](13-model-evaluation.md).
 
 ---
 

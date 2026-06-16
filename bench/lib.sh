@@ -6,7 +6,7 @@
 # pinned in /etc/llama-server/models.ini and the model card / GGUF
 # general.sampling), NOT a single fixed temperature. A fixed temperature is fair
 # for comparison but misrepresents models whose architecture expects a different
-# operating point (e.g. Gemma 4 and the dense Ornstein loop at low temp).
+# operating point (e.g. Gemma 4 loops at low temp).
 
 BENCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST="${LLAMA_HOST:-http://127.0.0.1:8080}"
@@ -34,16 +34,15 @@ resolve_key() {
 # --- Per-model recommended sampling -----------------------------------------
 # Echo: temp top_p top_k repeat_penalty min_p
 #   repeat_penalty 0 = omit; min_p 0 = omit; top_p 1.0 = nucleus disabled.
-# gemma + ornstein-35b use min-p (top-p disabled) — it fixed their Go variance
-# (gemma 1/4->4/4; ornstein-35b 1/4->4/4 at temp 0.3). See page 14.
+# gemma-4-26B-A4B uses min-p (top-p disabled) — it fixed its Go variance
+# (1/4->4/4 at temp 1.0). See page 14.
 sampling_for() {
   case "$1" in
     qwen3-coder-next)    echo "0.7 0.8  20 1.05 0"   ;;
     qwen36-35b-a3b)      echo "0.6 0.95 20 0    0"   ;;
-    ornstein36-27B)      echo "1.0 0.95 20 0    0"   ;;
-    ornstein36-35b-a3b)  echo "0.3 1.0  20 0    0.1" ;;
     gemma-4-26B-A4B)     echo "1.0 1.0  64 0    0.1" ;;
-    qwopus36-35b-a3b)    echo "0.6 0.95 20 0    0"   ;;
+    gemma-4-31B)         echo "1.0 0.95 64 0    0"   ;;
+    qwen36-27b)          echo "1.0 0.95 20 0    0"   ;;
     *)                   echo "${BENCH_TEMP:-0.7} ${BENCH_TOPP:-0.95} ${BENCH_TOPK:-40} 0 0" ;;
   esac
 }

@@ -21,8 +21,8 @@ Each model runs at its **own recommended sampling** (pinned in
 `/etc/llama-server/models.ini` and the model card / GGUF `general.sampling`),
 defined in `sampling_for()` in `lib.sh` — **not** a single fixed temperature.
 A fixed temperature is fair for comparison but misrepresents models whose
-architecture expects a different operating point (Gemma 4 and the dense Ornstein
-loop at low temp; they deliver at temp ≈ 1.0).
+architecture expects a different operating point (Gemma 4 loops at low temp;
+it delivers at temp ≈ 1.0).
 
 Current map (`temp / top_p / top_k / repeat / min_p`; `top_p=1.0` = nucleus off):
 
@@ -30,14 +30,12 @@ Current map (`temp / top_p / top_k / repeat / min_p`; `top_p=1.0` = nucleus off)
 |---|---|---|---|---|---|
 | `qwen3-coder-next`   | 0.7 | 0.8  | 20 | 1.05 | —   |
 | `qwen36-35b-a3b`     | 0.6 | 0.95 | 20 | —    | —   |
-| `ornstein36-27B`     | 1.0 | 0.95 | 20 | —    | —   |
-| `ornstein36-35b-a3b` | 0.3 | off  | 20 | —    | 0.1 |
 | `gemma-4-26B-A4B`    | 1.0 | off  | 64 | —    | 0.1 |
-| `qwopus36-35b-a3b`   | 0.6 | 0.95 | 20 | —    | —   |
+| `gemma-4-31B`        | 1.0 | 0.95 | 64 | —    | —   |
 
-Gemma and ornstein-35b use **min-p with top-p disabled** — it fixed their Go
-variance (gemma 1/4→4/4 at temp 1.0; ornstein-35b 1/4→4/4 at temp 0.3; see
-page 14). Override any model for an experiment with `BENCH_FORCE_TEMP` /
+`gemma-4-26B-A4B` uses **min-p with top-p disabled** — it fixed its Go
+variance (1/4→4/4 at temp 1.0; see page 14). Override any model for an
+experiment with `BENCH_FORCE_TEMP` /
 `BENCH_FORCE_TOPP` / `BENCH_FORCE_TOPK` / `BENCH_FORCE_MINP`, e.g. the sweep in
 `sweep-java.sh`.
 
