@@ -13,7 +13,7 @@
       "title": "Gen t/s",
       "gridPos": {"x": 0, "y": 0, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "llamacpp:predicted_tokens_seconds"}],
+      "targets": [{"refId": "A", "expr": "sum(llamacpp:predicted_tokens_seconds)"}],
       "fieldConfig": {"defaults": {"unit": "none", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 20}, {"color": "green", "value": 40}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
     },
@@ -23,7 +23,7 @@
       "title": "Prompt t/s",
       "gridPos": {"x": 3, "y": 0, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "llamacpp:prompt_tokens_seconds"}],
+      "targets": [{"refId": "A", "expr": "sum(llamacpp:prompt_tokens_seconds)"}],
       "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 500}, {"color": "green", "value": 900}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
     },
@@ -33,7 +33,7 @@
       "title": "Predicted total",
       "gridPos": {"x": 6, "y": 0, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "llamacpp:tokens_predicted_total"}],
+      "targets": [{"refId": "A", "expr": "sum(llamacpp:tokens_predicted_total)"}],
       "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
     },
@@ -43,7 +43,7 @@
       "title": "Prompt total",
       "gridPos": {"x": 9, "y": 0, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "llamacpp:prompt_tokens_total"}],
+      "targets": [{"refId": "A", "expr": "sum(llamacpp:prompt_tokens_total)"}],
       "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
     },
@@ -93,19 +93,19 @@
       "title": "Max n_tokens",
       "gridPos": {"x": 0, "y": 3, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "llamacpp:n_tokens_max"}],
+      "targets": [{"refId": "A", "expr": "max(llamacpp:n_tokens_max)"}],
       "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
     },
     {
       "id": 32,
       "type": "stat",
-      "title": "llama scrape",
+      "title": "Loaded model",
       "gridPos": {"x": 3, "y": 3, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "up{job=\"llama-server\"}"}],
-      "fieldConfig": {"defaults": {"unit": "none", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "background", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
+      "targets": [{"refId": "A", "expr": "up{job=\"llama-server\"} == 1", "legendFormat": "{{model}}", "instant": true}],
+      "fieldConfig": {"defaults": {"unit": "none", "noValue": "none loaded", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "background", "graphMode": "none", "textMode": "name", "justifyMode": "center"}
     },
     {
       "id": 104,
@@ -143,7 +143,7 @@
       "title": "Tokens 1h",
       "gridPos": {"x": 15, "y": 3, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "increase(llamacpp:tokens_predicted_total[1h])"}],
+      "targets": [{"refId": "A", "expr": "sum(increase(llamacpp:tokens_predicted_total[1h]))"}],
       "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
     },
@@ -153,7 +153,7 @@
       "title": "Tokens 24h",
       "gridPos": {"x": 18, "y": 3, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "increase(llamacpp:tokens_predicted_total[24h])"}],
+      "targets": [{"refId": "A", "expr": "sum(increase(llamacpp:tokens_predicted_total[24h]))"}],
       "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center"}
     },
@@ -163,7 +163,7 @@
       "title": "Slot util %",
       "gridPos": {"x": 21, "y": 3, "w": 3, "h": 3},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "llamacpp:requests_processing / 4 * 100"}],
+      "targets": [{"refId": "A", "expr": "sum(llamacpp:requests_processing) / 4 * 100"}],
       "fieldConfig": {"defaults": {"unit": "percent", "decimals": 0, "min": 0, "max": 100, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 50}, {"color": "yellow", "value": 90}]}}, "overrides": []},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center"}
     },

@@ -53,39 +53,34 @@ load-on-startup = true
 model           = /opt/llm/models/qwen36-35b-a3b/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf
 load-on-startup = false
 
-; ---- Model 3: clients request "model": "ornstein36-27B" ----
-; A model whose embedded chat template is correct: enable it with jinja = true
-; rather than pointing at an external chat-template-file (contrast Model 2).
-[ornstein36-27B]
-model           = /opt/llm/models/ornstein36-27B/Qwen3.6-27B-MTP-NSC-ACE-SABER-Ornstein-Q6_K.gguf
-jinja           = true
-load-on-startup = false
-
-; ---- Model 4: clients request "model": "ornstein36-35b-a3b" ----
-; MoE sibling of Model 3, also embedded-template (jinja). It ships a working
-; MTP head; the speculative-decoding tuning for it lives in 8.11.
-[ornstein36-35b-a3b]
-model           = /opt/llm/models/ornstein36-35b-a3b/ornstein3.6-35B-A3B-NSC-ACE-SABER-MTP-Q8_0.gguf
-jinja           = true
-load-on-startup = false
-
-; ---- Model 5: clients request "model": "gemma-4-26B-A4B" ----
-; A different vendor/arch (gemma4 MoE, Q4 QAT). Embedded template (jinja).
-; No embedded MTP head, but it ships a separate assistant draft model used for
-; MTP (spec-type + spec-draft-model — see 8.12). Its own sampling differs from
-; the Qwen [*] defaults — see 8.12; it needs temp ~1.0 (low temp makes it loop).
+; ---- Model 3: clients request "model": "gemma-4-26B-A4B" ----
+; A different vendor/arch (gemma4 MoE, Q4 QAT ~14 GB). Embedded template (jinja),
+; so enable it with jinja = true rather than an external chat-template-file
+; (contrast Model 2). No embedded MTP head, but it ships a separate Q8_0-MTP draft
+; model used for MTP (spec-type + spec-draft-model — see 8.10). Its own sampling
+; differs from the Qwen [*] defaults — see 8.10; it needs temp ~1.0 (low temp loops).
 [gemma-4-26B-A4B]
 model           = /opt/llm/models/gemma-4-26B-A4B/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf
 jinja           = true
 load-on-startup = false
 
-; ---- Model 6: clients request "model": "qwopus36-35b-a3b" ----
-; Jackrong "Qwopus3.6" — a Qwen3.6 35B-A3B MoE finetune (qwen35moe, 256
-; experts / 8 active, 41 blocks), Q4_K_M is ~21 GB. Embedded template (jinja).
-; Like Model 4 it ships a working MTP head (nextn_predict_layers = 1), so the
-; speculative-decoding tuning in 8.11 applies.
-[qwopus36-35b-a3b]
-model           = /opt/llm/models/qwopus3.6-35b-a3b/Qwopus3.6-35B-A3B-v1-MTP-Q4_K_M.gguf
+; ---- Model 4: clients request "model": "gemma-4-31B" ----
+; Larger Gemma 4 (gemma4 MoE, QAT Q4_K_XL ~17 GB), same setup as Model 3 with its
+; own separate Q8_0-MTP draft. NOTE: a *reasoning* model — output goes to
+; reasoning_content before final content, so clients need a generous max_tokens.
+; Sampling/spec-decoding are tuned in 8.10; coding scores are on page 13.
+[gemma-4-31B]
+model           = /opt/llm/models/gemma-4-31B/gemma-4-31B-it-qat-UD-Q4_K_XL.gguf
+jinja           = true
+load-on-startup = false
+
+; ---- Model 5: clients request "model": "qwen36-27b" ----
+; Qwen3.6-27B base (unsloth Qwen3.6-27B-MTP-GGUF), UD-Q5_K_XL ~19 GB. A *dense*
+; Qwen3.6 model. Embedded template (jinja). Ships a working embedded MTP head;
+; its spec-decoding and sampling (it must run at temp 1.0, lower temps loop) are
+; tuned in 8.8/8.10.
+[qwen36-27b]
+model           = /opt/llm/models/qwen36-27b/Qwen3.6-27B-UD-Q5_K_XL.gguf
 jinja           = true
 load-on-startup = false
 ```
@@ -99,7 +94,7 @@ Notes on the format:
 - `--metrics` lives **in the preset**, not on the unit — it's the child instances that expose `/metrics`, and the router proxies it. Page 9 relies on this.
 - Host, port, API key and model alias are **controlled by the router** and ignored if you put them here — set them on the unit (6.4) instead.
 
-> **Memory budget — why `--models-max 1`.** On the 128 GB GB10 the model weights, the KV cache and page cache all share one pool. The Q4 coder model is ~50 GB, the Q8 35B is ~36 GB and the Q6 27B is ~22 GB; with KV cache and headroom you cannot safely hold the large ones resident together. `--models-max 1` makes the router unload the current model before loading the next. If all your models are small enough to coexist (and you've done the arithmetic), raise it — but the default for this guide is swap.
+> **Memory budget — why `--models-max 1`.** On the 128 GB GB10 the model weights, the KV cache and page cache all share one pool. The Q4 coder model is ~50 GB, the Q8 35B is ~36 GB and the Q5 dense 27B (`qwen36-27b`) is ~19 GB; with KV cache and headroom you cannot safely hold the large ones resident together. `--models-max 1` makes the router unload the current model before loading the next. If all your models are small enough to coexist (and you've done the arithmetic), raise it — but the default for this guide is swap.
 
 Lock the file down. The service runs as `SERVICE_USER`, which must be able to read it:
 
@@ -205,7 +200,7 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/models | jq '.data[] | {id, status: .status.value}'
 ```
 
-You should see all six models (`qwen3-coder-next`, `qwen36-35b-a3b`, `ornstein36-27B`, `ornstein36-35b-a3b`, `gemma-4-26B-A4B`, `qwopus36-35b-a3b`), with the startup model `loaded` and the others `unloaded`.
+You should see all five models (`qwen3-coder-next`, `qwen36-35b-a3b`, `gemma-4-26B-A4B`, `gemma-4-31B`, `qwen36-27b`), with the startup model `loaded` and the others `unloaded`.
 
 Route a request to a specific model with the `"model"` field:
 

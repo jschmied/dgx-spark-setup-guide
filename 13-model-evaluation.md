@@ -8,10 +8,10 @@ Results of the [page 12](12-model-coding-test.md) coding test — two tasks (Go 
 
 | | |
 |---|---|
-| Date | 2026-06-09 (llama.cpp b9571) |
+| Date | 2026-06-09 (llama.cpp b9571); `gemma-4-31B` added 2026-06-16 (b9641) |
 | Hardware | GB10 (128 GB unified), router mode, one model resident |
 | Sampling | each model at its **deployed** `models.ini` sampling (table below); **not** a single fixed temperature — see [page 14](14-sampling-and-variance.md) for why |
-| Samples | **N=4** for the five fast models, **N=1** for the dense `ornstein36-27B` (~27 min/sample). **Sonnet 4.6 †** is a single indicative sample (different harness, not re-run). |
+| Samples | **N=4** for the four fast local models. **Sonnet 4.6 †** is a single indicative sample (different harness, not re-run). |
 | Verdict | **Neutral suite** = the model's *production* code passes an independent suite (the real signal). **Own** = the model's *delivered* tests also build & pass. |
 
 Deployed sampling (`temp / top_p / top_k / repeat / min_p`; `top_p` off = nucleus disabled):
@@ -20,15 +20,13 @@ Deployed sampling (`temp / top_p / top_k / repeat / min_p`; `top_p` off = nucleu
 |---|---|---|---|---|---|
 | `qwen3-coder-next`   | 0.7 | 0.8  | 20 | 1.05 | — |
 | `qwen36-35b-a3b`     | 0.6 | 0.95 | 20 | —    | — |
-| `ornstein36-27B`     | 1.0 | 0.95 | 20 | —    | — |
-| `ornstein36-35b-a3b` | 0.3 | off  | 20 | —    | **0.1** |
 | `gemma-4-26B-A4B`    | 1.0 | off  | 64 | —    | **0.1** |
-| `qwopus36-35b-a3b`   | 0.6 | 0.95 | 20 | —    | —       |
+| `gemma-4-31B`        | 1.0 | 0.95 | 64 | —    | — |
 
 **Headline — two findings, one per task:**
 
 1. **Spring/Java production logic was correct for every model on every sample** (neutral 4/4, 1/1 for the dense model). The only differentiator is whether each model's *own delivered tests* compile and pass.
-2. **Go production correctness is sampling-sensitive — but tunable.** At the general-purpose recommended temps it is a coin-flip-or-worse, yet the right sampling fixes it: **min-p (top-p off)** took `gemma-4-26B-A4B` from 1/4 to **4/4** (at temp 1.0) and `ornstein36-35b-a3b` from 1/4 to **4/4** (at temp 0.3, after a sweep). For models not yet tuned, sample N times and keep the build-green one, or lower temp with a compile gate. The tuning story is on [page 14](14-sampling-and-variance.md).
+2. **Go production correctness is sampling-sensitive — but tunable.** At the general-purpose recommended temps it is a coin-flip-or-worse, yet the right sampling fixes it: **min-p (top-p off)** took `gemma-4-26B-A4B` from 1/4 to **4/4** (at temp 1.0). For models not yet tuned, sample N times and keep the build-green one, or lower temp with a compile gate. The tuning story is on [page 14](14-sampling-and-variance.md).
 
 ## 13.2 Task A — Go cache: results
 
@@ -37,10 +35,8 @@ Neutral = production code passes the independent suite (idempotent `Close`, expi
 | Model (sampling) | **Neutral (prod-correct)** | Own (delivered) | Notes |
 |---|---|---|---|
 | `gemma-4-26B-A4B` (min-p 0.1) | **4/4** ✅ | 0/4 | min-p fixed the variance (was 1/4 with top-p); own tests carry unused-symbol nits |
-| `ornstein36-35b-a3b` (0.3, min-p 0.1) | **4/4** ✅ | 1/4 | was 1/4 at top-p; low temp + min-p fixed the Go variance (page 14) |
+| `gemma-4-31B` (1.0, top-p 0.95) | **3/4** | 2/4 | reasoning model; the one neutral miss was a trivial unused-variable compile error (`k declared and not used`) |
 | `qwen36-35b-a3b` (0.6) | 2/4 | 1/4 | best of the top-p models; documents `capacity==0`; fails with `undefined: K` (generics) |
-| `qwopus36-35b-a3b` (0.6) | 1/4 | 0/4 | sampling-noisy like its base: one non-delivery (26k-token reasoning, no code), a `syntax error: unexpected &&`, and the `e.Value` capitalization bug; min-p/low-temp don't help (page 14) |
-| `ornstein36-27B` (1.0, N=1) | 1/1 | 0/1 | `sync.Once` `Close`, `container/list`; own test has unused import + vars |
 | `qwen3-coder-next` (0.7) | 1/4 | 0/4 | `Close()` panics on 2nd call; non-compiling own test |
 | `Sonnet 4.6 †` (default, N=1) | 1/1 | 16/17 | cleanest single sample; one self-inconsistent timing test |
 
@@ -51,20 +47,17 @@ Neutral = production logic passes an independent (entity-shape-agnostic) Mockito
 | Model (sampling) | **Neutral (prod-correct)** | Own (delivered) | Notes |
 |---|---|---|---|
 | `gemma-4-26B-A4B` (min-p 0.1) | **4/4** ✅ | 3/4 | most reliable local Java deliverable, fewest tokens |
+| `gemma-4-31B` (1.0, top-p 0.95) | 4/4 ✅ | 1/4 | production logic correct every sample; own tests over-specify `save()` (verify `times(1)` vs the legitimate 2 calls) |
 | `qwen36-35b-a3b` (0.6) | 4/4 ✅ | 2/4 | when green: 7/7, explicit `save`, `@Version` asserted |
-| `qwopus36-35b-a3b` (0.6) | 4/4 ✅ | 2/4 | production logic correct every sample; own tests split (2/4 build) |
-| `ornstein36-27B` (1.0, N=1) | 1/1 ✅ | 1/1 | BUILD SUCCESS 7/7; real Hibernate `@Version` round-trip |
-| `ornstein36-35b-a3b` (0.3, min-p 0.1) | 3/4 | 2/4 | the one neutral fail is a sampling-resistant missing-import bug (page 14) — gate on build |
 | `qwen3-coder-next` (0.7) | 4/4 ✅ | 0/4 | own test calls a `setId` the entity lacks → never compiles |
 | `Sonnet 4.6 †` (default, N=1) | 1/1 ✅ | 12/12 | most thorough suite (version-on-insert, null-amount) |
 
 ## 13.4 Recommendation
 
-- **Fastest capable local model → `gemma-4-26B-A4B`.** With **min-p 0.1** it is production-correct on both tasks (Go 4/4, Java 4/4), the most reliable Java deliverable, the fastest and lightest, and now MTP-accelerated (page 8 §8.12). The clear default for local coding.
+- **Fastest capable local model → `gemma-4-26B-A4B`.** With **min-p 0.1** it is production-correct on both tasks (Go 4/4, Java 4/4), the most reliable Java deliverable, the fastest and lightest, and now MTP-accelerated (page 8 §8.10). The clear default for local coding.
+- **Larger Gemma, reasoning variant → `gemma-4-31B`.** Same family as the 26B but a *reasoning* model (emits `reasoning_content` first, so give it generous `max_tokens`). Production-correct on Java (neutral 4/4) and Go **3/4** — the single Go miss a trivial unused-variable compile error — so just behind the 26B on Go, and its *own* delivered tests are frequently self-inconsistent (over-verify `save()`). Default to the faster, lighter 26B; reach for the 31B when you want the larger model's reasoning. Sampling: `temp 1.0 / top-p 0.95 / top-k 64`.
 - **Best reasoning model → `qwen36-35b-a3b`.** Relative best of the top-p models on Go (2/4, documents `capacity==0`) and clean Spring builds; pays in reasoning tokens/latency.
 - **High-throughput scaffolding → `qwen3-coder-next`** — cheapest, production logic usually right, but **gate every deliverable** (Go `Close` panic, Java never compiles its tests).
-- **Of the Ornstein merges, prefer the MoE `ornstein36-35b-a3b`** (far faster than the dense 27B). After a sampling sweep its Go went from volatile (1/4) to **4/4** at `temp 0.3 / top-k 20 / min-p 0.1` (page 14); Java is 3/4, the one fail being a sampling-resistant missing-import bug — so still gate on build. Keep the dense **`ornstein36-27B`** only for its style and only at `temp 1.0` (~27 min/answer).
-- **Fastest Qwen-family throughput → `qwopus36-35b-a3b`** (Q4 MoE, ~91 t/s with MTP — page 8 §8.13). Java production logic is solid (neutral 4/4), but **Go is weak and noisy (1/4)** and **no sampling config fixes it** — across `temp 0.3 / 0.6 / 1.0` and min-p, Go never beats 1/4 (low temp loops into non-delivery, high temp keeps the compile bugs; page 14). Use it when you want speed and reach for it on Java/Spring work; **gate every Go deliverable on `go build`**. Its deployed sampling is the plain Qwen3.6 default (`temp 0.6 / top-p 0.95`).
 - **Frontier reference → `Sonnet 4.6 †`** when output quality outweighs keeping inference on-box.
 - **Cross-cutting:** for deterministic code, don't trust a single sample at a general-purpose temperature. Use min-p where it helps (gemma), sample N times, or lower temp with a compile/test gate. The reasoning behind all of this is on [page 14](14-sampling-and-variance.md).
 

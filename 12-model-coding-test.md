@@ -6,7 +6,7 @@ A reproducible way to compare the **coding ability** of any model the router ser
 
 > **Runnable harness.** The whole procedure below is implemented as version-controlled scripts in [`bench/`](bench/) so it survives reboots (an earlier `/tmp` copy did not). Run everything with `cd bench && ./run-all.sh` (or `./run-all.sh <model-id>` for one). The sections below explain what those scripts do; read them to adapt the test, or just run the harness.
 
-> **Sampling: per-model, not fixed.** An earlier version of this test ran every model at a single fixed `temperature 0.2`. **That was a mistake** — a fixed low temperature sends some models (Gemma 4, the dense Ornstein) into repetition loops and makes them look incapable when the real problem is sampling. Each model is now run at its **own recommended sampling** (the value pinned in `models.ini` / the model card / GGUF `general.sampling`; see `bench/lib.sh`). This trades strict cross-model comparability for fairness to each model's intended operating point — the right call, since the goal is to judge capability, not to punish a model for a temperature it never asked for.
+> **Sampling: per-model, not fixed.** An earlier version of this test ran every model at a single fixed `temperature 0.2`. **That was a mistake** — a fixed low temperature sends some models (Gemma 4) into repetition loops and makes them look incapable when the real problem is sampling. Each model is now run at its **own recommended sampling** (the value pinned in `models.ini` / the model card / GGUF `general.sampling`; see `bench/lib.sh`). This trades strict cross-model comparability for fairness to each model's intended operating point — the right call, since the goal is to judge capability, not to punish a model for a temperature it never asked for.
 
 There are **two tasks**, each model run at its recommended sampling → extract the files → build → test:
 
@@ -67,7 +67,7 @@ PROMPT
 
 ## 12.3 Run the prompt against a model
 
-Run the model at its **recommended sampling** (not a fixed temperature — see the callout above). `bench/run-go.sh` looks the values up per model in `bench/lib.sh`; doing it by hand, set them to match the model's `models.ini` section. Non-streaming, generous token budget (reasoning models spend thousands of tokens thinking before emitting code — the harness uses 26000 for Task A so the dense Ornstein's ~19k-token answers aren't truncated).
+Run the model at its **recommended sampling** (not a fixed temperature — see the callout above). `bench/run-go.sh` looks the values up per model in `bench/lib.sh`; doing it by hand, set them to match the model's `models.ini` section. Non-streaming, generous token budget (reasoning models spend thousands of tokens thinking before emitting code — the harness uses 26000 for Task A so a reasoning model's long answers aren't truncated).
 
 ```bash
 KEY=$(sudo head -1 /etc/llama-server/api_keys.txt)
@@ -409,7 +409,7 @@ It mocks `AccountRepository`, builds accounts via the constructor, stubs `findBy
 ## 12.9 Caveats — making it robust
 
 - **One sample is indicative, not statistical.** For a firm ranking run 3–5 samples per model (`-count` of *runs*, not test iterations) and report the spread; variance is real, especially at the higher temperatures some models require.
-- **Use each model's recommended sampling, not a fixed value.** A single fixed temperature looks "fair" but misrepresents models tuned for a different operating point (Gemma 4 and the dense Ornstein loop at low temp). Send each model the sampling from its `models.ini` section / model card (`bench/lib.sh` encodes this). What you send in the request overrides the preset, so set it deliberately — and note that the WebUI would otherwise inject its own params (see page 6 notes).
+- **Use each model's recommended sampling, not a fixed value.** A single fixed temperature looks "fair" but misrepresents models tuned for a different operating point (Gemma 4 loops at low temp). Send each model the sampling from its `models.ini` section / model card (`bench/lib.sh` encodes this). What you send in the request overrides the preset, so set it deliberately — and note that the WebUI would otherwise inject its own params (see page 6 notes).
 - **Reasoning models** (e.g. Qwen3.6) emit a long thinking pass first — budget tokens and time accordingly, and compare cost honestly.
 - **Run both tasks** (Task A §12.1–12.7 *and* Task B §12.8) — a single task can flatter one model. Adding a third task type (a parser, a data pipeline) cross-checks further.
 - **Task B needs network** (Maven Central) on the first build and a JDK 17+/Maven install; pre-warm `~/.m2` once so per-model builds are fast and comparable.

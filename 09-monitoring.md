@@ -139,13 +139,11 @@ scrape_configs:
       - targets: ['127.0.0.1:8080']
         labels: { model: qwen36-35b-a3b,  service: qwen36-35b-a3b }
       - targets: ['127.0.0.1:8080']
-        labels: { model: ornstein36-27B,  service: ornstein36-27B }
-      - targets: ['127.0.0.1:8080']
-        labels: { model: ornstein36-35b-a3b, service: ornstein36-35b-a3b }
-      - targets: ['127.0.0.1:8080']
         labels: { model: gemma-4-26B-A4B, service: gemma-4-26B-A4B }
       - targets: ['127.0.0.1:8080']
-        labels: { model: qwopus36-35b-a3b, service: qwopus36-35b-a3b }
+        labels: { model: gemma-4-31B, service: gemma-4-31B }
+      - targets: ['127.0.0.1:8080']
+        labels: { model: qwen36-27b, service: qwen36-27b }
     relabel_configs:
       # turn the per-target `model` label into the ?model= query param
       - source_labels: [model]
@@ -234,9 +232,9 @@ Expected output (only the resident model reads `up`; the swapped-out ones read `
 ```
 llama-server    qwen3-coder-next    up
 llama-server    qwen36-35b-a3b      down
-llama-server    ornstein36-27B      down
-llama-server    ornstein36-35b-a3b  down
 llama-server    gemma-4-26B-A4B     down
+llama-server    gemma-4-31B         down
+llama-server    qwen36-27b          down
 dcgm            gb10                up
 prometheus      127.0.0.1:9090      up
 ```
