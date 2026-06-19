@@ -32,6 +32,13 @@ Current map (`temp / top_p / top_k / repeat / min_p`; `top_p=1.0` = nucleus off)
 | `qwen36-35b-a3b`     | 0.6 | 0.95 | 20 | —    | —   |
 | `gemma-4-26B-A4B`    | 1.0 | off  | 64 | —    | 0.1 |
 | `gemma-4-31B`        | 1.0 | 0.95 | 64 | —    | —   |
+| `step-37`            | 1.0 | 0.95 | 64 | —    | —   |
+
+`step-37`'s card documents only temp 1.0 (top_p/top_k/min_p unspecified, so a
+mild neutral nucleus is used). It is the heaviest model in the roster (UD-Q3_K_XL
+~84 GB, multi-minute swaps) and a **reasoning** model — give it a generous
+`max_tokens` or `content` comes back empty. It is **not coding-benchmarked yet** —
+run it explicitly (`./run-all.sh step-37`); it's excluded from the default sweep.
 
 `gemma-4-26B-A4B` uses **min-p with top-p disabled** — it fixed its Go
 variance (1/4→4/4 at temp 1.0; see page 14). Override any model for an

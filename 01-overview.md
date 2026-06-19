@@ -45,7 +45,8 @@ LAN client  ───HTTP+API key─▶  llama-server router (127.0.0.1:8080)
                             ├── qwen36-35b-a3b      ─┤
                             ├── gemma-4-26B-A4B     ─┤
                             ├── gemma-4-31B         ─┤
-                            └── qwen36-27b          ─┴─▶ one resident
+                            ├── qwen36-27b          ─┤
+                            └── step-37             ─┴─▶ one resident
                                                         at a time on GB10 GPU
 ```
 
