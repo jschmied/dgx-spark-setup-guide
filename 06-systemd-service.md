@@ -83,6 +83,28 @@ load-on-startup = false
 model           = /opt/llm/models/qwen36-27b/Qwen3.6-27B-UD-Q5_K_XL.gguf
 jinja           = true
 load-on-startup = false
+
+; ---- Model 6: clients request "model": "step-37" ----
+; StepFun Step 3.7 Flash (unsloth Step-3.7-Flash-GGUF): a 198B-total / ~11B-active
+; MoE — by far the largest model in the roster. Served at UD-Q3_K_XL ~84 GB (3
+; shards; point at the first). It fits ONLY with --models-max 1 (never co-resident
+; with the other big models) and the load/swap takes minutes. ctx-size is set to
+; 131072: weights are ~83 GiB and the q8_0 KV cache costs ~0.093 MiB/token
+; (measured), so 131072 ≈ 12 GiB of KV — ~99 GiB total, leaving ~22 GiB headroom.
+; The full native 262144 (~24 GiB KV) also fits but only if you drop --cache-ram
+; (the prompt cache, not KV, is the competitor for RAM). batch/ubatch capped at
+; 2048 — the params it was validated with. Embedded template (jinja); it
+; must run at temp 1.0. NOTE: a *reasoning* model — output goes to reasoning_content
+; before final content, so clients need a generous max_tokens (a small budget comes
+; back with empty content).
+[step-37]
+model           = /opt/llm/models/step-37/Step-3.7-Flash-UD-Q3_K_XL-00001-of-00003.gguf
+ctx-size        = 131072
+batch-size      = 2048
+ubatch-size     = 2048
+temp            = 1.0
+jinja           = true
+load-on-startup = false
 ```
 
 Notes on the format:
@@ -94,7 +116,9 @@ Notes on the format:
 - `--metrics` lives **in the preset**, not on the unit — it's the child instances that expose `/metrics`, and the router proxies it. Page 9 relies on this.
 - Host, port, API key and model alias are **controlled by the router** and ignored if you put them here — set them on the unit (6.4) instead.
 
-> **Memory budget — why `--models-max 1`.** On the 128 GB GB10 the model weights, the KV cache and page cache all share one pool. The Q4 coder model is ~50 GB, the Q8 35B is ~36 GB and the Q5 dense 27B (`qwen36-27b`) is ~19 GB; with KV cache and headroom you cannot safely hold the large ones resident together. `--models-max 1` makes the router unload the current model before loading the next. If all your models are small enough to coexist (and you've done the arithmetic), raise it — but the default for this guide is swap.
+> **The live file is the source of truth.** This page shows the preset as a reference block, but the running router only ever reads `/etc/llama-server/models.ini` on the box. **Adding or changing a model means editing that file** (e.g. `sudo tee -a /etc/llama-server/models.ini` to append a section), then making the router re-parse it. Two ways to apply the change: **`curl -s 'http://127.0.0.1:8080/models?reload=1'`** re-reads the preset from disk and reconciles in place (added in **b9722** — no downtime; it unloads any model whose section changed and drops sections you've removed), or **`sudo systemctl restart llama-router`** for a full restart. Editing a copy of this block elsewhere, or reloading without having touched the live file, changes nothing: confirm with `ls -l /etc/llama-server/models.ini` (the mtime should be recent) and `curl -s http://127.0.0.1:8080/v1/models | jq -r '.data[].id'` (the new id should appear, `unloaded`). If a new section still doesn't show after a reload, check `sudo journalctl -u llama-router -e` — an unrecognised key in the section can make the router skip it.
+
+> **Memory budget — why `--models-max 1`.** On the 128 GB GB10 the model weights, the KV cache and page cache all share one pool. The Q4 coder model is ~50 GB, the Q8 35B is ~36 GB and the Q5 dense 27B (`qwen36-27b`) is ~19 GB; with KV cache and headroom you cannot safely hold the large ones resident together. `--models-max 1` makes the router unload the current model before loading the next. If all your models are small enough to coexist (and you've done the arithmetic), raise it — but the default for this guide is swap. **`step-37` is the extreme case:** at ~84 GB (UD-Q3_K_XL) its weights dominate the 128 GB pool, so it can *only* exist under `--models-max 1`, never co-resident with the other large models. Its section sets `ctx-size = 131072` (q8_0 KV ≈ 0.093 MiB/token measured, so ~12 GiB of KV → ~99 GiB total, ~22 GiB headroom); the full native 262144 (~24 GiB KV) fits too, but only if you also lower `--cache-ram` since the prompt cache competes for the same pool. Expect a multi-minute load when swapping to or from it.
 
 Lock the file down. The service runs as `SERVICE_USER`, which must be able to read it:
 
@@ -200,7 +224,7 @@ curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/models | jq '.data[] | {id, status: .status.value}'
 ```
 
-You should see all five models (`qwen3-coder-next`, `qwen36-35b-a3b`, `gemma-4-26B-A4B`, `gemma-4-31B`, `qwen36-27b`), with the startup model `loaded` and the others `unloaded`.
+You should see all six models (`qwen3-coder-next`, `qwen36-35b-a3b`, `gemma-4-26B-A4B`, `gemma-4-31B`, `qwen36-27b`, `step-37`), with the startup model `loaded` and the others `unloaded`.
 
 Route a request to a specific model with the `"model"` field:
 
@@ -230,7 +254,37 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 
 Re-run the `/v1/models` query and you'll see the loaded/unloaded states have swapped. A request without a valid `"model"` returns `400 model name is missing from the request`.
 
-## 6.8 What's next
+## 6.8 Managing models at runtime (router API)
+
+As of **b9722** (PR #23976) the router exposes a model-management API, so you can load, unload and reload models without restarting the service. `GET /models` is public (like `/health`); the **mutating** endpoints require the API key in an `Authorization: Bearer` header — without it they return `401`.
+
+```bash
+KEY=sk-alice-REPLACE_ME
+
+# Load a model into memory. With --models-max 1 this swaps out the resident one,
+# so the call carries the load latency (tens of seconds).
+curl -s -X POST http://127.0.0.1:8080/models/load \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model": "qwen36-27b"}'         # -> {"success": true}; 400 if already running
+
+# Explicitly unload a model and reclaim its memory (without loading another).
+curl -s -X POST http://127.0.0.1:8080/models/unload \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model": "qwen36-27b"}'
+
+# Re-read /etc/llama-server/models.ini from disk and reconcile — no restart, no key.
+curl -s 'http://127.0.0.1:8080/models?reload=1' | jq -r '.data[] | "\(.id) \(.status.value)"'
+```
+
+`load` returns `{"success": true}` once the child is listening, or `400 model is already running` if it's already loaded. `unload` is the explicit counterpart to free memory — handy before a manual benchmark or to drop the resident model without immediately loading another. `?reload=1` is the no-downtime alternative to a full restart after editing the preset (see the source-of-truth callout in 6.2): it diffs the freshly-parsed `models.ini` against the running set, unloading sections that changed and dropping ones you removed.
+
+The richer `GET /models` (vs the OpenAI-style `/v1/models` in 6.7) returns each model's full child args, rendered preset, and a `can_remove` flag. Preset-sourced models — everything in this guide's `models.ini` — report `source: "preset"` and `can_remove: false`; they're managed by editing the file (6.2), not deleted over the API.
+
+> If you instead start the router with a models directory (`--models-dir`), the same API also covers `POST /models {"model": "<repo:quant>"}` to **download** a model (progress streams over the `/models` SSE channel) and `DELETE /models` to remove a downloaded one, with `--models-max` evicting least-recently-used. This guide's preset-driven layout doesn't use `--models-dir`, so those two are noted only for completeness.
+
+> **This does not change monitoring.** Loading/unloading over the API is invisible to Prometheus' scrape config — adding a *new* model to monitoring still means editing `prometheus.yml` and restarting the `llama-prom` container (page 9). The router API only changes how models are loaded on the llama.cpp side.
+
+## 6.9 What's next
 
 - **For LAN-only use** → skip page 7 and go to page 8 (tuning) or page 9 (monitoring).
 - **For public exposure** → page 7 sets up Cloudflare Tunnel.

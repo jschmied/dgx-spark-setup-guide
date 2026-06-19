@@ -43,6 +43,11 @@ sampling_for() {
     gemma-4-26B-A4B)     echo "1.0 1.0  64 0    0.1" ;;
     gemma-4-31B)         echo "1.0 0.95 64 0    0"   ;;
     qwen36-27b)          echo "1.0 0.95 20 0    0"   ;;
+    # step-37: card documents only temp 1.0; top_p/top_k/min_p unspecified, so
+    # mild neutral nucleus. Heaviest model in the roster (Q3_K_XL ~84 GB, swaps) and
+    # a reasoning model (needs generous max_tokens) — not in the run-all.sh default
+    # sweep; run it explicitly.
+    step-37)             echo "1.0 0.95 64 0    0"   ;;
     *)                   echo "${BENCH_TEMP:-0.7} ${BENCH_TOPP:-0.95} ${BENCH_TOPK:-40} 0 0" ;;
   esac
 }

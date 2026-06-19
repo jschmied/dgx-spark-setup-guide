@@ -144,6 +144,8 @@ scrape_configs:
         labels: { model: gemma-4-31B, service: gemma-4-31B }
       - targets: ['127.0.0.1:8080']
         labels: { model: qwen36-27b, service: qwen36-27b }
+      - targets: ['127.0.0.1:8080']
+        labels: { model: step-37, service: step-37 }
     relabel_configs:
       # turn the per-target `model` label into the ?model= query param
       - source_labels: [model]
@@ -235,6 +237,7 @@ llama-server    qwen36-35b-a3b      down
 llama-server    gemma-4-26B-A4B     down
 llama-server    gemma-4-31B         down
 llama-server    qwen36-27b          down
+llama-server    step-37             down
 dcgm            gb10                up
 prometheus      127.0.0.1:9090      up
 ```
