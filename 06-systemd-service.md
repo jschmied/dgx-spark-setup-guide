@@ -44,14 +44,36 @@ cache-type-v  = q8_0
 metrics       = true
 
 ; ---- Model 1: clients request "model": "qwen3-coder-next" ----
+; jinja = true so it uses its own embedded template — a non-thinking, XML
+; tool-call dialect (<function=..><parameter=..>) specific to Qwen3-Coder. Do NOT
+; point it at the qwen3.6-froggeric template (Models 2/5): that one advertises
+; tools as JSON schema and adds <think> scaffolding this model wasn't trained on.
+; Without jinja, tool calls fall back to generic parsing and break (cf. Model 2).
 [qwen3-coder-next]
+jinja           = true
 model           = /opt/llm/models/qwen3-coder-next/Qwen3-Coder-Next-UD-Q4_K_XL.gguf
 load-on-startup = true
 
 ; ---- Model 2: clients request "model": "qwen36-35b-a3b" ----
+; Embedded template is broken, so override it with chat-template-file (contrast
+; the embedded-template models below). jinja = true is REQUIRED: without it the
+; chat-template-file / chat-template-kwargs are inert, the server falls back to a
+; generic chat format, and Qwen's <tool_call> output is left unparsed -> agent
+; (tool-calling) clients fail mid-stream. Own sampling (temp 0.6, top-p 0.95,
+; top-k 20) per the Qwen3.6 card; 256K ctx.
 [qwen36-35b-a3b]
-model           = /opt/llm/models/qwen36-35b-a3b/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf
-load-on-startup = false
+jinja                = true
+model                = /opt/llm/models/qwen36-35b-a3b/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf
+ctx-size             = 262144
+chat-template-file   = /opt/llm/models/qwen36-35b-a3b/chat_template.jinja
+chat-template-kwargs = {"preserve_thinking": false}
+temp                 = 0.6
+top-p                = 0.95
+top-k                = 20
+min-p                = 0.0
+presence-penalty     = 0.0
+repeat-penalty       = 1.0
+load-on-startup      = true
 
 ; ---- Model 3: clients request "model": "gemma-4-26B-A4B" ----
 ; A different vendor/arch (gemma4 MoE, Q4 QAT ~14 GB). Embedded template (jinja),
@@ -76,13 +98,18 @@ load-on-startup = false
 
 ; ---- Model 5: clients request "model": "qwen36-27b" ----
 ; Qwen3.6-27B base (unsloth Qwen3.6-27B-MTP-GGUF), UD-Q5_K_XL ~19 GB. A *dense*
-; Qwen3.6 model. Embedded template (jinja). Ships a working embedded MTP head;
-; its spec-decoding and sampling (it must run at temp 1.0, lower temps loop) are
-; tuned in 8.8/8.10.
+; Qwen3.6 model. Uses the same external chat-template-file as qwen36-35b-a3b (the
+; shared qwen3.6-froggeric-v20 family template; a copy lives in this model's dir so
+; it is self-contained) — jinja = true is REQUIRED for the template + tool-call
+; parsing to take effect (see Model 2). Ships a working embedded MTP head; its
+; spec-decoding and sampling (it must run at temp 1.0, lower temps loop) are tuned
+; in 8.8/8.10.
 [qwen36-27b]
-model           = /opt/llm/models/qwen36-27b/Qwen3.6-27B-UD-Q5_K_XL.gguf
-jinja           = true
-load-on-startup = false
+model                = /opt/llm/models/qwen36-27b/Qwen3.6-27B-UD-Q5_K_XL.gguf
+jinja                = true
+chat-template-file   = /opt/llm/models/qwen36-27b/chat_template.jinja
+chat-template-kwargs = {"preserve_thinking": false}
+load-on-startup      = false
 
 ; ---- Model 6: clients request "model": "step-37" ----
 ; StepFun Step 3.7 Flash (unsloth Step-3.7-Flash-GGUF): a 198B-total / ~11B-active
@@ -111,7 +138,7 @@ Notes on the format:
 
 - The `[*]` section is **global**: its keys are passed to every model instance. A key set in a model section overrides the global one.
 - A flag that takes no value (`mlock`, `cont-batching`, `metrics`, `jinja`, …) is written `= true`.
-- `jinja = true` makes a model use its **own embedded** chat template (Model 3). Use `chat-template-file` instead when the embedded one is broken and you need to override it (Model 2). Both are per-model.
+- `jinja = true` selects the model-specific (minja) template path and **is required for tool calling** — without it the server falls back to a generic chat parser that can't read a model's `<tool_call>` output (you'll see `common_chat_peg_parse: unparsed peg-native output: <tool_call>` in the log and agent clients fail mid-stream). With `jinja = true` and no other key, the model uses its **own embedded** template (Models 3-6). To override a broken embedded template, add `chat-template-file` **alongside** `jinja = true` (Models 2 and 5) — it is *not* an alternative to jinja; `chat-template-file`/`chat-template-kwargs` are inert without it. All three keys are per-model.
 - `load-on-startup` and `stop-timeout` are **preset-only** keys (not CLI flags). With `--models-max 1`, mark exactly **one** model `load-on-startup = true`; the others load on first request.
 - `--metrics` lives **in the preset**, not on the unit — it's the child instances that expose `/metrics`, and the router proxies it. Page 9 relies on this.
 - Host, port, API key and model alias are **controlled by the router** and ignored if you put them here — set them on the unit (6.4) instead.

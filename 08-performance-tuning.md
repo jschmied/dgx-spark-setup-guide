@@ -118,6 +118,7 @@ The tuned values live in `[*]`, so they apply to **every** model the router serv
 ```ini
 [qwen36-35b-a3b]
 model               = /opt/llm/models/qwen36-35b-a3b/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf
+jinja               = true
 chat-template-file  = /opt/llm/models/qwen36-35b-a3b/chat_template.jinja
 chat-template-kwargs = {"preserve_thinking": false}
 temp                = 0.6
@@ -130,13 +131,15 @@ repeat-penalty      = 1.0
 
 These sampler keys are server-side **defaults** for that model; a client can still override per-request. The only one that differs from the tuned `[*]` here is `repeat-penalty` (1.0 vs the global 1.05) — the rest are pinned for clarity so the model's behaviour doesn't drift if you later retune `[*]`.
 
-A third model, **`qwen36-27b`** — the plain **Qwen3.6-27B** (unsloth `Qwen3.6-27B-MTP-GGUF`, `UD-Q5_K_XL`, ~19 GB) — shows two more per-model patterns: the **other** template pattern, and **MTP self-speculation**. Its embedded chat template is correct, so instead of an external `chat-template-file` you just turn Jinja on for it. It is a *dense* `qwen35` model (slow to decode — every token streams the full ~19 GB of weights), so it's the one model here that benefits from its built-in MTP head as its own draft. Note its sampling: it **must run at `temp = 1.0`** (vendor recommendation) — at `temp 0.6`/`0.2` this arch falls into reasoning-repetition loops and emits nothing. It runs at the full native 256 K, so it also gets `ctx-size`. Add the two `spec-*` keys for MTP:
+A third model, **`qwen36-27b`** — the plain **Qwen3.6-27B** (unsloth `Qwen3.6-27B-MTP-GGUF`, `UD-Q5_K_XL`, ~19 GB) — shows **MTP self-speculation**. Being the same Qwen3.6 family as the 35B, it uses the **same** external `chat_template.jinja` (the `qwen3.6-froggeric-v20` template; keep a copy in its own model dir so it's self-contained) with `jinja = true` — standardising the family on one template. It is a *dense* `qwen35` model (slow to decode — every token streams the full ~19 GB of weights), so it's the one model here that benefits from its built-in MTP head as its own draft. Note its sampling: it **must run at `temp = 1.0`** (vendor recommendation) — at `temp 0.6`/`0.2` this arch falls into reasoning-repetition loops and emits nothing. It runs at the full native 256 K, so it also gets `ctx-size`. Add the two `spec-*` keys for MTP:
 
 ```ini
 [qwen36-27b]
 model            = /opt/llm/models/qwen36-27b/Qwen3.6-27B-UD-Q5_K_XL.gguf
 ctx-size         = 262144
 jinja            = true
+chat-template-file   = /opt/llm/models/qwen36-27b/chat_template.jinja   ; same froggeric template as the 35B
+chat-template-kwargs = {"preserve_thinking": false}
 spec-type        = draft-mtp   ; use the model's own embedded MTP head as its draft
 spec-draft-n-max = 3           ; draft depth; 3 is the sweet spot on this box
 temp             = 1.0         ; vendor sampling; lower temps loop
@@ -175,6 +178,7 @@ Gemma 4's MTP is **not** an embedded head like `qwen36-27b`'s — it ships a sma
 ```ini
 [qwen3-coder-next]
 model           = /opt/llm/models/qwen3-coder-next/Qwen3-Coder-Next-UD-Q4_K_XL.gguf
+jinja           = true         ; its OWN embedded (XML) template — required for tool calls; do NOT use the froggeric file
 temp            = 0.7
 top-p           = 0.8          ; tighter than the reasoning models' 0.95
 top-k           = 20
@@ -187,8 +191,23 @@ Most flags transfer cleanly to other GGUFs. Four things worth pinning per-model 
 
 - **`cache-reuse = 256`** assumes prompts share a non-trivial prefix. Harmless for other workloads but the gain depends on usage patterns.
 - **`cache-type-k/v = q8_0`** is conservative. Some models tolerate `q4_0` KV without quality loss (saves memory + bandwidth) — but on Qwen3-Coder-Next `q4_0` gives degenerate output (see 8.7), which is exactly why per-model overrides matter once you serve a mix.
-- **`chat-template-file`** points at a Jinja template that overrides the one embedded in the GGUF. Some GGUFs ship a buggy template (wrong tool-call or thinking handling); a community-fixed template fixes it without re-quantizing. Download the `.jinja` next to the model and reference it with an absolute path. Jinja is on by default, so the file is accepted as-is; the override applies the next time that model loads. (Verify after a restart with `journalctl -u llama-router | grep chat-template-file` and a sample completion.)
+- **`chat-template-file`** points at a Jinja template that overrides the one embedded in the GGUF. Some GGUFs ship a buggy template (wrong tool-call or thinking handling); a community-fixed template fixes it without re-quantizing. Download the `.jinja` next to the model and reference it with an absolute path. **It requires `jinja = true` in the same section** — Jinja is *not* on by default, and `chat-template-file`/`chat-template-kwargs` are silently ignored without it (the model then loads, but tool calls break — see "Jinja and tool calling" below). The override applies the next time that model loads; verify after a restart with `journalctl -u llama-router | grep chat-template-file` and a sample completion.
 - **`chat-template-kwargs`** passes a JSON object straight into the Jinja template's variables — pin it here rather than trusting the client to send it. The fixed Qwen3.6 template above exposes `preserve_thinking` (whether *previous* turns' `reasoning_content` is re-fed into the prompt; default `false`). Setting it `false` keeps the context lean across multi-turn chats and stops a client from flipping it on. The value is a single line of valid JSON — `{"preserve_thinking": false}` — and is passed to the child as one argument intact, spaces and all. (Don't confuse it with `enable_thinking`, which controls whether the model thinks *at all*; that's still `true`.)
+
+**Jinja and tool calling.** `jinja = true` does two things: it selects the model-specific (minja) template path — so `chat-template-file`/`chat-template-kwargs` take effect — *and* it builds the structured tool-call grammar from that template. Leave it off and the server uses a generic parser that doesn't know the model's tool-call syntax: the model still emits its `<tool_call>…</tool_call>`, but the server can't turn that into a structured `tool_calls` field. It logs `common_chat_peg_parse: unparsed peg-native output: <tool_call>` and returns malformed output that makes agent/tool clients (e.g. a VS Code LLM gateway) fail mid-stream with errors like *"output does not match the expected peg-native format."* Plain chat is unaffected, which is why the gap hides until something actually requests tools. **Every model that should support tool calling needs `jinja = true`** — the embedded-template models (Gemma, Step, GLM) already carry it; the two Qwen3.6 models needed it added alongside their external template, and `qwen3-coder-next` needed it added on its own.
+
+**Which template each model uses.**
+
+| Model | Template | Dialect | Note |
+|---|---|---|---|
+| `qwen3-coder-next` | own embedded | XML `<function=…><parameter=…>`, non-thinking | tools advertised as nested `<function><name>` XML |
+| `qwen36-35b-a3b` | external froggeric | XML, thinking | embedded template is broken |
+| `qwen36-27b` | external froggeric (own copy) | XML, thinking | same Qwen3.6 family as the 35B |
+| `gemma-4-26B-A4B` / `-31B`, `step-37`, `glm-4.5-air` | own embedded | (vendor) | embedded template is correct |
+
+The `qwen3.6-froggeric-v20` template is **Qwen3.6-family only**. Do **not** point `qwen3-coder-next` at it: although both emit the same `<function=…><parameter=…>` call dialect, the froggeric template *advertises* tools as JSON schema and injects `<think>` scaffolding the coder was never trained on (it is a non-thinking model that advertises tools as nested XML). The coder's own embedded template is correct — it just needs `jinja = true`.
+
+**Backporting froggeric's extras (optional).** Beyond the broken-template fix, the froggeric template carries a few *dialect-independent* robustness features that could be grafted onto the coder's own template if wanted: **tool-response truncation** (`max_tool_response_chars` — caps huge tool outputs with a `[TRUNCATED …]` marker; the clear win for an agent-mode coder), **tool-arg truncation** (`max_tool_arg_chars`), and **consecutive-failure warnings** (injects an escalating `⚠️ SYSTEM WARNING` when tool results look like errors). Two caveats: they are **opt-in and currently inert** — the `max_*_chars` knobs default to `0` (off) and only activate via `chat-template-kwargs`, which here only pins `preserve_thinking` — and adopting them means **maintaining a forked coder template**. Everything else in froggeric (thinking extraction, `<|think_on/off|>` toggles, vision handling, JSON tool advertisement) is Qwen3.6-specific and must not be ported.
 
 > The benchmark tables in 8.4–8.6 were measured on **Qwen3-Coder-Next** (the 80B-A3B Q4 coder). The numbers for the second model live in 8.9.
 
