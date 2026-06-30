@@ -32,7 +32,7 @@ The CUDA build picks up the GB10's Blackwell tensor cores and the native FP4 pat
 /opt/llm/runtime/llama.cpp/build/bin/llama-server --version
 ```
 
-Expect lines mentioning `aarch64`, `CUDA`, and a recent build counter. On a current mainline checkout the system_info line at startup also reports:
+Expect lines mentioning `aarch64`, `CUDA`, and a recent build counter. On a current mainline checkout (verified on **b9777 / `88636e178`**, 2026-06-24) the system_info line at startup also reports:
 
 ```
 CUDA : ARCHS = 1210 | USE_GRAPHS = 1 | PEER_MAX_BATCH_SIZE = 128 | BLACKWELL_NATIVE_FP4 = 1
