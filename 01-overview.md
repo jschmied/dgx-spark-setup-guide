@@ -87,7 +87,7 @@ A valid request from outside, in the public deployment, must satisfy **both** ed
 
 - Replacing the vendor's CUDA/driver stack (treat that as provided).
 - Multi-GPU / multi-host setups — GB10 is a single iGPU; the guide assumes one box.
-- Running non-llama.cpp runtimes (vLLM, TGI, etc.). The systemd, networking, and monitoring chapters are still useful, but the model launch and tuning chapters are llama.cpp-specific.
+- Running non-llama.cpp runtimes (vLLM, TGI, etc.) as the *primary* backend. The systemd, networking, and monitoring chapters are still useful, but the model launch and tuning chapters are llama.cpp-specific. The [vLLM switch appendix](appendix/vllm-switch.md) covers adding vLLM as a second, mutually-exclusive backend on the same port — needed for formats llama.cpp can't serve, such as NVFP4.
 - Fine-tuning. This is an inference-only guide.
 
 ---
