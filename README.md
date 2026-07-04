@@ -33,6 +33,7 @@ The reference workload is **`unsloth/Qwen3-Coder-Next-GGUF`** served with **`lla
 | 14 | [Sampling & variance](14-sampling-and-variance.md) | How the eval was tuned: the fixed-temp mistake, recommended-temp variance, the neutral-suite fix, and the top-p → min-p win that took Gemma's Go from 1/4 to 4/4 |
 | 15 | [SWE-bench (mini-SWE-agent)](15-swebench.md) | Standardized real-issue eval against the local router: install, OpenAI-compatible wiring, the aarch64 image-arch fixes (+ idempotent re-patcher), rollouts → `preds.json`, harness scoring, and the aarch64 reality — arm64 image coverage (Lite 17 %, Java 0 %), why emulation and self-built arm64 don't pay off, and when to use x86/cloud |
 | A | [vLLM switch (NVFP4)](appendix/vllm-switch.md) | Add vLLM as a second backend on the same `:8080` and API keys, mutually exclusive with the router via systemd `Conflicts=`; worked example serves `nvidia/Qwen3.6-35B-A3B-NVFP4` (`--quantization modelopt`), with a one-command `llm-switch` and the monitoring/auth caveats |
+| B | [DeepSeek-V4-Flash-180B & A4Q](appendix/deepseek-v4-flash-180b-and-a4q.md) | Experimental bare-metal vLLM forks on GB10: fitting the REAP-pruned 180B (the 284B original doesn't), building the `deepseek_v4` vLLM from source (5 extraction gotchas + the unified-memory build-OOM lesson), `llm-switch dsv4`, its coding-bench underperformance, and **A4Q** native fp4 attention — blocked on DeepSeek-V4 (needs DeepGEMM) but working on the dense qwen36 NVFP4 fleet (nvf4 KV halves KV memory) |
 
 ## Conventions
 
