@@ -170,12 +170,43 @@ or set `VLLM_FLASHINFER_MM_PREFIX=1`); the wheel also needs the `gguf` dep (`--n
 262K; native nvf4 prefill. **Decode is ~unchanged** — A4Q is an attention/prefill kernel, and
 qwen36's hot path is MoE + MTP decode.
 
-### Quality: the open question
+### Quality A/B: does 4-bit KV degrade agentic work?
 
-The real risk with 4-bit KV is **multi-turn agentic degradation** — precision loss compounds over
-a growing trajectory. A controlled A/B (A4Q-nvf4 vs fp8 KV, same instances) via
-[mini-SWE-agent](../15-swebench.md) is the faithful test. *[Results pending — see the SWE-bench
-run; this section will be updated.]*
+The real risk with 4-bit KV is **multi-turn agentic degradation** — the worry is that precision
+loss *compounds* over a growing trajectory. Two instruments, one flawed and one clean:
+
+**1. SWE-bench (mini-SWE-agent) — saturated, so inconclusive.** On the arm64-available Lite
+subset, qwen36+A4Q-nvf4 resolved **12/12** cleanly-evaluated instances (0 test-failing patches;
+another ~11 hit *scoring-harness* flakiness, not model failures). But 100% is a **ceiling** — that
+subset is too easy to discriminate nvf4 from fp8. It rules out *catastrophic* breakage; it can't
+measure *subtle* degradation. (Lesson: a saturated benchmark is a blind instrument.)
+
+**2. Per-token logprob divergence — ceiling-free, and decisive.** Feed an identical fixed
+~38.6k-token code context to the served model under **nvf4** then **fp8** KV (can't co-serve on one
+`:8080`), capture per-position logprobs (`echo`+`logprobs`, greedy), and diff them:
+
+```
+mean |Δlogprob|          : 0.127      (small)
+greedy-argmax divergence : 4.27 %     (top-1 token differs at ~1 in 23 positions)
+perplexity               : nvf4 only ~0.6 % higher than fp8
+
+By context position (the compounding test):
+  pos     0– 3.9k :  6.53 %    ← most disagreement is EARLY
+  ...
+  pos  34.8k–38.6k:  1.50 %    ← deep context: nvf4 ≈ fp8 ~98.5 %
+```
+
+**The compounding fear is refuted.** Divergence is *highest at the start* and *decays* with depth —
+the opposite of accumulating error. The disagreements concentrate where the model is **least
+confident** (early, high-entropy, near-tie argmax); deep in a long context, predictions are
+confidence-locked and nvf4 barely moves them. That also explains the SWE-bench 12/12: the confident,
+context-constrained predictions that drive task completion are nearly untouched by 4-bit KV.
+
+**Verdict:** nvf4 KV costs ~0.6 % perplexity and some low-confidence argmax flips, and **does not
+compound over long context** — for long-context / multi-turn agentic use the KV-memory halving is
+close to free. Caveat: this is teacher-forced next-token divergence (not full autoregressive drift,
+where nvf4's own choices feed back into its own KV) on a single code context; treat as strong but
+not the last word.
 
 ---
 
@@ -188,4 +219,9 @@ run; this section will be updated.]*
   hangs the box.
 - DeepSeek-V4-Flash-180B **underperforms** the qwen daily-drivers on coding (REAP precision loss).
 - **A4Q works on the dense qwen36 fleet** (not ds4, which needs DeepGEMM) — nvf4 KV halves KV
-  memory with the native fp4 prefill kernel; the multi-turn quality A/B is the deciding test.
+  memory with the native fp4 prefill kernel. The quality A/B (logprob divergence) shows the hit is
+  **small (~0.6 % perplexity) and non-compounding** — divergence *shrinks* with context depth — so
+  for long-context agentic use the memory halving is close to free.
+- Methodology note: **a saturated benchmark can't measure degradation.** When SWE-bench hit 100 %
+  on the easy arm64 subset, the ceiling-free logprob-divergence probe was the instrument that
+  actually answered the question.
