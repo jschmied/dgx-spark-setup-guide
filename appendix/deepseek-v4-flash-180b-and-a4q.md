@@ -272,11 +272,29 @@ traffic is **bursty** (often 1–2 active streams), so the 17-tok/s cliff disqua
 robust across the whole range for an 8–11 % best-case loss. `flashinfer_b12x` is a one-line swap
 *only if* a permanently-saturated batch workload (bulk/offline) appears.
 
+### MTP spec decode stacks on top (+39% decode)
+
+Adding the model's MTP head (`--speculative-config
+'{"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"}'`, matching prod)
+**coexists with cudagraphs** on the A4Q wheel (still `FULL_AND_PIECEWISE`; the capture sizes just
+expand to cover the spec batch multiplier):
+
+| decode (35B-A3B) | no spec | + MTP |
+|---|---:|---:|
+| single-stream | 73 | **102** (+39%) |
+| 4-concurrent (agg) | 157 | **171** (+9%) |
+
+MTP helps at *both* batch 1 and batch 4 — so, contrary to the usual "spec hurts under concurrency,"
+**no `disable_by_batch_size` cutoff is needed** for the 4–6-session range (it only bites at
+saturation well above this workload). Cost is a ~6% prefill dip. 102 tok/s is at/above vanilla
+vLLM 0.24.0's 76.
+
 ### Recommended config — big-prompt, 4–6-session agentic
 
 ```
-A4Q wheel + CUDA graphs + nvf4 KV + 256k context + marlin MoE + MTP-off
+A4Q wheel + CUDA graphs + MTP + nvf4 KV + 256k context + marlin MoE
   --kv-cache-dtype nvfp4 --attention-backend flashinfer --moe-backend marlin
+  --speculative-config '{"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"}'
   --max-model-len 262144 --max-num-seqs 6 --max-num-batched-tokens 16384
   (no --enforce-eager)    env VLLM_NVFP4_A4Q=1
 ```
@@ -284,11 +302,12 @@ A4Q wheel + CUDA graphs + nvf4 KV + 256k context + marlin MoE + MTP-off
 - **256k context** — the model is native 262 144 (no YaRN); the old 128k cap wasted half the window.
   nvf4 KV gives **11.2 M tokens / 42.7× concurrency at full 256k**, so KV capacity is a *non-issue*
   at 4–6 sessions — the constraint is *prefill*, not sessions.
-- **MTP off** — spec decode wastes compute once the batch fills; wrong lever for concurrency.
+- **MTP on** — +39% single-stream / +9% 4-concurrent decode, and it coexists with cudagraphs; helps
+  across the whole 4–6-session range (no cutoff needed).
 - **marlin** — robust across bursty load (the cliff above).
 
-First A4Q config that's a genuine **recommendation**: vanilla-class decode *and* ~2× prefill *and*
-the full 256k window.
+First A4Q config that's a genuine **recommendation**: **102 tok/s decode** (with MTP, at/above
+vanilla 0.24.0) *and* ~2× prefill *and* the full 256k window.
 
 ### Upstream status (2026-07-06)
 
@@ -312,12 +331,15 @@ Expect it piecemeal over weeks-to-months; the prebuilt `jethac` fork stays the o
   memory with the native fp4 prefill kernel. The quality A/B (logprob divergence) shows the hit is
   **small (~0.6 % perplexity) and non-compounding** — divergence *shrinks* with context depth — so
   for long-context agentic use the memory halving is close to free.
-- **The A4Q wheel is productionized as `llm-switch a4q`** (§B.6): with CUDA graphs it matches
-  vanilla-vLLM decode (**27 → 73 tok/s**) *and* ~2× prefill *and* the full **256k** window — the
-  first genuinely-recommended config, for big-prompt 4–6-session agentic.
+- **The A4Q wheel is productionized as `llm-switch a4q`** (§B.6): CUDA graphs + MTP take decode
+  **27 → 102 tok/s** single-stream (at/above vanilla vLLM 0.24.0), keeping ~2× prefill and the full
+  **256k** window — the first genuinely-recommended config, for big-prompt 4–6-session agentic.
 - **The scary number was a config artifact.** 27 tok/s decode was purely `enforce-eager`; dropping
-  it (cudagraphs work fine on the fork) recovers it. Always separate "the kernel is slow" from
-  "a feature is disabled."
+  it (cudagraphs work fine on the fork) recovers most of it, and MTP spec decode adds the rest
+  (+39%). Always separate "the kernel is slow" from "a feature is disabled."
+- **Prefill throughput is a *curve*, not a number** — O(n²) attention makes it fall with prompt
+  size: ~12k tok/s single-stream at a 6.5k prompt, but ~4.6k aggregate (4 concurrent) at 64k and
+  2.7k at 128k. Quote prefill *with* its prompt size and concurrency, or it's meaningless.
 - **`marlin` stays the MoE backend.** Of the native-FP4 alternatives, only `flashinfer_b12x` runs
   on sm121, and it has a **4× single-stream decode cliff** (17 vs 73) — a batch-tuned kernel that
   loses at the low-concurrency batch-1 that bursty agentic actually lives in.
