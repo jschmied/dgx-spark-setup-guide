@@ -5,9 +5,12 @@ This appendix documents two experimental bare-metal vLLM efforts on the DGX Spar
 the router / NVFP4 backends via the same `llm-switch` + systemd `Conflicts=` mechanism
 from [Appendix A](vllm-switch.md).
 
-> **Status:** experimental. DeepSeek-V4-Flash-180B is live via `llm-switch dsv4` but
-> underperforms the daily-driver coding models. A4Q is validated on the qwen36 NVFP4
-> fleet. Neither is a recommended production default — this is a field report.
+> **Status (2026-07-06):** DeepSeek-V4-Flash-180B was built, benchmarked, and
+> **decommissioned** — it underperformed the daily-drivers (§B.4) and its 107 GB was
+> better spent, so §B.1–B.4 are now a *historical* build report. **A4Q was kept and
+> productionized** for the qwen36 NVFP4 fleet as `llm-switch a4q`: with CUDA graphs it
+> matches vanilla-vLLM decode *and* roughly doubles prefill (§B.6) — a genuine
+> recommendation for big-prompt agentic use, not just a field experiment.
 
 ---
 
@@ -210,7 +213,94 @@ not the last word.
 
 ---
 
-## B.6 Takeaways
+## B.6 Productionizing A4Q for the qwen fleet (and decommissioning ds4)
+
+The ds4 build (107 GB: 97 GB weights + 11 GB venv), its `vllm-dsv4.service`, and the
+`llm-switch dsv4` verb were **removed** — it underperformed the qwen daily-drivers (§B.4) and
+the space was better spent. The A4Q venv was **kept and promoted to a first-class backend**:
+
+- venv renamed `dsv4-a4q` → **`/opt/llm/models/a4q-vllm`** (65 hardcoded paths fixed — bin/
+  shebangs, `pyvenv.cfg`, activate scripts, `.pth`)
+- new `vllm-a4q.service` + `a4q-conflict.conf` drop-ins on the peers + a `llm-switch a4q` case
+  → fourth mutually-exclusive backend on `:8080`.
+
+### The MoE-backend map on GB10 (sm121)
+
+A4Q fixes *attention* prefill, but the fleet still ran `--moe-backend marlin`, which logs *"no
+native FP4 → weight-only compression, may degrade performance."* The fork exposes several NVFP4
+MoE backends; only some are built for consumer Blackwell:
+
+| Backend | Device gate | GB10 (sm121)? |
+|---|---|---|
+| `flashinfer_cutedsl` | capability family **100** (datacenter B200/GB200) | ❌ crashes: *"kernel does not support current device"* |
+| `flashinfer_cutlass` | sm90 (Hopper) or family 100 | ❌ |
+| **`flashinfer_b12x`** | **sm12x consumer Blackwell** | ⚠️ works, but excluded from auto-select pending an upstream *"CUTLASS SM121 MMA op guard"* |
+| `marlin` | any (weight-only FP4) | ✅ the auto default |
+
+### CUDA graphs are the real win (decode 27 → 73 tok/s)
+
+The initial A4Q config ran `--enforce-eager` (cudagraphs were unverified on the fork). That
+throttled decode badly — a 3B-active MoE is dominated by per-step kernel-launch overhead in eager
+mode. **Dropping `enforce-eager` enables torch.compile (inductor) + cudagraphs, which capture
+cleanly on the A4Q wheel** (`FULL_AND_PIECEWISE`, 0.63 GiB, 4 s — correctly piecewise-splitting the
+model's *hybrid* mamba+attention layers):
+
+| 35B-A3B, nvf4 KV (single-stream unless noted) | eager | **+ CUDA graphs** |
+|---|---:|---:|
+| decode, single-stream | 27 | **73** |
+| decode, 4-concurrent (aggregate) | — | **157** |
+| prefill, 64k ×4 | 3,663 | **4,608** (+26 %) |
+
+73 tok/s **matches vanilla vLLM 0.24.0** on the same box (an external single-stream benchmark:
+35B-A3B **76** decode / 6k prefill, vs **27B *dense* 13 / 1.1k** — the MoE is 5–6× faster, so stay
+on 35B-A3B). And the A4Q backend's prefill (~12k single-stream at 6.5k) is ~**2× vanilla's 6k** —
+the nvf4-QK kernel earning its keep.
+
+### marlin vs b12x: the single-stream cliff
+
+With graphs on, is the native `flashinfer_b12x` MoE worth it? It captures fine, but:
+
+| Both + graphs | marlin | b12x |
+|---|---:|---:|
+| decode, single-stream | **73** | **17** ← 4× cliff |
+| decode, 4-concurrent (agg) | 157 | 174 (+11 %) |
+| prefill, 64k ×4 | 4,608 | 4,955 (+8 %) |
+
+b12x wins the *compute-bound* regimes (prefill, saturated batch) but **collapses at batch-1
+decode** — a compute-tuned cutlass kernel is terrible when memory-bound at low batch. Agentic
+traffic is **bursty** (often 1–2 active streams), so the 17-tok/s cliff disqualifies b12x; marlin is
+robust across the whole range for an 8–11 % best-case loss. `flashinfer_b12x` is a one-line swap
+*only if* a permanently-saturated batch workload (bulk/offline) appears.
+
+### Recommended config — big-prompt, 4–6-session agentic
+
+```
+A4Q wheel + CUDA graphs + nvf4 KV + 256k context + marlin MoE + MTP-off
+  --kv-cache-dtype nvfp4 --attention-backend flashinfer --moe-backend marlin
+  --max-model-len 262144 --max-num-seqs 6 --max-num-batched-tokens 16384
+  (no --enforce-eager)    env VLLM_NVFP4_A4Q=1
+```
+
+- **256k context** — the model is native 262 144 (no YaRN); the old 128k cap wasted half the window.
+  nvf4 KV gives **11.2 M tokens / 42.7× concurrency at full 256k**, so KV capacity is a *non-issue*
+  at 4–6 sessions — the constraint is *prefill*, not sessions.
+- **MTP off** — spec decode wastes compute once the batch fills; wrong lever for concurrency.
+- **marlin** — robust across bursty load (the cliff above).
+
+First A4Q config that's a genuine **recommendation**: vanilla-class decode *and* ~2× prefill *and*
+the full 256k window.
+
+### Upstream status (2026-07-06)
+
+None of this is mainline yet. "A4Q" has **zero** upstream PRs; the *capability* is a stack of open,
+unmerged PRs across two repos — vLLM #46329 (nvf4 KV on consumer Blackwell via FlashInfer FA2),
+#44851 (draft), the ds4 enablement #41834 (170 commits, conflict-ridden), the SM121/GB10 foundation
+#34822 (stale since April) — plus FlashInfer #3684 (the nvf4 prefill kernel, also conflicted).
+Expect it piecemeal over weeks-to-months; the prebuilt `jethac` fork stays the only turnkey path.
+
+---
+
+## B.7 Takeaways
 
 - The **REAP-pruned 180B fits** a single GB10; the NVIDIA 284B original does not.
 - Building the ds4 vLLM from source is a multi-hour, version-brittle affair with **five distinct
@@ -222,6 +312,17 @@ not the last word.
   memory with the native fp4 prefill kernel. The quality A/B (logprob divergence) shows the hit is
   **small (~0.6 % perplexity) and non-compounding** — divergence *shrinks* with context depth — so
   for long-context agentic use the memory halving is close to free.
+- **The A4Q wheel is productionized as `llm-switch a4q`** (§B.6): with CUDA graphs it matches
+  vanilla-vLLM decode (**27 → 73 tok/s**) *and* ~2× prefill *and* the full **256k** window — the
+  first genuinely-recommended config, for big-prompt 4–6-session agentic.
+- **The scary number was a config artifact.** 27 tok/s decode was purely `enforce-eager`; dropping
+  it (cudagraphs work fine on the fork) recovers it. Always separate "the kernel is slow" from
+  "a feature is disabled."
+- **`marlin` stays the MoE backend.** Of the native-FP4 alternatives, only `flashinfer_b12x` runs
+  on sm121, and it has a **4× single-stream decode cliff** (17 vs 73) — a batch-tuned kernel that
+  loses at the low-concurrency batch-1 that bursty agentic actually lives in.
+- **Right model for concurrency = the MoE, not the smaller dense one.** 35B-**A3B** (3B active) is
+  5–6× faster than the 27B *dense* — active params drive compute; "bigger" MoE ≠ slower.
 - Methodology note: **a saturated benchmark can't measure degradation.** When SWE-bench hit 100 %
   on the easy arm64 subset, the ceiling-free logprob-divergence probe was the instrument that
   actually answered the question.
