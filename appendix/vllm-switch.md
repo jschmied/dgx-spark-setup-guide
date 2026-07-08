@@ -75,6 +75,18 @@ PY
 > (13.x here) and a matching flashinfer. If `torch.cuda.is_available()` is `False`,
 > you got the CPU wheel — reinstall torch explicitly from
 > `https://download.pytorch.org/whl/cu130` before continuing.
+>
+> **SM_120 ≠ SM_121 — don't mistake desktop-Blackwell fixes for GB10 wins.** GB10 is
+> **sm_121**; RTX 50-series / RTX PRO 6000 desktop Blackwell is **sm_120**. Upstream
+> CUTLASS FP8/FP4 grouped-GEMM kernels are guarded `enable_sm120_only` and **trap on
+> sm_121** (`"This kernel only supports sm120"`), so nightly changelog items that say
+> "SM120 blockwise FP8 GEMM" or "NVFP4 CUTLASS MoE" do **not** light up on this box until
+> SM_121 registration lands. Also note "non-gated MoE" NVFP4 support = the Nemotron
+> `is_act_and_mul=False` path — irrelevant to the gated (SwiGLU) Qwen MoE experts here.
+> Tracking: vllm [#43507](https://github.com/vllm-project/vllm/issues/43507) (CUTLASS MoE
+> unavailable sm_120/121), [#43906](https://github.com/vllm-project/vllm/issues/43906)
+> (MXFP8 MoE → Marlin fallback on sm_121), CUTLASS
+> [#2800](https://github.com/NVIDIA/cutlass/issues/2800) (FP4 restricted to sm_100a).
 
 ---
 
