@@ -8,9 +8,13 @@ from [Appendix A](vllm-switch.md).
 > **Status (2026-07-06):** DeepSeek-V4-Flash-180B was built, benchmarked, and
 > **decommissioned** — it underperformed the daily-drivers (§B.4) and its 107 GB was
 > better spent, so §B.1–B.4 are now a *historical* build report. **A4Q was kept and
-> productionized** for the qwen36 NVFP4 fleet as `llm-switch a4q`: with CUDA graphs it
-> matches vanilla-vLLM decode *and* roughly doubles prefill (§B.6) — a genuine
-> recommendation for big-prompt agentic use, not just a field experiment.
+> productionized** for the qwen36 NVFP4 fleet as `llm-switch a4q`: with CUDA graphs + MTP it
+> matches vanilla-vLLM decode *and* roughly doubles prefill (§B.6). **But real-task quality
+> favors prod** (mainline vLLM + fp8 KV) considerably over A4Q's 4-bit nvf4 KV — so the standing
+> recommendation is **prod for daily/agentic work, A4Q reserved for speed-critical big-prompt
+> bursts** (§B.5). A4Q remains a valuable experiment and a genuine prefill win; it is not the
+> daily-driver quality choice. **Update (2026-07-10):** in practice A4Q is now *shelved* — prod runs
+> mainline vLLM + fp8 KV (MTP-3 retained), independently reproduced by an external recipe (§B.6).
 
 ---
 
@@ -211,6 +215,34 @@ close to free. Caveat: this is teacher-forced next-token divergence (not full au
 where nvf4's own choices feed back into its own KV) on a single code context; treat as strong but
 not the last word.
 
+**Re-run 2026-07-06 — whole-stack A/B + the temperature twist.** A second run compared the
+*whole* A4Q stack (fork vLLM + nvf4 KV) against the *whole* prod stack (mainline 0.24.0 + fp8 KV),
+not just the KV dtype: **5.55% argmax divergence** over 12k tokens (vs 4.27% for KV-dtype-alone on
+one wheel), still non-compounding (3–8% band, no trend), nvf4 perplexity ~0.7% higher. The extra
+~1pp is the fork-vs-mainline difference; ~4pp is the 4-bit KV. Same verdict: small, bounded,
+non-accumulating. (Practical note: 40k-token `echo`+`logprobs:5` **OOM'd** the engine under the
+tighter memory of the MTP+cudagraph config — use ≤12k tokens + `logprobs:1` for captures.)
+
+But those divergences are **greedy** (temp 0) — and that distinction turned out to matter. When A4Q
+showed real agentic tool/skill failures, the culprit was **not** the KV: it was the model's
+`generation_config.json` **default `temperature: 1.0`** (both backends inherit it — neither sets
+`--generation-config vllm`). At temp 1.0, tool-call reliability collapsed to **1/8**; at 0.2 it was
+**7/8**, at 0.6 (Qwen's precise preset) **6/8**. nvf4 KV *amplifies* it at high temp — greedy
+divergence understates the effect because sampling hits the distorted distribution tail — but
+temperature is the dominant, controllable lever. **Fix:** pin sane sampling server-side
+(`--override-generation-config '{"temperature":0.6,"top_p":0.95,"top_k":20,"min_p":0,"presence_penalty":0}'`)
+or per-client. The 4-bit KV was never the real problem — the default temperature was.
+
+**Real-task verdict (and a methodology correction).** With temperature fixed on *both* backends,
+extended real-task use still showed **prod (fp8 KV) considerably better than the A4Q nvf4-KV
+backend**. That overturns the rosy logprob conclusion above: a ~5% *greedy* argmax divergence sounded
+"close to free," but it **understated** the practical gap. Real work samples at temp > 0 and drifts
+*autoregressively* — the model's own choices feed back into its own 4-bit KV — and greedy,
+teacher-forced next-token logprobs capture neither. **Lesson: greedy logprob divergence is a weak
+proxy for the real-task quality of a KV-cache change; trust real-task behavior over it.** So nvf4 KV
+is *not* "free": it's a real, perceptible quality tax that the offline metric missed. Keep fp8 KV for
+work you care about; use nvf4/A4Q for its prefill speed when quality is secondary.
+
 ---
 
 ## B.6 Productionizing A4Q for the qwen fleet (and decommissioning ds4)
@@ -234,7 +266,7 @@ MoE backends; only some are built for consumer Blackwell:
 |---|---|---|
 | `flashinfer_cutedsl` | capability family **100** (datacenter B200/GB200) | ❌ crashes: *"kernel does not support current device"* |
 | `flashinfer_cutlass` | sm90 (Hopper) or family 100 | ❌ |
-| **`flashinfer_b12x`** | **sm12x consumer Blackwell** | ⚠️ works, but excluded from auto-select pending an upstream *"CUTLASS SM121 MMA op guard"* |
+| **`flashinfer_b12x`** | **sm12x consumer Blackwell** | ⚠️ works, but excluded from auto-select (opt-in only). On the *fork* it cliffs at batch-1; on *mainline* 0.24 (cute-dsl kernel) it does **not** — see "b12x on mainline" below |
 | `marlin` | any (weight-only FP4) | ✅ the auto default |
 
 ### CUDA graphs are the real win (decode 27 → 73 tok/s)
@@ -306,8 +338,64 @@ A4Q wheel + CUDA graphs + MTP + nvf4 KV + 256k context + marlin MoE
   across the whole 4–6-session range (no cutoff needed).
 - **marlin** — robust across bursty load (the cliff above).
 
-First A4Q config that's a genuine **recommendation**: **102 tok/s decode** (with MTP, at/above
-vanilla 0.24.0) *and* ~2× prefill *and* the full 256k window.
+This is the best *A4Q* config — **102 tok/s decode** (with MTP, at/above vanilla 0.24.0) *and* ~2×
+prefill *and* the full 256k window. **But it is the speed choice, not the quality choice:** real-task
+use (§B.5) found prod's fp8-KV stack considerably better, so for daily/agentic work run **prod**
+(`llm-switch vllm` — mainline 0.24.0, fp8 KV, same 256k, same MTP, same temp-0.6 override) and keep
+this A4Q config for big-prompt bursts where prefill speed outweighs the nvf4 quality tax. The two are
+mutually exclusive on `:8080`; switch per task.
+
+### Prod reality (2026-07-10) — a4q shelved, mainline + fp8 KV is the live daily driver
+
+The A/B in §B.5 settled it in practice: **`llm-switch a4q` is no longer the running backend.** Prod
+serves the qwen36 fleet on **mainline vLLM + fp8 KV** (`llm-switch vllm`, `vllm.service` on `:8080`);
+`vllm-a4q.service` is inactive. The nvf4 KV memory halving was never needed at 4–6 sessions and the
+real-task quality tax isn't worth it — a4q stays parked for speed-critical big-prompt bursts only.
+**MTP-3 spec decode carried over unchanged** (it's a checkpoint draft head, orthogonal to the KV
+dtype), so the 102 tok/s single-stream decode win is intact on prod. Confirmed live config:
+
+```
+mainline vLLM (venv /opt/llm/runtime/vllm-venv) — /usr/local/bin/vllm-launch
+  --quantization modelopt --kv-cache-dtype fp8 --attention-backend flashinfer --moe-backend marlin
+  --speculative-config '{"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"}'
+  --max-model-len 262144 --max-num-seqs 12 --max-num-batched-tokens 16384
+  --enable-chunked-prefill --async-scheduling --enable-prefix-caching --tool-call-parser qwen3_xml
+  --override-generation-config '{"temperature":0.6,"top_p":0.95,"top_k":20,"min_p":0,"presence_penalty":0}'
+```
+
+**Independently reproduced.** The community recipe [Weschera/spark-bench
+`qwen36-35b-nvidia-nvfp4-mtp3`](https://github.com/Weschera/spark-bench/blob/main/recipes/qwen36-35b-nvidia-nvfp4-mtp3.md)
+lands on the *same kernel stack* (fp8 KV + FlashInfer + marlin + MTP-3) and reports the same
+single-stream decode: **74→102 tok/s** (we measured 73→102). Their config diverges only on
+*workload* knobs — 32K ctx, prefix-cache off, gpu-util 0.6, `max-num-batched-tokens 8192` — which are
+throughput-bench choices, not serving improvements; prod's 256K / prefix-on / 16384-batch are correct
+for big-prompt agentic. **One genuine gap** the recipe surfaced — `VLLM_MARLIN_USE_ATOMIC_ADD=1`
+(marlin split-K reduction via atomicAdd) — prod set nowhere; measured and adopted below.
+
+### Tuning sweep (2026-07-10) — MTP nspec × marlin atomic-add × concurrency
+
+Isolated sweep on prod's exact stack (mainline 0.24.0, fp8 KV, flashinfer, marlin, 256K) at **temp 0.6
+— prod's real sampling, not greedy**. Single-request decode t/s:
+
+| config | c=1 | c=2 | c=4 | c=8 | c=12 | MTP accept |
+|---|---:|---:|---:|---:|---:|---:|
+| nspec 2 | 87 | 51 | 35 | 20 | 16 | 0.76–0.80 |
+| **nspec 3** (prod) | **97** | 64 | 43 | 21 | 15 | 0.64–0.67 |
+| nspec 4 | 78 | 65 | 39 | 23 | 16 | 0.54–0.66 |
+| nspec 3 **+ atomic-add** | 98 | 58 | **46** | **26** | **16** | — |
+
+**Two findings.** (1) **MTP nspec = 3 is the optimum — a clean inverted-U.** nspec = 2 under-speculates
+(87 single-stream); nspec = 4 *overshoots* — the single MTP head (`mtp_num_hidden_layers=1`) reused 4×
+proposes low-quality tokens, **acceptance collapses 0.67 → 0.54**, wasted verification pulls single-stream
+back to 78. Prod's nspec = 3 was already right. (2) **`VLLM_MARLIN_USE_ATOMIC_ADD=1` is a modest but real
+win at concurrency ≥ 4** — neutral/noise at c = 1–2, then **+7 % (c4), +8 % aggregate / +21 % single (c8),
++4 % (c12)**; split-K atomics help more as batch grows, which is exactly prod's 4–6-session regime.
+**Adopted** via a systemd drop-in on `vllm.service` (35B MoE only — the dense 27B keeps the weight-only
+marlin path).
+
+Note this makes the honest single-stream decode **~97 t/s at temp 0.6**, not the "102" quoted above and
+in the Weschera recipe — both are greedy/temp-0 figures. Temp-0.6 sampling lowers MTP acceptance, so ~97
+is what agentic clients actually see. (Bench harness: `bench/` — `bench_client.py` + `sweep.sh`.)
 
 ### Upstream status (2026-07-06)
 
@@ -316,6 +404,53 @@ unmerged PRs across two repos — vLLM #46329 (nvf4 KV on consumer Blackwell via
 #44851 (draft), the ds4 enablement #41834 (170 commits, conflict-ridden), the SM121/GB10 foundation
 #34822 (stale since April) — plus FlashInfer #3684 (the nvf4 prefill kernel, also conflicted).
 Expect it piecemeal over weeks-to-months; the prebuilt `jethac` fork stays the only turnkey path.
+
+### b12x on *mainline* vLLM (2026-07-11) — the fork's single-stream cliff does **not** reproduce
+
+The `flashinfer_b12x` "4× cliff" above was measured on the **jethac A4Q fork**. On **mainline vLLM
+0.24.0** the b12x path is a *different, newer* kernel — FlashInfer's `cute_dsl/blackwell_sm12x`
+fused MoE (vLLM #40082) — and it holds up fine on GB10. Two things the earlier §B.6 note pre-dated:
+
+- **No 4.4.2 downgrade needed.** `nvidia-cutlass-dsl` **4.5.2 already ships the `sm_121a` MMA-op
+  acceptance** the merge PR hand-patched, and on this box's **CUDA 13** stack the FP4 `block_scale`
+  lowering emits valid PTX (CUTLASS #3227 bites CUDA-12 only). So b12x is pure opt-in:
+  `--moe-backend flashinfer_b12x` + `CUTE_DSL_ARCH=sm_121a` (it's excluded from *auto*-select, not broken).
+- **Unsloth's mixed-precision needs a one-line shim.** Unsloth's compressed-tensors checkpoint keeps
+  the last 8 layers' experts at FP8, and vLLM applies one global `--moe-backend` to *all* MoE layers
+  → the FP8 oracle rejects `flashinfer_b12x`. Patch `map_fp8_backend` to route it to `MARLIN` for the
+  FP8 layers (isolated venv). NVIDIA's uniform-FP4 checkpoint needs **no** shim.
+
+A **matched-params** 2×2 (identical fp8 KV, MTP-3, `max-num-seqs 24`, mem-util 0.75, `max-model-len
+131072`, all on one venv — only weights × MoE-kernel vary), decode **aggregate** tok/s at temp 0.6:
+
+| aggregate tok/s | A NV·marlin | B Uns·marlin | C Uns·b12x | D NV·b12x |
+|---|---:|---:|---:|---:|
+| c=1  | 78.4  | 60.0  | 64.5  | 71.9 |
+| c=4  | 116.3 | 111.4 | 114.7 | **121.2** |
+| c=6  | 127.9 | 119.5 | 124.4 | **132.2** |
+| c=8  | 136.9 | 130.5 | 136.8 | **142.9** |
+| c=12 | 148.5 | 142.2 | 147.6 | **154.4** |
+| TTFT c=1 (s) | 2.06 | 2.11 | 1.95 | **1.89** |
+
+**On mainline, b12x ≥ marlin** — at every concurrency ≥4 b12x beats its marlin twin on aggregate
+throughput (D>A, C>B) *and* has lower TTFT, for **both** weight sets. No batch-1 collapse: per-stream
+decode at c=1 (MTP on) is Uns·marlin **79.7** vs Uns·b12x **78.8** — tied, not 4×. The margin is
+small (~4–6%), and **NVIDIA weights (W4A16) beat Unsloth (W4A4+FP8)** on throughput for the same
+kernel. Best config overall: **D = NVIDIA·b12x** (top aggregate + lowest TTFT, and no shim).
+
+> **Retraction.** An earlier draft of this run showed b12x "collapsing at c=12" (TTFT ~25 s). That was
+> a **benchmark artifact**: the b12x services ran `--max-num-seqs 6` while prod-A ran `12` (plus
+> async-scheduling + `VLLM_MARLIN_USE_ATOMIC_ADD`), so at c=12 the b12x side was queue-starved, not
+> kernel-limited. With every serving param matched, the collapse vanishes. *Never compare backends
+> across unmatched `--max-num-seqs`.*
+
+Caveats: decode t/s carries **MTP-acceptance variance** (A's c=1 rode a 0.76 draw vs D's 0.63 — trust
+*aggregate*, not single-cell single-stream); a 4-task SWE-bench run alongside was dominated by
+trajectory divergence (unusable as a speed metric, and **quality/resolution was not scored**). So this
+is a *throughput* result, not a quality verdict. Bottom line: on GB10, native FP4 (b12x) is a **small
+real win** over marlin — free for NVIDIA weights (no shim), ~5% + lower TTFT — but marlin leaves
+little on the table, so adopt b12x only if that headroom beats its operational surface (cute-dsl JIT,
+`sm_121a` pin, the mixed-precision shim).
 
 ---
 
@@ -333,16 +468,27 @@ Expect it piecemeal over weeks-to-months; the prebuilt `jethac` fork stays the o
   for long-context agentic use the memory halving is close to free.
 - **The A4Q wheel is productionized as `llm-switch a4q`** (§B.6): CUDA graphs + MTP take decode
   **27 → 102 tok/s** single-stream (at/above vanilla vLLM 0.24.0), keeping ~2× prefill and the full
-  **256k** window — the first genuinely-recommended config, for big-prompt 4–6-session agentic.
+  **256k** window. A real prefill/speed win — but see the quality caveat below.
+- **Real-task quality: prod (fp8 KV) ≫ A4Q (nvf4 KV).** Despite a benign-looking ~5% *greedy* logprob
+  divergence, extended real-task use (temperature fixed on both) found prod **considerably** better.
+  **Greedy logprob divergence understated the gap** — real work samples at temp > 0 and drifts
+  autoregressively through its own 4-bit KV, which the offline metric can't see. **Run prod for work
+  you care about; reserve A4Q for speed-critical big-prompt bursts.** nvf4 KV is not "free."
+- **Agentic tool/skill failures were *temperature*, not the backend.** The model's `generation_config`
+  defaults to **temp 1.0**; both backends inherit it. Tool-call reliability: 1/8 at 1.0, 6/8 at 0.6,
+  7/8 at 0.2. Pin sane sampling server-side (`--override-generation-config`) or per-client. This is
+  additive to (and separate from) the nvf4-vs-fp8 quality gap.
 - **The scary number was a config artifact.** 27 tok/s decode was purely `enforce-eager`; dropping
   it (cudagraphs work fine on the fork) recovers most of it, and MTP spec decode adds the rest
   (+39%). Always separate "the kernel is slow" from "a feature is disabled."
 - **Prefill throughput is a *curve*, not a number** — O(n²) attention makes it fall with prompt
   size: ~12k tok/s single-stream at a 6.5k prompt, but ~4.6k aggregate (4 concurrent) at 64k and
   2.7k at 128k. Quote prefill *with* its prompt size and concurrency, or it's meaningless.
-- **`marlin` stays the MoE backend.** Of the native-FP4 alternatives, only `flashinfer_b12x` runs
-  on sm121, and it has a **4× single-stream decode cliff** (17 vs 73) — a batch-tuned kernel that
-  loses at the low-concurrency batch-1 that bursty agentic actually lives in.
+- **`marlin` stays the MoE backend *on the A4Q fork*.** There the only sm121 native-FP4 alternative,
+  `flashinfer_b12x`, has a **4× single-stream decode cliff** (17 vs 73) — a batch-tuned kernel that
+  loses at the low-concurrency batch-1 that bursty agentic lives in. **But this is fork-specific:** on
+  *mainline* vLLM 0.24 the newer cute-dsl b12x kernel has **no cliff** and is marginally *faster* than
+  marlin at concurrency ≥4 (see "b12x on mainline," §B.6). Always re-measure a kernel per vLLM build.
 - **Right model for concurrency = the MoE, not the smaller dense one.** 35B-**A3B** (3B active) is
   5–6× faster than the 27B *dense* — active params drive compute; "bigger" MoE ≠ slower.
 - Methodology note: **a saturated benchmark can't measure degradation.** When SWE-bench hit 100 %

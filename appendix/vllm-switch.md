@@ -87,6 +87,16 @@ PY
 > unavailable sm_120/121), [#43906](https://github.com/vllm-project/vllm/issues/43906)
 > (MXFP8 MoE → Marlin fallback on sm_121), CUTLASS
 > [#2800](https://github.com/NVIDIA/cutlass/issues/2800) (FP4 restricted to sm_100a).
+>
+> **Update (2026-07-11): the *FlashInfer cute-dsl* path is the sm_121 exception.** The gate above is
+> about the **CUTLASS** grouped-GEMM kernels. A *separate* NVFP4 MoE path — FlashInfer's
+> `cute_dsl/blackwell_sm12x` fused kernel (vLLM [#40082](https://github.com/vllm-project/vllm/pull/40082),
+> `--moe-backend flashinfer_b12x`) — **does run on GB10**: `nvidia-cutlass-dsl` 4.5.2 already accepts
+> `sm_121a`, and on CUDA 13 the FP4 `block_scale` PTX is valid (CUTLASS #3227 is CUDA-12-only). Opt in
+> with `--moe-backend flashinfer_b12x` + `CUTE_DSL_ARCH=sm_121a` (it's excluded from *auto*-select, not
+> broken). A matched benchmark found it **marginally faster than marlin** at concurrency ≥4 — see
+> [Appendix B, "b12x on mainline vLLM"](deepseek-v4-flash-180b-and-a4q.md). So the takeaway is narrower
+> than "no FP4 MoE on GB10": the *CUTLASS* route is gated; the *cute-dsl* route works.
 
 ---
 
@@ -166,8 +176,8 @@ exec /opt/llm/runtime/vllm-venv/bin/vllm serve "$MODEL_DIR" \
   --moe-backend marlin \
   --gpu-memory-utilization 0.4 \
   --max-model-len 262144 \
-  --max-num-seqs 4 \
-  --max-num-batched-tokens 8192 \
+  --max-num-seqs 12 \
+  --max-num-batched-tokens 16384 \
   --enable-chunked-prefill \
   --async-scheduling \
   --enable-prefix-caching \
@@ -190,6 +200,23 @@ guide: **`--host 127.0.0.1`** (loopback only, like the router — never `0.0.0.0
 build uses. `--gpu-memory-utilization 0.4` is NVIDIA's conservative default for the
 shared 128 GB pool; because nothing else is resident while vLLM runs you can raise it
 if you need more KV headroom at 262K context — watch `nvidia-smi` and total RAM.
+
+> **Sizing `--max-num-seqs` / `--max-num-batched-tokens` for a developer fleet.**
+> NVIDIA's card ships `4` / `8192`, tuned for a single interactive user. For a shared
+> fleet these were the throttle: with several developers the admission cap (4) queued
+> requests long before memory did. At `--gpu-memory-utilization 0.4` the fp8 KV pool
+> holds **~3.55M tokens** (`vllm:cache_config_info{kv_cache_size_tokens}`), which vLLM
+> reports as **~13.5 concurrent *full* 262K-context sequences** — and far more at the
+> ~48K-token contexts real coding traffic averages. Observed peak KV usage was **6.6%**,
+> so the pool had ~15× headroom while admission sat at 4. We raise `--max-num-seqs` to
+> **12** (fits the KV budget with margin, covers ~8 developers through interactive
+> bursts) and `--max-num-batched-tokens` to **16384** so the large agentic prefills
+> (p95 ~134K tokens) clear in fewer scheduler steps under contention. Raising seqs
+> costs **no extra memory** — the KV pool is pre-allocated inside the 0.4 budget; it
+> just admits more of it. Decode is memory-bandwidth-bound on the single GB10, so
+> aggregate tok/s saturates past a point — 12 buys queueing relief, not linear
+> throughput. Watch the **admission panels** (queue depth, KV headroom) added to the
+> vLLM dashboard to confirm you're no longer hitting the `max-num-seqs` wall.
 
 > **`--quantization modelopt`.** NVIDIA's 35B card sets it explicitly; the MiaAI-Lab
 > 27B reference omits it and lets vLLM auto-detect NVFP4 from `hf_quant_config.json`
@@ -345,11 +372,24 @@ curl -s http://127.0.0.1:8080/v1/chat/completions \
   users trusted, and **rotate these keys** (page 10) if the journal is ever shipped
   off-box or shared. There is no multi-key file option in vLLM 0.24 (`VLLM_API_KEY`
   is single-key only).
-- **Monitoring gaps while vLLM is live (page 9).** The Prometheus job scrapes the
-  router's proxied `/metrics` (llama.cpp metric names). vLLM exposes its *own*
-  `/metrics` on `:8080` with different metric names, so the router's Grafana panels
-  won't populate while vLLM is up. If you want continuity, add a vLLM scrape job and
-  a small vLLM panel row; otherwise expect a gap for the duration of the switch.
+- **Separate metrics namespace + its own dashboard (page 9).** The router's
+  Prometheus job scrapes its proxied `/metrics` (llama.cpp metric names); vLLM
+  exposes its *own* `/metrics` on `:8080` under the `vllm:*` namespace, so the
+  router's Grafana panels stay flat while vLLM is up — that's expected, not a fault.
+  The box already handles this: `prometheus.yml` carries a dedicated `vllm` scrape
+  job (labelled `service: vllm-nvfp4`) and *drops* `vllm:*` from the `llama-server`
+  job so the series aren't double-ingested under fake model labels. `up{job="vllm"}`
+  is `1` only while `vllm.service` is live and `0` under the router — the switch is
+  visible in Prometheus itself. A companion board,
+  [appendix/vllm-dashboard.json](vllm-dashboard.json), drops into
+  `grafana/dashboards/` (provisioner picks it up within 10 s) and covers the vLLM
+  serving metrics — E2E/TTFT/ITL latency, throughput, scheduler state, KV-cache use —
+  plus panels specific to this deployment: a **spec-decode (MTP) row** (acceptance
+  rate overall and per draft position, effective tokens/step), **prefix-cache hit
+  rate** (`--enable-prefix-caching`), **preemptions** (KV-pressure early warning),
+  and a **GPU (DCGM) row** so GPU load reads on the same board. The dashboard is
+  `model_name`-templated, so it re-targets automatically if you switch the served
+  model per A.7.
 - **`--models-max 1` logic doesn't apply.** vLLM serves a single model per process.
   Switching *models* on the vLLM side means editing `vllm-launch` and restarting the
   unit — there's no router-style on-demand model swap.
@@ -380,3 +420,53 @@ swap. Two ways to add the 27B:
 
 Either way the download follows A.2 (aria2c, 6 MB/s cap, pinned shard names) into
 `/opt/llm/models/qwen36-27b-nvfp4`, and the shared `api_keys.txt` covers it for free.
+
+### A.7.1 As deployed — parameterised wrapper + 27B-specific tuning
+
+We took option 1. `vllm-launch` reads the backend from the environment (35B defaults,
+so `vllm.service` needs no env): `VLLM_MODEL_DIR`, `VLLM_SERVED_NAMES`, `VLLM_MOE`
+(1 = MoE → adds `--moe-backend marlin` + MTP `moe_backend`; 0 = dense), plus two
+tunables added below — `VLLM_GPU_MEM_UTIL` (default 0.4) and `VLLM_MTP_NSPEC`
+(default 3). `vllm-27b.service` sets the dense backend and overrides both tunables in
+a `vllm-27b.service.d/optimize.conf` drop-in.
+
+> **Quote space-separated `Environment=` values.** systemd splits an unquoted
+> `Environment=VLLM_SERVED_NAMES=qwen36-27b qwen36-27b-nvfp4` on whitespace and drops
+> the second token (`systemd-analyze verify` flags it: *"Invalid environment
+> assignment, ignoring: qwen36-27b-nvfp4"*), so the model silently answers to only the
+> first alias. Wrap the whole value in quotes: `Environment="VLLM_SERVED_NAMES=…"`.
+
+**The 27B is dense — do not inherit the 35B's KV/util sizing.** Both models are hybrid
+Gated-DeltaNet (KV grows only on the full-attention layers), but the 27B has 16 full-attn
+layers × 4 KV heads vs the 35B-A3B's 10 × 2 → **~3.2× the KV bytes per token**. At the
+shared-launcher default `--gpu-memory-utilization 0.4` that leaves the 27B only ~3.8
+full-262K sequences (vs the 35B's measured 13.3). Since the dense weights (~21 GB) leave
+the box nearly empty when the 27B is the sole resident model, the drop-in raises it to
+**`VLLM_GPU_MEM_UTIL=0.6`** — measured `kv_cache_size_tokens=1.85M` →
+**7.06 full-context concurrency** (`vllm:cache_config_info{kv_cache_max_concurrency}`).
+
+**The 27B is memory-bandwidth-bound; MTP is a big win.** A dense 27B reads all ~27B
+params/token (~15 GB at NVFP4) against GB10's ~273 GB/s, so decode floors at ~12 t/s —
+**~7× slower than the 35B-A3B MoE** (which reads only ~3B active params/token, ~87 t/s).
+That makes MTP speculative decoding unusually valuable here: it verifies several draft
+tokens per weight-read pass. A dedicated nspec sweep (`bench/sweep-27b.sh`,
+`results-nspec-27b-2026-07-10/`, util 0.6, temp 0.6, 256-tok outputs):
+
+| MTP nspec | c=1 decode t/s | accept | c=4 aggregate t/s | accept |
+|---:|---:|---:|---:|---:|
+| 0 (off) | 11.8 | — | 13.8 | — |
+| 2 | 24.0 | 0.834 | 15.7 | 0.797 |
+| **3** | **25.9** | 0.671 | **17.0** | 0.702 |
+| 4 | 28.6 | 0.659 | 15.7 | 0.584 |
+
+MTP up to **2.4× single-stream** (11.8 → 28.6). Unlike the 35B (which collapses at
+nspec=4), the 27B's *single-stream* decode keeps rising with nspec — the marginal cost
+of verifying extra drafts is cheap against the weight read. But at the **c=4 concurrency
+the fleet runs, aggregate peaks at nspec=3** (17.0, +23% vs off); nspec=4's acceptance
+collapses (0.584) and it loses aggregate under load. The drop-in ships
+**`VLLM_MTP_NSPEC=3`** — best under concurrency, within 10 % of the single-stream
+optimum, and consistent with the 35B.
+
+**Bottom line:** the 27B is a fine *fallback* but a poor primary on GB10 — at ~26 t/s
+(nspec=3) it is still ~3× slower than the 35B-A3B's MTP decode. Keep the 35B as prod;
+the 27B unit stays `disabled`.
