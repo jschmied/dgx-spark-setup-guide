@@ -1,0 +1,394 @@
+<style>
+  :root{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3; --surface-3:#e6eded;
+    --ink:#0f181a; --muted:#55686c; --faint:#7f9296; --line:#dbe4e4;
+    --accent:#0c9a80; --accent-ink:#07715e;
+    --good:#2f9e6f; --good-bg:#e6f4ec;
+    --warn:#b5771a; --warn-bg:#f7efdd;
+    --crit:#cc4a40; --crit-bg:#f8e6e4;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --maxw:940px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0d1315; --surface:#141d20; --surface-2:#1a2529; --surface-3:#213033;
+      --ink:#e3ecec; --muted:#93a7a9; --faint:#6d8285; --line:#263335;
+      --accent:#34c8a6; --accent-ink:#57d8ba;
+      --good:#46c088; --good-bg:#152b22;
+      --warn:#d69a3e; --warn-bg:#2c2415;
+      --crit:#e8685c; --crit-bg:#2e1a18;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3; --surface-3:#e6eded;
+    --ink:#0f181a; --muted:#55686c; --faint:#7f9296; --line:#dbe4e4;
+    --accent:#0c9a80; --accent-ink:#07715e;
+    --good:#2f9e6f; --good-bg:#e6f4ec; --warn:#b5771a; --warn-bg:#f7efdd; --crit:#cc4a40; --crit-bg:#f8e6e4;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1315; --surface:#141d20; --surface-2:#1a2529; --surface-3:#213033;
+    --ink:#e3ecec; --muted:#93a7a9; --faint:#6d8285; --line:#263335;
+    --accent:#34c8a6; --accent-ink:#57d8ba;
+    --good:#46c088; --good-bg:#152b22; --warn:#d69a3e; --warn-bg:#2c2415; --crit:#e8685c; --crit-bg:#2e1a18;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:56px 24px 96px;display:flex;flex-direction:column;gap:40px}
+  .mono{font-family:var(--mono)}
+  a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+  h1,h2,h3{text-wrap:balance;margin:0;line-height:1.2}
+  h1{font-size:2.15rem;font-weight:700;letter-spacing:-.02em}
+  h2{font-size:1.3rem;font-weight:650;letter-spacing:-.01em}
+  h3{font-size:1rem;font-weight:650}
+  p{margin:0}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .lede{font-size:1.12rem;color:var(--muted);max-width:64ch}
+  .rule{height:1px;background:var(--line);border:0;margin:0}
+
+  /* header */
+  header{display:flex;flex-direction:column;gap:14px}
+  .metaline{display:flex;flex-wrap:wrap;gap:8px;font-family:var(--mono);font-size:.72rem;color:var(--faint)}
+  .metaline span{background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+
+  section{display:flex;flex-direction:column;gap:18px}
+  .sechead{display:flex;flex-direction:column;gap:4px}
+  .sechead .eyebrow{color:var(--accent-ink)}
+
+  /* verdict card */
+  .verdict{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .verdict .top{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),var(--surface));
+    padding:22px 24px;border-bottom:1px solid var(--line)}
+  .verdict h2{font-size:1.15rem}
+  .verdict .rows{display:flex;flex-direction:column}
+  .vrow{display:grid;grid-template-columns:150px 1fr;gap:18px;padding:16px 24px;align-items:baseline}
+  .vrow+.vrow{border-top:1px solid var(--line)}
+  .vrow .k{font-family:var(--mono);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+  .vrow .v{font-size:1rem}
+  .vrow .v b{color:var(--ink)}
+  .pick{font-family:var(--mono);font-weight:700;color:var(--accent-ink)}
+
+  /* matrix */
+  .matrix{display:grid;grid-template-columns:auto 1fr 1fr;gap:10px}
+  .mlabel{display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+    font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:600;text-align:center}
+  .mcorner{}
+  .cell{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:16px 16px 15px;
+    display:flex;flex-direction:column;gap:8px;min-height:150px}
+  .cell.best{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent), 0 6px 22px -12px color-mix(in srgb,var(--accent) 60%,transparent)}
+  .cell .cid{display:flex;align-items:center;gap:9px}
+  .cell .badge{font-family:var(--mono);font-weight:700;font-size:.82rem;width:26px;height:26px;border-radius:8px;
+    display:grid;place-items:center;background:var(--surface-3);color:var(--muted)}
+  .cell.best .badge{background:var(--accent);color:#fff}
+  .cell .cname{font-family:var(--mono);font-size:.86rem;font-weight:600;color:var(--ink)}
+  .cell .sub{font-size:.82rem;color:var(--faint);font-family:var(--mono)}
+  .cell .verd{font-size:.92rem;color:var(--muted);margin-top:auto}
+  .cell .verd b{color:var(--ink)}
+  .tag{align-self:flex-start;font-family:var(--mono);font-size:.68rem;font-weight:700;letter-spacing:.04em;
+    text-transform:uppercase;padding:3px 8px;border-radius:6px}
+  .tag.good{background:var(--good-bg);color:var(--good)}
+  .tag.warn{background:var(--warn-bg);color:var(--warn)}
+  .tag.crit{background:var(--crit-bg);color:var(--crit)}
+  .tag.neutral{background:var(--surface-3);color:var(--muted)}
+
+  /* tables */
+  .twrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:.9rem}
+  caption{caption-side:top;text-align:left;padding:12px 16px 0;font-size:.8rem;color:var(--faint);font-family:var(--mono)}
+  th,td{padding:11px 16px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  thead th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600;background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .cfg{font-family:var(--mono);font-weight:600}
+  .rowbest{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+  .chip{display:inline-block;font-family:var(--mono);font-size:.74rem;font-weight:700;padding:1px 7px;border-radius:5px}
+  .chip.good{background:var(--good-bg);color:var(--good)}
+  .chip.warn{background:var(--warn-bg);color:var(--warn)}
+  .chip.crit{background:var(--crit-bg);color:var(--crit)}
+
+  /* callout cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .card{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px 17px;display:flex;flex-direction:column;gap:7px}
+  .card .h{display:flex;align-items:baseline;gap:9px}
+  .card .n{font-family:var(--mono);font-size:.78rem;color:var(--accent-ink);font-weight:700}
+  .card h3{font-size:.98rem}
+  .card p{font-size:.9rem;color:var(--muted)}
+  .card p b{color:var(--ink)}
+
+  /* trap list */
+  .traps{display:flex;flex-direction:column;gap:10px}
+  .trap{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;
+    border:1px solid var(--line);border-left:3px solid var(--crit);border-radius:10px;background:var(--surface);padding:13px 16px}
+  .trap .stripe{font-family:var(--mono);font-size:.7rem;font-weight:700;color:var(--crit);text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+  .trap p{font-size:.9rem;color:var(--muted)}
+  .trap p b{color:var(--ink)}
+  .trap .mono{color:var(--ink)}
+
+  .keyline{font-size:1.02rem;color:var(--ink);border-left:3px solid var(--accent);padding:2px 0 2px 16px;max-width:66ch}
+  .keyline b{color:var(--accent-ink)}
+
+  footer{color:var(--faint);font-size:.82rem;display:flex;flex-direction:column;gap:10px}
+  footer .legend{display:flex;flex-wrap:wrap;gap:6px}
+  footer code{font-family:var(--mono);background:var(--surface-2);padding:1px 6px;border-radius:5px;color:var(--muted)}
+
+  @media (max-width:620px){
+    h1{font-size:1.7rem}
+    .vrow{grid-template-columns:1fr;gap:4px}
+    .matrix{grid-template-columns:1fr}
+    .mlabel.col,.mcorner{display:none}
+    .mlabel.row{justify-content:flex-start;padding:6px 2px 0}
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Field guide · quant selection</p>
+    <h1>Picking an NVFP4 quant for an agentic coding agent on DGX&nbsp;Spark</h1>
+    <p class="lede">Four ways to serve <span class="mono">Qwen3.6-35B-A3B</span> NVFP4 on a single GB10 — two weight sets × two MoE kernels. They are <em>not</em> interchangeable for a coding agent. Here's what actually differs, measured on SWE-bench.</p>
+    <div class="metaline">
+      <span>GB10 · sm_121 · 128&nbsp;GB unified</span>
+      <span>vLLM 0.24 · CUDA&nbsp;13</span>
+      <span>SWE-bench Verified + Multilingual</span>
+      <span>temp 0.6 · MTP-3</span>
+    </div>
+  </header>
+
+  <hr class="rule"/>
+
+  <!-- VERDICT -->
+  <section>
+    <div class="verdict">
+      <div class="top"><h2>Bottom line</h2></div>
+      <div class="rows">
+        <div class="vrow">
+          <div class="k">Best overall</div>
+          <div class="v"><span class="pick">Unsloth · b12x</span> — fastest path that <b>doesn't collapse on Java/JS</b>. 34/58 resolved, no calibration skew, native FP4 speed.</div>
+        </div>
+        <div class="vrow">
+          <div class="k">If NVIDIA weights</div>
+          <div class="v">Use <span class="pick">marlin</span>, <b>not b12x</b>. Same speed, ~half the Java/JS give-ups. b12x's uniform FP4 activations are what break NVIDIA on Java/JS.</div>
+        </div>
+        <div class="vrow">
+          <div class="k">Python-only agent</div>
+          <div class="v">Either NVIDIA config is fine — a slim edge over Unsloth (<span class="mono">19</span> vs <span class="mono">17</span> / 30). The gap only opens up on other languages.</div>
+        </div>
+        <div class="vrow">
+          <div class="k">Always</div>
+          <div class="v">Send <b>temperature 0.6</b>, and <b>verify the kernel</b> — b12x is not the default and will silently fall back to marlin.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MATRIX -->
+  <section>
+    <div class="sechead">
+      <p class="eyebrow">The four configs</p>
+      <h2>Weights × kernel</h2>
+      <p class="lede">The axes are independent. <b>Weights</b> decide calibration and the precision carve-out; <b>kernel</b> decides how activations are computed at runtime.</p>
+    </div>
+    <div class="matrix">
+      <div class="mcorner"></div>
+      <div class="mlabel col">marlin&nbsp;· W4A16<br><span style="color:var(--faint);font-weight:400">16-bit activations</span></div>
+      <div class="mlabel col">b12x&nbsp;· W4A4<br><span style="color:var(--faint);font-weight:400">native FP4 activations</span></div>
+
+      <div class="mlabel row">NVIDIA<br>modelopt</div>
+      <div class="cell">
+        <div class="cid"><span class="badge">A</span><span class="cname">NVIDIA · marlin</span></div>
+        <span class="tag good">solid</span>
+        <p class="verd"><b>Best NVIDIA option.</b> 14/28 Java/JS, only 3 give-ups. Weight-only FP4 → 16-bit compute, but ≈ b12x speed.</p>
+      </div>
+      <div class="cell">
+        <div class="cid"><span class="badge">D</span><span class="cname">NVIDIA · b12x</span></div>
+        <span class="tag crit">Java/JS trap</span>
+        <p class="verd"><b>Gives up on Java/JS.</b> 11/28 empty patches (39%). Fast, tops Python — but the uniform FP4 activations collapse non-Python.</p>
+      </div>
+
+      <div class="mlabel row">Unsloth<br>compressed-tensors</div>
+      <div class="cell">
+        <div class="cid"><span class="badge">B</span><span class="cname">Unsloth · marlin</span></div>
+        <span class="tag neutral">no reason</span>
+        <p class="verd">Works, but you're paying b12x's absence for nothing — the dynamic quant is built for FP4 cores.</p>
+      </div>
+      <div class="cell best">
+        <div class="cid"><span class="badge">C</span><span class="cname">Unsloth · b12x</span></div>
+        <span class="tag good">recommended</span>
+        <p class="verd"><b>Fast + robust.</b> 17/28 Java/JS, 6 give-ups. Dynamic W4A4 experts + FP8 tail; data-free, so nothing to mis-calibrate.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUALITY -->
+  <section>
+    <div class="sechead">
+      <p class="eyebrow">Result 1 · quality</p>
+      <h2>Agentic resolution — and where NVIDIA gives up</h2>
+      <p class="lede">Real patches scored by the SWE-bench harness (apply + run the failing tests). The Java/JS column is where the configs diverge.</p>
+    </div>
+    <div class="twrap">
+      <table>
+        <caption>Model-appropriate slices · Verified-30 (Python) + Multilingual-28 (Java/JS) · temp 0.6</caption>
+        <thead>
+          <tr>
+            <th>Config</th>
+            <th class="num">Python /30</th>
+            <th class="num">Java/JS /28</th>
+            <th class="num">Java/JS give-ups</th>
+            <th>Read</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="rowbest">
+            <td class="cfg">C · Unsloth·b12x</td>
+            <td class="num">17</td><td class="num">17</td>
+            <td class="num"><span class="chip good">6</span></td>
+            <td>Best balance across languages</td>
+          </tr>
+          <tr>
+            <td class="cfg">A · NVIDIA·marlin</td>
+            <td class="num">—</td><td class="num">14</td>
+            <td class="num"><span class="chip good">3</span></td>
+            <td>NVIDIA weights, no collapse</td>
+          </tr>
+          <tr>
+            <td class="cfg">D · NVIDIA·b12x</td>
+            <td class="num">19</td><td class="num">10</td>
+            <td class="num"><span class="chip crit">11</span></td>
+            <td>Wins Python, folds on Java/JS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="keyline">The give-up column is the whole story: on Java/JS, <b>NVIDIA·b12x emits an empty patch 39% of the time</b> — the agent flails and produces nothing. The <em>same NVIDIA weights on marlin</em> do it only ~10%. It's not the model or the checkpoint — it's the <b>runtime FP4 activation quantization</b>.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="h"><span class="n">why</span><h3>Activation precision</h3></div>
+        <p>Give-ups track how hard the <b>expert activations</b> are quantized. 16-bit (marlin) or dynamic + FP8-carveout (Unsloth) hold up; <b>uniform FP4 on all 40 layers</b> (NVIDIA·b12x) collapses on non-Python.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">why</span><h3>Calibration</h3></div>
+        <p>NVIDIA's modelopt scales are <b>static, calibrated on English news</b> (cnn_dailymail — no code). Unsloth is <b>data-free / dynamic</b> — computed per input, so it can't be domain-skewed toward Python.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">watch</span><h3>Don't trust Lite</h3></div>
+        <p>SWE-bench <b>Lite is 100% Python</b>. On it NVIDIA looked far ahead (59 vs 38). That verdict does not survive contact with Java/JS. Benchmark the languages you'll actually run.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPEED -->
+  <section>
+    <div class="sechead">
+      <p class="eyebrow">Result 2 · speed</p>
+      <h2>marlin vs b12x — closer than the folklore</h2>
+      <p class="lede">Single-stream, cache-busted, isolated box. Prefill (time-to-first-token) and decode measured separately across context length.</p>
+    </div>
+    <div class="twrap">
+      <table>
+        <caption>TTFT / prefill (s) · decode (tok/s) · MTP on</caption>
+        <thead>
+          <tr>
+            <th>Context</th>
+            <th class="num">marlin TTFT</th>
+            <th class="num">b12x TTFT</th>
+            <th class="num">Δ prefill</th>
+            <th class="num">marlin dec</th>
+            <th class="num">b12x dec</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="cfg">1k</td><td class="num">0.96</td><td class="num">0.95</td><td class="num">1.01×</td><td class="num">34.1</td><td class="num">33.8</td></tr>
+          <tr><td class="cfg">8k</td><td class="num">11.33</td><td class="num">10.56</td><td class="num">1.07×</td><td class="num">31.5</td><td class="num">31.8</td></tr>
+          <tr><td class="cfg">32k</td><td class="num">95.70</td><td class="num">92.50</td><td class="num">1.03×</td><td class="num">24.8</td><td class="num">25.1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="keyline">Prefill and decode are <b>within ~3–7%</b> — no widening gap. "marlin is too slow for agents" is a <b>myth</b>: at long context the prefill is <em>attention-dominated</em> (same kernel for both). What actually happened in agentic runs is subtler:</p>
+    <div class="cards">
+      <div class="card">
+        <div class="h"><span class="n">insight</span><h3>Persistence ≠ slowness</h3></div>
+        <p>marlin's longer wall-time on hard tasks is because it <b>keeps trying</b> (3 give-ups). b12x looks "fast" partly because it <b>quits early</b> (11 give-ups). Give a persistent config a longer per-step timeout.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">note</span><h3>The real cost is prefill</h3></div>
+        <p>A 32k-token turn spends <b>~95 s before the first token</b> — on <em>both</em> kernels. That's a GB10 property, not a kernel choice. Big tool observations (large Java files) are the tax.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">note</span><h3>b12x's real edge</h3></div>
+        <p>Single-stream they tie. b12x's advantage is <b>~5% at concurrency</b> (c≥4). It's a throughput lever, not a latency one.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DECISION POINTS -->
+  <section>
+    <div class="sechead">
+      <p class="eyebrow">The decisions</p>
+      <h2>Choosing, in order</h2>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="h"><span class="n">01</span><h3>Language mix</h3></div>
+        <p>Polyglot / any Java·JS·TS → weights that don't collapse (<b>Unsloth</b>, or NVIDIA on marlin). Pure Python → NVIDIA's slim edge is real but marginal.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">02</span><h3>Weights</h3></div>
+        <p><b>Unsloth</b> is the safe default — dynamic activations, no calibration to skew, no language hole. NVIDIA is competitive <em>only</em> on marlin.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">03</span><h3>Kernel</h3></div>
+        <p>For <b>Unsloth → b12x</b> (that's what its FP4 design is for; needs a 1-line FP8-tail shim). For <b>NVIDIA → marlin</b> (b12x is the give-up trap). Speed is ~a wash either way.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">04</span><h3>Sampling</h3></div>
+        <p><b>temp 0.6</b> coding preset. The generation-config default of 1.0 breaks tool-calling (1/8 vs 7/8 tool calls at low temp).</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">05</span><h3>Serving stack</h3></div>
+        <p>b12x needs <b>CUDA 13 + cutlass-dsl 4.5.2</b>. On 0.24 that's a manual pin; <b>0.25 upstreams it</b>. Then opt in explicitly and run the preflight.</p>
+      </div>
+      <div class="card">
+        <div class="h"><span class="n">06</span><h3>Timeout</h3></div>
+        <p>A config that doesn't give up will take more turns on hard tasks. Set a generous per-step request timeout so persistence isn't misread as a hang.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRAPS -->
+  <section>
+    <div class="sechead">
+      <p class="eyebrow">Bad-by-default</p>
+      <h2>Traps that make a good model look bad</h2>
+      <p class="lede">Each of these silently degrades the out-of-box experience — you get a worse model and don't know it.</p>
+    </div>
+    <div class="traps">
+      <div class="trap">
+        <div class="stripe">kernel</div>
+        <p><b>b12x is not the default on Spark.</b> vLLM auto-select picks <span class="mono">marlin</span> on sm_121; you must pass <code class="mono">--moe-backend flashinfer_b12x</code> + <code class="mono">CUTE_DSL_ARCH=sm_121a</code>. A naive head-to-head is secretly marlin-vs-marlin — run the b12x preflight to be sure.</p>
+      </div>
+      <div class="trap">
+        <div class="stripe">quality</div>
+        <p><b>NVIDIA·b12x's Java/JS collapse is invisible on Python.</b> Static English-news calibration + uniform FP4 activations produce a 39% give-up rate that a Python-only eval never surfaces.</p>
+      </div>
+      <div class="trap">
+        <div class="stripe">tools</div>
+        <p><b>The default temperature breaks agents.</b> generation_config ships temp 1.0; tool-calling reliability craters. Override to 0.6 server-side or per-request.</p>
+      </div>
+      <div class="trap">
+        <div class="stripe">ceiling</div>
+        <p><b>BF16 won't serve here.</b> The 65&nbsp;GB hybrid+multimodal model OOMs vLLM at KV/mamba profiling on 128&nbsp;GB unified. On this box the practical ceiling is Q8, not BF16 — don't plan around a full-precision reference.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule"/>
+
+  <footer>
+    <p><b style="color:var(--muted)">Method.</b> One GB10 box, one agent scaffold (mini-swe-agent), patches scored by the official SWE-bench harness on x86. Slices chosen model-appropriate (tractable, single-file). n is modest per language — treat as direction, not decimals. Configs matched on everything but the named variable; single-stream speed on an isolated box.</p>
+    <p class="legend"><code>A NVIDIA·marlin</code><code>B Unsloth·marlin</code><code>C Unsloth·b12x</code><code>D NVIDIA·b12x</code><code>W4A16 = 16-bit activations</code><code>W4A4 = FP4 activations</code></p>
+  </footer>
+
+</div>

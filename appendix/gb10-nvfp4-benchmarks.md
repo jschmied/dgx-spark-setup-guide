@@ -13,6 +13,13 @@ W4A16_NVFP4) and **Unsloth** (W4A4 experts + FP8 on attention/lm_head/last-8-lay
 
 The 2×2 configs: **A** = NVIDIA·marlin, **B** = Unsloth·marlin, **C** = Unsloth·b12x, **D** = NVIDIA·b12x.
 
+> **Superseded in part by [Appendix E](nvfp4-agentic-coding.md).** This page's agentic study (§2) is
+> **SWE-bench Lite, Python-only, temp 0, counting *submitted* patches**. A larger **multi-language,
+> resolution-scored** re-run (Appendix E) revises two conclusions: (a) the *"NVIDIA wins agentic"* verdict
+> is a **Python-only artifact** — on Java/JS, NVIDIA·b12x gives up 39 % of the time and **Unsloth wins
+> overall**; and (b) *"b12x is worse/slower"* is a **misattribution** — marlin ≈ b12x in speed; the
+> difference is give-up/persistence. The KV-cache ladder (§3) and the throughput sweep (§1) still stand.
+
 ---
 
 ## 1. Decode throughput — synthetic sweep (aggregate tok/s)
@@ -113,3 +120,8 @@ Ranking: **bf16 ≈ fp8 ≫ nvfp4.**
 
 Net: **NVIDIA·marlin·fp8-KV** (i.e. prod) is the agentic-optimal config on GB10; b12x is a
 throughput-only lever, not a default.
+
+> **Revised for coding agents ([Appendix E](nvfp4-agentic-coding.md)).** The scored multi-language re-run
+> holds this verdict for **Python-only** work, but for a **polyglot coding agent** the pick is
+> **Unsloth·b12x** (no Java/JS collapse, native-FP4 fast). And if you run NVIDIA weights, prefer **marlin
+> over b12x** for quality reasons (fewer give-ups), not speed — the two kernels benchmark ~equal single-stream.
