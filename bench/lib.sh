@@ -65,15 +65,21 @@ call_model() {
   [ -n "${BENCH_FORCE_TOPP:-}" ] && topp="$BENCH_FORCE_TOPP"
   [ -n "${BENCH_FORCE_TOPK:-}" ] && topk="$BENCH_FORCE_TOPK"
   [ -n "${BENCH_FORCE_MINP:-}" ] && minp="$BENCH_FORCE_MINP"
-  echo ">>> $model  temp=$temp top_p=$topp top_k=$topk min_p=$minp repeat=$rep  max_tokens=$maxtok" >&2
+  # Reasoning models whose template exposes a thinking budget (step-37: low|medium|high).
+  # Unset = send nothing, i.e. the model's own default. step-37 unconditioned spends its
+  # whole token budget in <think> and returns empty content — see bench/README.md.
+  local effort="${BENCH_REASONING_EFFORT:-}"
+  echo ">>> $model  temp=$temp top_p=$topp top_k=$topk min_p=$minp repeat=$rep  max_tokens=$maxtok${effort:+ reasoning_effort=$effort}" >&2
   local body
   body=$(jq -n --rawfile p "$prompt" --arg m "$model" \
     --argjson temp "$temp" --argjson topp "$topp" --argjson topk "$topk" \
-    --argjson rep "$rep" --argjson minp "$minp" --argjson mt "$maxtok" '
+    --argjson rep "$rep" --argjson minp "$minp" --argjson mt "$maxtok" \
+    --arg effort "$effort" '
     {model:$m, messages:[{role:"user",content:$p}],
      temperature:$temp, top_p:$topp, top_k:$topk, max_tokens:$mt, stream:false}
     + (if $rep  > 0 then {repeat_penalty:$rep} else {} end)
-    + (if $minp > 0 then {min_p:$minp} else {} end)')
+    + (if $minp > 0 then {min_p:$minp} else {} end)
+    + (if $effort != "" then {chat_template_kwargs:{reasoning_effort:$effort}} else {} end)')
   # Pass the key via a --config fd (process substitution) so it never appears
   # in the process list / argv. Only the prompt body goes on the command line.
   curl -s --max-time 2400 "$HOST/v1/chat/completions" \

@@ -9,6 +9,11 @@ cd "$(dirname "$0")"; source ./lib.sh
 MODEL="${1:?usage: run-samples.sh <model-id> <N> [go|java|both]}"
 N="${2:?N}"
 WHICH="${3:-both}"
+# Token caps. Reasoning models can spend the whole budget in <think> and deliver
+# nothing (finish=length, empty content) — that scores as a model FAIL when it is
+# really a harness cap. Raise these for reasoning models and check fin= in the output.
+MAXTOK_GO="${BENCH_MAXTOK_GO:-26000}"
+MAXTOK_JAVA="${BENCH_MAXTOK_JAVA:-24000}"
 mkdir -p "$RESULTS_DIR" .work
 export GOFLAGS=-mod=mod GOCACHE="${GOCACHE:-/tmp/gocache}" GOPATH="${GOPATH:-/tmp/gopath}"
 export JAVA_HOME="${JAVA_HOME:-$(ls -d /usr/lib/jvm/java-17-openjdk-* 2>/dev/null | head -1)}"
@@ -35,7 +40,7 @@ extract_go() {
 go_sample() {
   local i="$1" out="$RESULTS_DIR/go_${MODEL}_s${i}.json" md=".work/go_${MODEL}_s${i}.md"
   local src=".work/go_${MODEL}_s${i}" neu=".work/go_${MODEL}_s${i}_n"
-  call_model "$MODEL" "$BENCH_DIR/prompts/cache.txt" 26000 "$out" >/dev/null 2>&1
+  call_model "$MODEL" "$BENCH_DIR/prompts/cache.txt" "$MAXTOK_GO" "$out" >/dev/null 2>&1
   jq -r '.choices[0].message.content' "$out" > "$md"
   local blocks; blocks=$(extract_go "$md" "$src")
   local vet own neur err=""
@@ -54,7 +59,7 @@ go_sample() {
 java_sample() {
   local i="$1" out="$RESULTS_DIR/java_${MODEL}_s${i}.json"
   local proj=".work/java_${MODEL}_s${i}" neu=".work/java_${MODEL}_s${i}_n"
-  call_model "$MODEL" "$BENCH_DIR/prompts/transfer.txt" 24000 "$out" >/dev/null 2>&1
+  call_model "$MODEL" "$BENCH_DIR/prompts/transfer.txt" "$MAXTOK_JAVA" "$out" >/dev/null 2>&1
   rm -rf "$proj"; mkdir -p "$proj"
   python3 "$BENCH_DIR/extract_java.py" "$out" "$proj" >/dev/null 2>&1
   local own neur err=""

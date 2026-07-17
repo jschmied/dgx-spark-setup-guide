@@ -20,6 +20,17 @@ while i < len(lines):
         i += 1; blocks.append((lang, "\n".join(body)))
     else:
         i += 1
+# Some models label the file INSIDE the fence, so the body's first line is a bare
+# path ("pom.xml", "src/main/java/com/example/bank/Account.java"). That label is not
+# valid Java/XML and fails the build at [1,1] before any logic is tested. Strip a
+# first line that is *exactly* such a path; anything else is left untouched.
+labelre = re.compile(r'^[\w./\\-]+\.(?:java|xml)$')
+def strip_path_label(body):
+    b = body.lstrip("\n")
+    first, sep, rest = b.partition("\n")
+    return rest if sep and labelre.match(first.strip()) else body
+
+blocks = [(lang, strip_path_label(body)) for lang, body in blocks]
 pkgre = re.compile(r'^\s*package\s+([\w.]+)\s*;', re.M)
 typere = re.compile(r'(?:public\s+|final\s+|abstract\s+)*\b(class|interface|enum|record)\s+(\w+)')
 outdir = sys.argv[2]
