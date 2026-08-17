@@ -587,6 +587,49 @@ download and no training, and it converted a plausible-sounding argument into a 
 was not run separately — it searches the same generated text for copies, so the position-0 ceiling
 of ~42 % applies to it too.
 
+#### Was it the quantization mismatch? Measured on both targets — no
+
+DSpark was trained against `Qwen/Qwen3.8-27B-FP8`, so a natural objection to the result above is
+that we fed it activations from an NVFP4 target it was never fitted to. That is testable without
+any training: serve the FP8 target and repeat. Same drafter, same 8 agent contexts, same seed.
+
+**Acceptance at draft position 0:**
+
+| | MTP n=3 | DSpark k=7 | gap |
+|---|---|---|---|
+| **NVFP4 target** | **87.2 %** | 62.4 % | **−24.8 pp** |
+| **FP8 target** | 83.4 % | 65.0 % | **−18.4 pp** |
+| Δ from target | −3.8 pp | **+2.6 pp** | |
+
+**Effective tokens per step:**
+
+| | MTP n=3 | DSpark k=7 |
+|---|---|---|
+| NVFP4 | **3.31** | 2.73 |
+| FP8 | 3.20 | 2.78 |
+
+Overall acceptance: MTP 77.0 % / 73.4 %, DSpark 24.7 % / 25.4 %.
+
+**The mismatch is real but small.** DSpark gains **+2.6 pp** on its native target — the right
+direction, and about a tenth of the gap to MTP. Crucially the comparison now holds *within one
+target*: 83.4 % against 65.0 % on FP8. The confound is quantified rather than assumed away.
+
+The other diagonal is the surprise: **MTP loses 3.8 pp on FP8**, i.e. the built-in head does better
+on the *more* aggressively quantized target. Counter-intuitive, not robust at N=8 prompts, but
+enough to retire the assumption that a higher-precision target automatically helps a drafter.
+
+FP8 also costs throughput outright — 225 s versus 136 s for the same eight prompts — so even a
+favourable result here would have been a diagnosis, not a configuration worth adopting.
+
+> **Also ruled out: the upstream DSpark routing bug.** vllm-project/vllm#50851 reports that
+> `use_dflash()` excludes `"dspark"`, so the model runner never sets `use_aux_hidden_state_outputs`
+> and a drafter designed to read target layers `[4,16,28,40,52]` silently gets none of them. Our
+> 0.27.1 does contain the excluding code, so this looked like the explanation. Patching all four
+> sites and re-measuring produced a **bit-identical** result and an identical KV footprint — on
+> this version and this checkpoint the path is already equivalent. The patch was reverted rather
+> than carried as unverified local drift. Related: #51581 (quantized drafters, filed against this
+> exact GB10 setup), #49646 (arch routing), #49614.
+
 ### Third-party claims we could not reproduce
 
 - **"CUTLASS FP4 kernels emit silent garbage on SM121."** We run exactly that path
