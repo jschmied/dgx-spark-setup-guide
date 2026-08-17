@@ -1,0 +1,109 @@
+
+############################################################
+# deepseek-v4-flash-180b
+############################################################
+=== Task A (Go) :: deepseek-v4-flash-180b ===
+>>> deepseek-v4-flash-180b  temp=0.6 top_p=0.95 top_k=20 min_p=0 repeat=0  max_tokens=26000
+{
+  "finish": "stop",
+  "completion_tokens": 8034,
+  "has_reasoning": true,
+  "content_len": 13217
+}
+--- extracted ---
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/go_deepseek-v4-flash-180b/cache.go:package cache
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/go_deepseek-v4-flash-180b/cache_test.go:package cache_test
+stray fences (want 0 0):
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/go_deepseek-v4-flash-180b/cache.go:0
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/go_deepseek-v4-flash-180b/cache_test.go:0
+--- go vet (own) ---
+cache.go:10:8: "std" is not an importable package; see 'go help packages'
+--- go test -race (own suite) ---
+cache.go:10:8: "std" is not an importable package; see 'go help packages'
+--- go test -race (NEUTRAL suite) ---
+cache.go:10:8: "std" is not an importable package; see 'go help packages'
+=== VERDICT deepseek-v4-flash-180b (Go) :: vet=FAIL own=FAIL neutral=FAIL ===
+=== Task B (Java) :: deepseek-v4-flash-180b  (JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64) ===
+>>> deepseek-v4-flash-180b  temp=0.6 top_p=0.95 top_k=20 min_p=0 repeat=0  max_tokens=24000
+{
+  "finish": "stop",
+  "completion_tokens": 3209,
+  "has_reasoning": true,
+  "content_len": 12351
+}
+wrote pom.xml
+wrote src/main/java/com/example/bank/BankApplication.java
+wrote src/main/java/com/example/bank/Account.java
+wrote src/main/java/com/example/bank/AccountRepository.java
+wrote src/main/java/com/example/bank/TransferService.java
+wrote src/main/java/com/example/bank/AccountNotFoundException.java
+wrote src/main/java/com/example/bank/InsufficientFundsException.java
+wrote src/test/java/com/example/bank/TransferServiceTest.java
+wrote src/test/java/com/example/bank/AccountRepositoryDataJpaTest.java
+--- files ---
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/pom.xml
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/main/java/com/example/bank/Account.java
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/main/java/com/example/bank/AccountNotFoundException.java
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/main/java/com/example/bank/AccountRepository.java
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/main/java/com/example/bank/BankApplication.java
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/main/java/com/example/bank/InsufficientFundsException.java
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/main/java/com/example/bank/TransferService.java
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/AccountRepositoryDataJpaTest.java
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java
+--- mvn test (own suite) ---
+[ERROR] COMPILATION ERROR : 
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[7,25] cannot find symbol
+  symbol:   class MockitoJUnitExtension
+  location: package org.mockito.junit
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[17,13] cannot find symbol
+  symbol: class MockitoExtension
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/AccountRepositoryDataJpaTest.java:[45,27] cannot find symbol
+  symbol:   method persistAndReturn(com.example.bank.Account)
+  location: variable em of type org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[29,15] cannot find symbol
+  symbol:   method setId(long)
+  location: variable source of type com.example.bank.Account
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[31,13] cannot find symbol
+  symbol:   method setId(long)
+  location: variable dest of type com.example.bank.Account
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[47,15] cannot find symbol
+  symbol:   method setId(long)
+  location: variable source of type com.example.bank.Account
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[49,13] cannot find symbol
+  symbol:   method setId(long)
+  location: variable dest of type com.example.bank.Account
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:testCompile (default-testCompile) on project bank: Compilation failure: Compilation failure: 
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[7,25] cannot find symbol
+[ERROR]   symbol:   class MockitoJUnitExtension
+[ERROR]   location: package org.mockito.junit
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[17,13] cannot find symbol
+[ERROR]   symbol: class MockitoExtension
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/AccountRepositoryDataJpaTest.java:[45,27] cannot find symbol
+[ERROR]   symbol:   method persistAndReturn(com.example.bank.Account)
+[ERROR]   location: variable em of type org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[29,15] cannot find symbol
+[ERROR]   symbol:   method setId(long)
+[ERROR]   location: variable source of type com.example.bank.Account
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[31,13] cannot find symbol
+[ERROR]   symbol:   method setId(long)
+[ERROR]   location: variable dest of type com.example.bank.Account
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[47,15] cannot find symbol
+[ERROR]   symbol:   method setId(long)
+[ERROR]   location: variable source of type com.example.bank.Account
+[ERROR] /home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b/src/test/java/com/example/bank/TransferServiceTest.java:[49,13] cannot find symbol
+[ERROR]   symbol:   method setId(long)
+[ERROR]   location: variable dest of type com.example.bank.Account
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+--- mvn test (NEUTRAL suite) ---
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+/home/jschmied/git/dgx-spark-setup-guide/bench/.work/java_deepseek-v4-flash-180b_neutral/target/surefire-reports/com.example.bank.NeutralTransferTest.txt:Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.557 s -- in com.example.bank.NeutralTransferTest
+=== VERDICT deepseek-v4-flash-180b (Java) :: own=FAIL neutral=PASS ===
+
+All done. JSON responses in results/, build dirs in .work/.
+BENCH_EXIT=0
