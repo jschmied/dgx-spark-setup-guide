@@ -507,7 +507,64 @@ Three things fall out, and they are the design brief:
 3. **Sustained acceptance beats peak acceptance.** MTP holds 87/77/67 over three positions. A
    drafter must hold ~75–80 % over *seven* — much harder than beating 87 % once.
 
-### Proposal: try n-gram / suffix drafting before training anything
+### Measured: nothing available beats the MTP head that ships with the target
+
+Four configurations, same 8 agent contexts, acceptance from vLLM's per-position counters:
+
+| config | tokens/step | bytes/step | acceptance | sessions @262 k |
+|---|---|---|---|---|
+| **MTP n=3** | **3.31** | 22.8 GB | 77.0 % | 7.18× |
+| DSpark k=7 | 2.73 | 41.5 GB | 24.7 % | 1.93× |
+| n-gram k=8 | 2.62 | 22.6 GB | 20.3 % | 7.07× |
+| n-gram k=4 | 2.26 | 22.6 GB | 31.5 % | 7.61× |
+
+Per-position acceptance, which is where the differences come from:
+
+| position | MTP n=3 | DSpark k=7 | n-gram k=8 |
+|---|---|---|---|
+| 0 | **87.2 %** | 62.4 % | 42.3 % |
+| 1 | 76.7 % | 41.2 % | 27.4 % |
+| 2 | 67.2 % | 26.0 % | 22.1 % |
+| 3–7 | — | 18.6 → 5.6 % | 17.4 → 12.0 % |
+
+**The copy-based proposal below was too optimistic, and the number that killed it is position 0.**
+The reasoning was that agent traffic is saturated with verbatim repetition — true of the *prompts*
+(1.52 M prompt vs 1.34 M assistant tokens in our corpus, and the prompts are largely echoed source)
+but not of what the model *generates*. Explanations, diff hunks and commands with varying arguments
+are new text. Only 42–45 % of immediate next tokens are copyable. Inferring predictability from a
+corpus statistic instead of measuring it was the error; the measurement cost one hour.
+
+n-gram does have the flattest tail of the three (12 % still accepted at position 7 vs DSpark's
+5.6 %) — when a copy match exists it tends to continue. Deeper `k` therefore helps it: `k=8` beat
+`k=4` by 16 %. Extrapolating the tail, matching MTP would need roughly `k=14`, at rising scheduler
+cost. Not obviously worth it, but the trend is real and cheap to re-test.
+
+**Why MTP is hard to beat:** it ships *inside* the target checkpoint (15 tensors — one transformer
+layer plus a projection), so it costs no extra weight bytes per step, needs no second precision
+class, and was fitted to exactly these activations at exactly this quantization. Every external
+drafter must pay its own bandwidth *and* out-predict it.
+
+#### The one proposal whose economics work: more MTP heads
+
+MTP's ceiling is drift, not capability. There is **one** head, reused at every draft position
+(`qwen3_5_mtp.py:162` — `spec_step_idx % num_mtp_layers` is always 0), so position 2 consumes hidden
+states derived from its own guesses. The measured decay 87 → 77 → 67 is exactly that, and it is why
+`nspec=3` is the optimum while `nspec=4` collapses.
+
+DeepSeek-style **separate heads per position** remove the drift by construction. If acceptance held
+near 87 % across four positions, that is ~4.2 tokens/step against today's 3.31 — **+27 % with zero
+additional bytes per step**, because the heads live in the target checkpoint like the existing one.
+
+Training such heads is real work, but note what it avoids: no second checkpoint to keep in step, no
+provenance question, no quantization mismatch, and no capacity loss. The MTP head is also a natural
+**initialization** for them — it is already fitted to this target at this precision.
+
+> **Not** a distillation target, though: acceptance is defined against what the *target* samples, so
+> the target is the teacher. Training a drafter against the MTP head would inherit its 12.8 % miss
+> at position 0 as a floor, and the head has no signal at all beyond position 2 — silent exactly
+> where a deeper drafter needs to learn.
+
+### Rejected after measurement: n-gram / suffix drafting
 
 The table's bottom row is the interesting one: at near-zero drafter cost the bar drops to ~79 % at
 `k=4`. vLLM already ships two drafters that cost **no model bytes at all** —
@@ -524,11 +581,11 @@ provenance question, no extra weights, and no separate checkpoint to keep in ste
 It is not free of cost: `k` speculative positions still enlarge scheduler buffers, which is what
 took KV from 66.74 to 27.06 GiB at `k=7` — budget for that, or run a smaller `k`.
 
-**Test order:** `ngram` and `suffix` at `k=3` and `k=4`, measured with
-`/opt/llm/replay_bench.py` against the same 24 agent contexts, and acceptance read from the
-per-position counters. That is roughly an hour, needs no downloads, and — unlike a fine-tune —
-fails cheaply. Only if copy-based drafting also falls short is a trained drafter worth revisiting,
-and then it must be ≤ 4-bit and trained on **this** target's activations.
+**Result: it fell short** — see the measurement above. `k=4` gave 2.26 tokens/step and `k=8` gave
+2.62, against MTP's 3.31, for the same bytes moved. The idea was still worth the hour: it cost no
+download and no training, and it converted a plausible-sounding argument into a number. `suffix`
+was not run separately — it searches the same generated text for copies, so the position-0 ceiling
+of ~42 % applies to it too.
 
 ### Third-party claims we could not reproduce
 
