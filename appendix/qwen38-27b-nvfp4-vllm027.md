@@ -84,20 +84,51 @@ vllm serve /models/qwen38-27b-nvfp4 \
   --enable-force-include-usage \
   --limit-mm-per-prompt '{"image":4,"video":0}' \
   --mm-processor-kwargs '{"max_pixels":1048576}' \
-  --max-model-len 262144 --max-num-seqs 4 --max-num-batched-tokens 8192 \
+  --max-model-len 262144 --max-num-seqs 16 --max-num-batched-tokens 8192 \
   --enable-chunked-prefill --enable-prefix-caching \
-  --compilation-config '{"cudagraph_mode":"PIECEWISE","cudagraph_capture_sizes":[1,2,4,8]}' \
-  --gpu-memory-utilization 0.5 --load-format fastsafetensors --trust-remote-code
+  --default-chat-template-kwargs '{"reasoning_effort":"medium"}' \
+  --compilation-config '{"cudagraph_mode":"PIECEWISE","cudagraph_capture_sizes":[1,2,4,8,16]}' \
+  --gpu-memory-utilization 0.76 --load-format fastsafetensors --trust-remote-code
 ```
+
+`cudagraph_capture_sizes` **must cover `max-num-seqs`** — batches larger than the biggest captured
+size silently fall back to eager. Raising one without the other is a quiet regression.
+
+PIECEWISE (not FULL) is also the correct mode under speculation: FULL capture is reported to
+corrupt output when combined with spec-decode. `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+is required for the full 262 k window.
 
 **No `--override-generation-config`** — the checkpoint's `generation_config.json`
 (temp 1.0 / top_p 0.95 / top_k 20) *is* the vendor thinking-mode set. Non-thinking clients should
 send temp 0.7 / top_p 0.80 / presence_penalty 1.5 per request.
 
-**`--gpu-memory-utilization 0.5` is enough**, and that is not a typo: it yields **35.45 GiB KV =
-1,114,865 tokens**, against the ~1.05 M needed for 4 sequences at the full 262 k window. The hybrid
-attention is why — only **16 of 64 layers** carry full-attention KV, the rest are linear attention.
-Leaving 0.4 of the machine unused costs nothing here and keeps you clear of the JIT-OOM failure mode.
+### Sizing: two ceilings, and which one binds
+
+The hybrid attention makes KV unusually cheap — only **16 of 64 layers** carry full-attention KV,
+the rest are linear attention. At `fp8` KV that works out to **37.2 KiB/token**. Measured on a
+121 GB box:
+
+| `gpu-memory-utilization` | KV | tokens | sessions @262 k | free RAM left |
+|---|---|---|---|---|
+| 0.50 | 35.45 GiB | 1,114,865 | 4.3 | ~55 GB |
+| 0.60 | 46.98 GiB | 1,325,364 | 5.1 | ~40 GB |
+| **0.76** | **66.74 GiB** | **1,883,336** | **7.2** | **~20 GB** |
+
+Two limits apply at once and the crossover moves with utilisation:
+
+```
+context per session > KV_tokens / max_num_seqs   ->  KV memory binds
+context per session < KV_tokens / max_num_seqs   ->  max-num-seqs binds
+```
+
+At 0.76 with `max-num-seqs 16` the crossover is **~118 k tokens/session**. Below that you get all
+16 sessions; above it you get `KV_tokens / context`. vLLM prints the answer itself at startup:
+`Maximum concurrency for 262,144 tokens per request: 7.18x`.
+
+⚠️ **Do not chase the last few GB.** `0.9` plus a 75 GiB KV pin killed this box outright (global
+OOM, power-cycle required). 0.76 leaves ~20 GB, which is enough headroom for a FlashInfer JIT
+recompile *provided* `MAX_JOBS`/`FLASHINFER_NVCC_THREADS` are bounded as above. Verify after any
+change that `free -g` still shows a double-digit "available" figure.
 
 ### Verify the native FP4 path is live
 ```
@@ -323,9 +354,62 @@ cached prefill, and the vendor default is the safer side of it.
 - **Prefix caching + this hybrid arch is flagged experimental** by vLLM
   (`Mamba cache 'align' mode`), and we run with it enabled.
 - **Not tested:** output quality at MTP depth (speculative decoding is distribution-preserving in
-  theory; we did not verify empirically), the `RadixArk/Qwen3.8-27B-DSpark` draft model as an
-  MTP alternative, and other NVFP4 quants (`RadixArk`, `Inferact`) against Unsloth's. Checkpoint
-  provenance is a plausible source of the ~50 % throughput disagreement between published reports.
+  theory; we did not verify empirically), and other NVFP4 quants (`RadixArk`, `Inferact`) against
+  Unsloth's. Checkpoint provenance is a plausible source of the ~50 % throughput disagreement
+  between published reports.
+
+### DSpark drafting — works, but it is not a drop-in win
+
+The DSpark draft model *does* run against this target on vLLM 0.27.1, after two non-obvious steps:
+
+1. The checkpoint ships `architectures: ["DSparkDraftModel"]`, which vLLM's registry maps to
+   **DeepSeek-V4** (`registry.py:617`). A Qwen3 target needs `["Qwen3DSparkModel"]`
+   (`registry.py:618` → `qwen3_dspark.py`). Patch the drafter's `config.json`.
+2. Pass the drafter path **explicitly**. With `model` unset, the dspark branch
+   (`config/speculative.py:717`) assumes DeepSeek-style in-checkpoint weights.
+
+```bash
+--speculative-config '{"method":"dspark","model":"/models/qwen38-27b-dspark","num_speculative_tokens":7}'
+```
+
+Paired against MTP n=3 (same util, `--max-model-len 32768`, `usage` tokens, 3 runs):
+
+| prompt | MTP n=3 | DSpark k=7 | DSpark k=14 |
+|---|---|---|---|
+| code (py) | 30.3 | **43.8 (+45 %)** | 42.8 |
+| prose | 18.0 | 16.4 (−9 %) | 13.8 (−23 %) |
+| code (bash) | 25.3 | 23.4 (−8 %) | 19.9 (−21 %) |
+| mean | 24.9 | **28.0 (+12 %)** | 26.0 |
+
+**`k=14` is worse than `k=7` here**, contradicting the published recommendation, and the reported
+72–75 tok/s single-stream did not reproduce — our best single figure is 43.8 on one code prompt.
+The likely reason is workload: published DSpark numbers come from an *edit-heavy* harness, where a
+drafter predicts echoed text cheaply, while the probe above generates fresh short text. That cuts
+both ways — agent traffic echoes file contents constantly, so real-work gain may exceed +12 %.
+**Unmeasured on real agent traffic; measure before adopting.** We stay on MTP n=3.
+
+Constraint: DSpark does **not** fit alongside the 262 k window at util 0.6 (needs ~14 GiB KV,
+6.5 available). Either shorten the context or raise utilisation.
+
+### Third-party claims we could not reproduce
+
+- **"CUTLASS FP4 kernels emit silent garbage on SM121."** We run exactly that path
+  (`CutlassNvFp4LinearKernel` + `CutlassFp4GemmRunner`) and scored **70/100 on SWE-bench
+  Multilingual**, plus 25/28 on a Java/JS slice reproduced twice with zero variance. Garbage output
+  does not solve real repository bugs. Treat as version-specific or wrong.
+- **"`W4A4` buys nothing."** That is a *performance* argument about activation precision; it is
+  presented alongside the correctness claim above and should not be read as one.
+- **Confirmed and already in the serve command:** `VLLM_MARLIN_USE_ATOMIC_ADD=1`, PIECEWISE
+  cudagraphs, `expandable_segments:True`.
+
+### ⚠️ `thinking_token_budget` may not apply
+
+vLLM 0.27.1 logs `Model Runner V2 does not yet support the thinking_token_budget request
+parameter`. This is the *only* sampler-enforced brake on runaway thinking, so where it is
+unavailable the effort level is a prompt nudge and nothing more. Observed consequence on real
+agent work: one SWE-bench instance burned `max_tokens` inside `<think>` five times at
+`reasoning_effort=medium` and never emitted a tool call, scoring as an empty patch. **Verify the
+parameter takes effect on your runner before relying on it.**
 - **Effort-level cost is unmeasured.** Three *semantically identical* requests produced 74 / 362 /
   489 reasoning tokens at temp 1.0. Any `medium`-vs-`xhigh` cost claim needs N ≥ 10 per cell.
 
@@ -402,6 +486,67 @@ eviction ordering. The model writes correct code and an inconsistent test for it
 > Harness note: `bench/run-go.sh`'s extractor asked for `m.group(2)` against a single-group regex,
 > raising `IndexError` on any response that actually contained a fenced code block — it only ever
 > appeared to work on empty responses. Group the language tag (`^```(\w*)\n(.*?)^```) to fix it.
+
+## 11. SWE-bench Multilingual — 70/100
+
+100-instance slice (seed 20260815), mini-swe-agent, `reasoning_effort=medium`, temp 0.6,
+`max_tokens 24000`, 6 workers.
+
+| outcome | n | meaning |
+|---|---|---|
+| resolved | **70** | patch applied, tests pass |
+| unresolved | 28 | real patch, tests fail — model miss |
+| patch did not apply | 1 | edited a *generated* file (`src/parser.c` from `parser.y`) |
+| empty patch | 1 | burned `max_tokens` inside `<think>`, never emitted a tool call |
+
+**70.0 %** of the full slice. Every non-result is accounted for, which is the point — see the
+harness bug below, which turned 18 solved instances into apparent model failures.
+
+Head-to-head against **qwen3.6-27B** on the same 28 Java/JS instances:
+
+| | resolved | Δ |
+|---|---|---|
+| qwen3.6-27B | 21/28 = 75.0 % | — |
+| **qwen3.8-27B** | **25/28 = 89.3 %** | +14.3 pp (wins 6, loses 2) |
+
+3.6's two non-results are genuine, not harness artifacts (checked: zero discarded submissions,
+zero shell noise in those images). One is a `ContextWindowExceededError` that 3.8 solves — the
+262 k native window is a plausible cause. 3.8 reproduced 25/28 across two independent runs with
+**zero instance-level variance** at temp 0.6. N=28 still means roughly ±10 pp, so treat the gap as
+a strong signal rather than a precise figure.
+
+### ⚠️ The harness bug that fakes model failures
+
+mini-swe-agent's `_check_finished` (`environments/docker.py:140`) accepts the submit marker **only
+on line 0**. Many `swebench/sweb.eval.x86_64.*` images ship a `/root/.bashrc` that sources a
+nonexistent conda path, and `config/benchmarks/swebench.yaml` sets `BASH_ENV=/root/.bashrc`, so
+every command prints an error *before* its real output. The submission is discarded, the agent
+idles to `step_limit`, and a solved task is recorded as an **empty patch**.
+
+Note the trigger is `BASH_ENV`, **not** the login shell — `swebench.yaml` already sets
+`interpreter: ["bash","-c"]`, so overriding that in a config overlay is a **no-op**.
+
+Measured on 18 affected instances, identical config otherwise:
+
+| | before | after |
+|---|---|---|
+| exited `Submitted` | 0/18 | **18/18** |
+| trajectory length | ~500 messages (step limit) | 25–103 messages |
+| of those, resolved | — | **13** |
+
+Thirteen solved instances — 13 pp on a 100-slice — were being scored as failures. A second
+symptom: when a submission *does* register with noise behind the marker, the noise is stored
+inside `model_patch` (12 of 28 predictions), which mostly still scores but adds an unexplained
+patch-application risk.
+
+Fix: skip shell-startup noise before the line-0 check, and again inside the payload.
+
+```python
+_STARTUP_NOISE = re.compile(r"^\S*(?:bashrc|bash_profile|profile|BASH_ENV):\s*line\s+\d+:")
+```
+
+**Any empty-patch count from an unpatched harness is not a model result.** Check before quoting
+one — including your own historical numbers.
 
 ## References
 
