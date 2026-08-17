@@ -360,6 +360,42 @@ cached prefill, and the vendor default is the safer side of it.
 
 ### DSpark drafting — works, but it is not a drop-in win
 
+**Provenance first, because this is third-party weights running in your inference process.**
+
+| | |
+|---|---|
+| Checkpoint | `RadixArk/Qwen3.8-27B-DSpark` — **not** published by Qwen/Alibaba |
+| Method | DSpark, extending **DFlash** (`github.com/z-lab/dflash`, arXiv 2602.06036) — an academic block-diffusion drafting method, not a vendor feature |
+| Trained with | **SpecForge** (`github.com/sgl-project/SpecForge`), served upstream via SGLang |
+| Checkpoint tag | `epoch_2_step_4166` — i.e. 2 epochs |
+| Size / dtype | 1.36 B params, BF16, 5 full-attention layers, GQA 40 Q / 8 KV heads |
+| Wiring into the target | auxiliary features tapped from target layers **`[4, 16, 28, 40, 52]`**; vanilla Markov confidence head, rank 256; block size 7 |
+| **Training data** | **not disclosed.** The card names the method and the checkpoint step but never the corpus. |
+| License | `other`, no named author |
+
+**⚠️ It was trained against a different quantization of the target.** The card states the target is
+`Qwen/Qwen3.8-27B-FP8`; we serve `unsloth/Qwen3.8-27B-NVFP4`. The drafter consumes hidden states
+from those five target layers, so it is being fed activations from weights it was not trained on.
+That is a plausible cause of the underwhelming result below, and it is testable: the FP8 checkpoint
+would isolate it.
+
+Their own reported acceptance length is **3.39 mean over 1,164 requests** (11 workloads, FP8 target
++ BF16 draft, SGLang) — 3.47 on HumanEval down to 2.71 on Arena-Hard-v2. Ours is a different target
+quantization and a different engine, so those numbers do not transfer.
+
+**Risk framing:** speculative decoding verifies every drafted token against the target, so the
+distribution is preserved and a poor or even hostile drafter costs *throughput*, not correctness.
+That bounds the exposure — but it is still unaudited third-party code (`dflash.py`, `dspark.py` ship
+with the checkpoint and require `--trust-remote-code`) executing in the server process.
+
+Related drafters on this box, for the same provenance question:
+- `z-lab/Qwen3.6-27B-DFlash` — academic, and its own card says *"still under training, and inference
+  engine support may not be fully available yet"*. Compute credited to Modal, InnoMatrix, Yotta Labs.
+  Training data not disclosed.
+- `poolside/Laguna-S-2.1-DFlash-NVFP4` — **the only first-party one**: poolside publishes both the
+  base and the speculator, and states `e0630_rhiemann_baseline` SFT, DFlash Stage-2, 15 k steps.
+  Corpus still not disclosed.
+
 The DSpark draft model *does* run against this target on vLLM 0.27.1, after two non-obvious steps:
 
 1. The checkpoint ships `architectures: ["DSparkDraftModel"]`, which vLLM's registry maps to
@@ -383,10 +419,16 @@ Paired against MTP n=3 (same util, `--max-model-len 32768`, `usage` tokens, 3 ru
 
 **`k=14` is worse than `k=7` here**, contradicting the published recommendation, and the reported
 72–75 tok/s single-stream did not reproduce — our best single figure is 43.8 on one code prompt.
-The likely reason is workload: published DSpark numbers come from an *edit-heavy* harness, where a
-drafter predicts echoed text cheaply, while the probe above generates fresh short text. That cuts
-both ways — agent traffic echoes file contents constantly, so real-work gain may exceed +12 %.
-**Unmeasured on real agent traffic; measure before adopting.** We stay on MTP n=3.
+
+Two candidate explanations, neither yet separated:
+1. **Workload.** Published DSpark numbers come from an *edit-heavy* harness, where a drafter
+   predicts echoed text cheaply; the probe above generates fresh short text. This cuts both ways —
+   agent traffic echoes file contents constantly, so real-work gain may exceed +12 %.
+2. **Quantization mismatch.** The drafter was trained against the FP8 target, not this NVFP4 one
+   (see provenance above), so its layer taps see activations it was not fitted to.
+
+**Unmeasured on real agent traffic; measure before adopting.** We stay on MTP n=3 — which has the
+advantage of shipping *inside* the target checkpoint, so it carries no separate provenance question.
 
 Constraint: DSpark does **not** fit alongside the 262 k window at util 0.6 (needs ~14 GiB KV,
 6.5 available). Either shorten the context or raise utilisation.
