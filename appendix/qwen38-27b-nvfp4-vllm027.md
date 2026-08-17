@@ -372,6 +372,30 @@ Dequantized both checkpoints and compared them to `Qwen/Qwen3.8-27B` BF16, 12 ML
 across tensors). Note `N↔F ≈ N↔B`: the distance to FP8 *is* the distance to the truth, because FP8
 is so close — which is what makes FP8 a usable stand-in when the BF16 weights are not on disk.
 
+### ⚠️ Do not read weight-L2 as a quality number
+
+**12 % is what the format costs, and it is not 1/16.** NVFP4 is E2M1 — *one* mantissa bit, so only
+two values per octave (`1, 1.5` then `2, 3` then `4, 6`). Relative grid steps are 29–67 %, averaging
+~40 %, and round-to-nearest over a ~40 % step gives an RMS relative error near `0.4/√12 ≈ 11.5 %`.
+The correct intuition is "one mantissa bit", not "16 levels"; 1/16 would apply to *linear*
+quantization. Simulating ideal E2M1 with group-16 `amax` scaling on the same tensors yields
+**9.43 %**, so 12 % is the expected order of magnitude.
+
+**But the shipped checkpoint is 12.59 % where ideal round-to-nearest is 9.43 %, and that gap is
+informative in the opposite direction from what it looks like.** Ruled out: nibble order (the
+alternative gives 141.69 %, i.e. garbage), scale derivation (stored scales are the ideal `amax/6`,
+median ratio 0.9998), and FP8 storage of the scale (worth 0.05 pp). The cause is the rounding
+itself — only **74.1 %** of weights carry the nearest E2M1 code; 13.1 % sit one grid step high,
+12.0 % one step low, mean offset +0.012.
+
+That symmetric, non-systematic pattern is the signature of a quantizer optimising **layer output
+error** rather than weight error — the GPTQ/AWQ family deliberately accepts larger weight deviation
+to compensate downstream. So a *better* quantizer scores *worse* on this metric.
+
+**Consequence: weight-L2 is a valid format comparison (NVFP4 vs FP8, same method both sides) but
+not a quality measure.** It says how far the numbers moved, not how much capability was lost — and
+this checkpoint carries 12.59 % weight deviation while solving 70 of 100 real repository bugs.
+
 ### Why this closes the recalibration question
 
 Of the 1,968 tensors, exactly **200 are calibrated**: 168 `input_global_scale` and 32 KV
@@ -396,9 +420,10 @@ Two further measurements support leaving it alone:
 
 ### The honest framing
 
-The same checkpoint carrying 12.1 % weight error and 1.11 nats of distributional distance from FP8
-**solves 70 of 100 real repository bugs**. Quantization error does not translate linearly into task
-failure, which is exactly why neither number should be read as an alarm.
+The same checkpoint carrying 12.6 % weight deviation and 1.11 nats of distributional distance from
+FP8 **solves 70 of 100 real repository bugs**. Neither number is a quality measure: the first is
+inflated by a quantizer that optimises output error over weight error (see the warning above), and
+the second measures distance from FP8, which is not ground truth for anything we care about.
 
 **If you want more quality, change the format, not the calibration.** FP8 is 4.5× closer to the
 original — and costs 30.9 GB instead of 22.6, and ran measurably slower here (225 s vs 136 s for the
