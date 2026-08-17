@@ -69,9 +69,11 @@ Fine-tuning is the right tool for distribution shift, and the shared 87 %-capabi
 trained — there is nothing to relearn.
 
 **Why this is not the DSpark plan again:** that one died because an external drafter must pay its
-own bandwidth *and* out-predict a head that ships inside the target. Extra MTP heads pay almost
-nothing: `k` heads are read **once each**, exactly like one head read `k` times. Bytes per step are
-unchanged; only resident memory grows by ~0.25 GB per head.
+own bandwidth *and* out-predict a head that ships inside the target. Extra MTP heads are cheaper,
+though **not free** (Phase 0 corrected this): `k` heads are read **once each**, exactly like one
+head read `k` times, so weight bytes per step are unchanged — but each head is a full attention
+layer and adds **~6 % KV per token**. Measured head size is **745 MB**, not the 0.25 GB first
+assumed.
 
 ---
 
@@ -115,19 +117,23 @@ Measured on 8 real agent contexts, acceptance from
 | 2 | 67.2 % | **> 67.2 %** |
 | 3 | collapses | anything usable is new capability |
 
-Today: **3.31 tokens/step at 23.35 GB = 7.05 GB per generated token.**
+Today: **3.31 tokens/step at 24.8 GB = 7.50 GB per generated token** (22.6 GB target + 3 reads of
+the 745 MB head).
 
-Payoff range, assuming `k=4` and 0.25 GB per head:
+Payoff range at `k=4`, using the **measured** 745 MB per head:
 
 | scenario | tokens/step | GB/token | throughput |
 |---|---|---|---|
-| no decay (87/87/87/87) | 4.49 | 5.26 | **+34 %** |
-| gentle decay (87/85/82/79) | 4.33 | 5.45 | +30 % |
-| today's decay, no compounding | 4.10 | 5.75 | +23 % |
-| pessimistic (87/77/67/58) | 3.89 | 6.07 | **+16 %** |
+| no decay (87/87/87/87) | 4.49 | 5.70 | **+32 %** |
+| gentle decay (87/85/82/79) | 4.33 | 5.91 | +27 % |
+| today's decay, no compounding | 4.10 | 6.24 | +20 % |
+| pessimistic (87/77/67/58) | 3.89 | 6.58 | **+14 %** |
 
-Even the pessimistic case wins, because the fourth position costs 0.25 GB and contributes ~0.58
-accepted tokens. That asymmetry is the entire argument.
+Even the pessimistic case wins on throughput, because the fourth position costs one extra 745 MB
+read and contributes ~0.58 accepted tokens. That asymmetry is the argument — but weigh it against
+the KV cost: four heads take full-context concurrency from 7.16× to roughly **5.5×**. On an agent
+fleet running long contexts, that trade is not obviously worth +14 %; on single-stream latency it
+is.
 
 ---
 
