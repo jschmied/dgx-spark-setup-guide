@@ -36,9 +36,25 @@ Current map (`temp / top_p / top_k / repeat / min_p`; `top_p=1.0` = nucleus off)
 
 `step-37`'s card documents only temp 1.0 (top_p/top_k/min_p unspecified, so a
 mild neutral nucleus is used). It is the heaviest model in the roster (UD-Q3_K_XL
-~84 GB, multi-minute swaps) and a **reasoning** model — give it a generous
-`max_tokens` or `content` comes back empty. It is **not coding-benchmarked yet** —
-run it explicitly (`./run-all.sh step-37`); it's excluded from the default sweep.
+~89 GB, multi-minute swaps, `-np 1`) and a **reasoning** model. Benchmarked
+2026-07-17 (N=1: Java pass, Go fail — page 13); excluded from the default sweep,
+run it explicitly (`./run-all.sh step-37`).
+
+**`step-37` MUST be given `reasoning_effort`** (`low`|`medium`|`high`) or it returns
+**nothing**: its template always opens `<think>` with no off-switch, so unconditioned
+it spends the entire budget reasoning and comes back `finish=length` with empty
+`content` — which the harness then scores as a FAIL the model never earned.
+
+```bash
+BENCH_REASONING_EFFORT=medium BENCH_MAXTOK_GO=60000 BENCH_MAXTOK_JAVA=60000 \
+  ./run-samples.sh step-37 4 both
+```
+
+`BENCH_REASONING_EFFORT` (lib.sh) sends `chat_template_kwargs.reasoning_effort`;
+unset = the model's own default. `BENCH_MAXTOK_GO` / `BENCH_MAXTOK_JAVA`
+(run-samples.sh) override the 26k/24k caps — too small for reasoning models
+(step-37 spends ~34k at `medium`; the cap already cost `qwen36-27b` a Go sample).
+Always check `fin=` in the output before trusting a verdict.
 
 `gemma-4-26B-A4B` uses **min-p with top-p disabled** — it fixed its Go
 variance (1/4→4/4 at temp 1.0; see page 14). Override any model for an

@@ -158,26 +158,37 @@
 
   <hr class="rule"/>
 
+  <!-- CORRECTION -->
+  <section>
+    <div class="trap">
+      <div class="stripe">corrected<br/>2026-07-14</div>
+      <div>
+        <p><b>This page originally said NVIDIA·b12x "gives up" on 39% of Java/JS tasks. That was a benchmarking artifact, and the claim is withdrawn.</b> Those empty patches were <b>uncached Docker eval images timing out</b> (<span class="mono">pull_timeout&nbsp;=&nbsp;120s</span>) — the model was never called on those instances. The three configs ran back-to-back against a <b>warming image cache</b>, so the failures tracked <em>run order</em>, not the model: D ran first and lost <b>8</b> instances, C lost 2, A lost 0. Verified against the surviving harness reports: all 8 of D's failures are in its <span class="mono">empty_patch_ids</span>.</p>
+        <p style="margin-top:8px">Scored only on instances each config <b>actually attempted</b>, real give-ups are <b>~3–4 for every config</b> — no difference. <b>What survives is a language split</b>, and it is <em>stronger</em> than first reported. Numbers below are the corrected ones.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- VERDICT -->
   <section>
     <div class="verdict">
       <div class="top"><h2>Bottom line</h2></div>
       <div class="rows">
         <div class="vrow">
-          <div class="k">Best overall</div>
-          <div class="v"><span class="pick">Unsloth · b12x</span> — fastest path that <b>doesn't collapse on Java/JS</b>. 34/58 resolved, no calibration skew, native FP4 speed.</div>
+          <div class="k">Polyglot agent</div>
+          <div class="v"><span class="pick">Unsloth · b12x</span> — best on Java/JS (<span class="mono">65%</span> vs NVIDIA's <span class="mono">50%</span>), native FP4 speed, nothing to mis-calibrate. The safe default.</div>
         </div>
         <div class="vrow">
-          <div class="k">If NVIDIA weights</div>
-          <div class="v">Use <span class="pick">marlin</span>, <b>not b12x</b>. Same speed, ~half the Java/JS give-ups. b12x's uniform FP4 activations are what break NVIDIA on Java/JS.</div>
+          <div class="k">Python-heavy agent</div>
+          <div class="v"><span class="pick">NVIDIA</span> — its Python edge is <b>real and bigger than we first thought</b>: <span class="mono">73%</span> vs <span class="mono">59%</span> resolved. Kernel barely matters; marlin is the no-opt-in choice.</div>
         </div>
         <div class="vrow">
-          <div class="k">Python-only agent</div>
-          <div class="v">Either NVIDIA config is fine — a slim edge over Unsloth (<span class="mono">19</span> vs <span class="mono">17</span> / 30). The gap only opens up on other languages.</div>
+          <div class="k">Kernel</div>
+          <div class="v"><b>Speed is a wash</b> (within 3–7%, measured). There is <b>no b12x "give-up trap"</b> — that was the artifact. Pick b12x for Unsloth (its FP4 design), marlin otherwise.</div>
         </div>
         <div class="vrow">
           <div class="k">Always</div>
-          <div class="v">Send <b>temperature 0.6</b>, and <b>verify the kernel</b> — b12x is not the default and will silently fall back to marlin.</div>
+          <div class="v">Send <b>temperature 0.6</b>, <b>verify the kernel</b> (b12x is not the default and silently falls back to marlin), and <b>pre-pull your eval images</b> before scoring anything.</div>
         </div>
       </div>
     </div>
@@ -199,12 +210,12 @@
       <div class="cell">
         <div class="cid"><span class="badge">A</span><span class="cname">NVIDIA · marlin</span></div>
         <span class="tag good">solid</span>
-        <p class="verd"><b>Best NVIDIA option.</b> 14/28 Java/JS, only 3 give-ups. Weight-only FP4 → 16-bit compute, but ≈ b12x speed.</p>
+        <p class="verd"><b>The default NVIDIA path.</b> 14/26 Java/JS (54%), 3 give-ups. Weight-only FP4 → 16-bit compute, but ≈ b12x speed. No opt-in needed.</p>
       </div>
       <div class="cell">
         <div class="cid"><span class="badge">D</span><span class="cname">NVIDIA · b12x</span></div>
-        <span class="tag crit">Java/JS trap</span>
-        <p class="verd"><b>Gives up on Java/JS.</b> 11/28 empty patches (39%). Fast, tops Python — but the uniform FP4 activations collapse non-Python.</p>
+        <span class="tag good">best on Python</span>
+        <p class="verd"><b>Tops Python: 19/26 (73%).</b> Weaker on Java/JS (10/20, 50%) — but only <b>3</b> real give-ups, same as the rest. The old "39% collapse" was the Docker artifact.</p>
       </div>
 
       <div class="mlabel row">Unsloth<br>compressed-tensors</div>
@@ -216,7 +227,7 @@
       <div class="cell best">
         <div class="cid"><span class="badge">C</span><span class="cname">Unsloth · b12x</span></div>
         <span class="tag good">recommended</span>
-        <p class="verd"><b>Fast + robust.</b> 17/28 Java/JS, 6 give-ups. Dynamic W4A4 experts + FP8 tail; data-free, so nothing to mis-calibrate.</p>
+        <p class="verd"><b>Best polyglot.</b> 17/26 Java/JS (65%), the top score on that slice. Dynamic W4A4 experts + FP8 tail; data-free, so nothing to mis-calibrate. Gives up Python (59%).</p>
       </div>
     </div>
   </section>
@@ -225,56 +236,56 @@
   <section>
     <div class="sechead">
       <p class="eyebrow">Result 1 · quality</p>
-      <h2>Agentic resolution — and where NVIDIA gives up</h2>
-      <p class="lede">Real patches scored by the SWE-bench harness (apply + run the failing tests). The Java/JS column is where the configs diverge.</p>
+      <h2>Agentic resolution splits by language</h2>
+      <p class="lede">Real patches scored by the SWE-bench harness (apply + run the failing tests), counted over the instances each config <b>actually attempted</b> — i.e. excluding the ones lost to Docker pull timeouts.</p>
     </div>
     <div class="twrap">
       <table>
-        <caption>Model-appropriate slices · Verified-30 (Python) + Multilingual-28 (Java/JS) · temp 0.6</caption>
+        <caption>Verified-30 (Python) + Multilingual-28 (Java/JS) · temp 0.6 · resolved / attempted</caption>
         <thead>
           <tr>
             <th>Config</th>
-            <th class="num">Python /30</th>
-            <th class="num">Java/JS /28</th>
-            <th class="num">Java/JS give-ups</th>
+            <th class="num">Python</th>
+            <th class="num">Java/JS</th>
+            <th class="num">real give-ups</th>
             <th>Read</th>
           </tr>
         </thead>
         <tbody>
           <tr class="rowbest">
             <td class="cfg">C · Unsloth·b12x</td>
-            <td class="num">17</td><td class="num">17</td>
-            <td class="num"><span class="chip good">6</span></td>
-            <td>Best balance across languages</td>
+            <td class="num">17/29 · 59%</td><td class="num"><b>17/26 · 65%</b></td>
+            <td class="num"><span class="chip good">4</span></td>
+            <td>Best on Java/JS → the polyglot pick</td>
           </tr>
           <tr>
             <td class="cfg">A · NVIDIA·marlin</td>
-            <td class="num">—</td><td class="num">14</td>
+            <td class="num">—</td><td class="num">14/26 · 54%</td>
             <td class="num"><span class="chip good">3</span></td>
-            <td>NVIDIA weights, no collapse</td>
+            <td>Middle on Java/JS; no opt-in needed</td>
           </tr>
           <tr>
             <td class="cfg">D · NVIDIA·b12x</td>
-            <td class="num">19</td><td class="num">10</td>
-            <td class="num"><span class="chip crit">11</span></td>
-            <td>Wins Python, folds on Java/JS</td>
+            <td class="num"><b>19/26 · 73%</b></td><td class="num">10/20 · 50%</td>
+            <td class="num"><span class="chip good">3</span></td>
+            <td>Best on Python, weakest on Java/JS</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p class="keyline">The give-up column is the whole story: on Java/JS, <b>NVIDIA·b12x emits an empty patch 39% of the time</b> — the agent flails and produces nothing. The <em>same NVIDIA weights on marlin</em> do it only ~10%. It's not the model or the checkpoint — it's the <b>runtime FP4 activation quantization</b>.</p>
+    <p class="keyline">The real finding is a <b>language split, not a collapse</b>: NVIDIA is clearly better on <b>Python</b> (73% vs 59%), Unsloth clearly better on <b>Java/JS</b> (65% vs 50%). Correcting the Docker artifact <em>widened</em> NVIDIA's Python lead — the old page called it "marginal". Every config gives up at the same low rate (~3–4/28), so <b>there is no coverage story left to tell</b>.</p>
     <div class="cards">
       <div class="card">
-        <div class="h"><span class="n">why</span><h3>Activation precision</h3></div>
-        <p>Give-ups track how hard the <b>expert activations</b> are quantized. 16-bit (marlin) or dynamic + FP8-carveout (Unsloth) hold up; <b>uniform FP4 on all 40 layers</b> (NVIDIA·b12x) collapses on non-Python.</p>
+        <div class="h"><span class="n">why</span><h3>Calibration <span style="color:var(--faint);font-weight:400">(hypothesis)</span></h3></div>
+        <p>NVIDIA's modelopt scales are <b>static, calibrated on English news</b> (cnn_dailymail — no code). Unsloth is <b>data-free / dynamic</b> — computed per input, so it can't be domain-skewed. That predicts exactly this shape: strongest where the calibration is least wrong. <b>Untested.</b></p>
       </div>
       <div class="card">
-        <div class="h"><span class="n">why</span><h3>Calibration</h3></div>
-        <p>NVIDIA's modelopt scales are <b>static, calibrated on English news</b> (cnn_dailymail — no code). Unsloth is <b>data-free / dynamic</b> — computed per input, so it can't be domain-skewed toward Python.</p>
+        <div class="h"><span class="n">watch</span><h3>Empty patch ≠ give-up</h3></div>
+        <p>An uncached eval image blows the <span class="mono">120s pull_timeout</span> and a slow model blows the <span class="mono">2h container_timeout</span> — <b>both produce an empty patch the harness scores as a failure</b>. Always subtract <span class="mono">grep -c "Error processing instance"</span> before believing a give-up count.</p>
       </div>
       <div class="card">
         <div class="h"><span class="n">watch</span><h3>Don't trust Lite</h3></div>
-        <p>SWE-bench <b>Lite is 100% Python</b>. On it NVIDIA looked far ahead (59 vs 38). That verdict does not survive contact with Java/JS. Benchmark the languages you'll actually run.</p>
+        <p>SWE-bench <b>Lite is 100% Python</b>. On it NVIDIA looked far ahead (59 vs 38) — and on Python it <em>is</em> ahead. But that tells you nothing about Java/JS, where it loses. Benchmark the languages you'll actually run.</p>
       </div>
     </div>
   </section>
@@ -306,11 +317,11 @@
         </tbody>
       </table>
     </div>
-    <p class="keyline">Prefill and decode are <b>within ~3–7%</b> — no widening gap. "marlin is too slow for agents" is a <b>myth</b>: at long context the prefill is <em>attention-dominated</em> (same kernel for both). What actually happened in agentic runs is subtler:</p>
+    <p class="keyline">Prefill and decode are <b>within ~3–7%</b> — no widening gap. "marlin is too slow for agents" is a <b>myth</b>: at long context the prefill is <em>attention-dominated</em> (same kernel for both), so marlin's dequant-to-16-bit MoE barely shows.</p>
     <div class="cards">
       <div class="card">
-        <div class="h"><span class="n">insight</span><h3>Persistence ≠ slowness</h3></div>
-        <p>marlin's longer wall-time on hard tasks is because it <b>keeps trying</b> (3 give-ups). b12x looks "fast" partly because it <b>quits early</b> (11 give-ups). Give a persistent config a longer per-step timeout.</p>
+        <div class="h"><span class="n">withdrawn</span><h3>The "persistence" story</h3></div>
+        <p>This page used to explain marlin's longer agentic wall-time as <b>persistence</b> — "it keeps trying (3 give-ups); b12x quits early (11)". <b>Withdrawn:</b> the 3-vs-11 gap was the Docker artifact. b12x never quit early — 8 of its instances <em>never started</em>. With give-up rates equal, there may be nothing to explain.</p>
       </div>
       <div class="card">
         <div class="h"><span class="n">note</span><h3>The real cost is prefill</h3></div>
@@ -332,15 +343,15 @@
     <div class="cards">
       <div class="card">
         <div class="h"><span class="n">01</span><h3>Language mix</h3></div>
-        <p>Polyglot / any Java·JS·TS → weights that don't collapse (<b>Unsloth</b>, or NVIDIA on marlin). Pure Python → NVIDIA's slim edge is real but marginal.</p>
+        <p><b>This is the live variable.</b> Polyglot / any Java·JS·TS → <b>Unsloth</b> (65% vs 50%). Predominantly Python → <b>NVIDIA</b> (73% vs 59%). Nothing else in this table matters as much.</p>
       </div>
       <div class="card">
         <div class="h"><span class="n">02</span><h3>Weights</h3></div>
-        <p><b>Unsloth</b> is the safe default — dynamic activations, no calibration to skew, no language hole. NVIDIA is competitive <em>only</em> on marlin.</p>
+        <p><b>Unsloth</b> is the safe default: it wins the polyglot case and loses Python by less than the slice can resolve. Choose NVIDIA only if you <em>know</em> the workload is Python-heavy.</p>
       </div>
       <div class="card">
         <div class="h"><span class="n">03</span><h3>Kernel</h3></div>
-        <p>For <b>Unsloth → b12x</b> (that's what its FP4 design is for; needs a 1-line FP8-tail shim). For <b>NVIDIA → marlin</b> (b12x is the give-up trap). Speed is ~a wash either way.</p>
+        <p>For <b>Unsloth → b12x</b> (that's what its FP4 design is for; needs a 1-line FP8-tail shim). For <b>NVIDIA → marlin</b>, simply because it's the default and needs no opt-in — <b>not</b> because b12x is a trap. Speed is a wash.</p>
       </div>
       <div class="card">
         <div class="h"><span class="n">04</span><h3>Sampling</h3></div>
@@ -351,8 +362,8 @@
         <p>b12x needs <b>CUDA 13 + cutlass-dsl 4.5.2</b>. On 0.24 that's a manual pin; <b>0.25 upstreams it</b>. Then opt in explicitly and run the preflight.</p>
       </div>
       <div class="card">
-        <div class="h"><span class="n">06</span><h3>Timeout</h3></div>
-        <p>A config that doesn't give up will take more turns on hard tasks. Set a generous per-step request timeout so persistence isn't misread as a hang.</p>
+        <div class="h"><span class="n">06</span><h3>Benchmark hygiene</h3></div>
+        <p><b>Pre-pull every eval image before a scored run</b>, or raise <span class="mono">pull_timeout</span> / <span class="mono">container_timeout</span>. A cold Docker cache silently penalises whichever config runs <em>first</em> — and the damage looks exactly like the model giving up. It cost us a headline finding.</p>
       </div>
     </div>
   </section>
@@ -371,7 +382,11 @@
       </div>
       <div class="trap">
         <div class="stripe">quality</div>
-        <p><b>NVIDIA·b12x's Java/JS collapse is invisible on Python.</b> Static English-news calibration + uniform FP4 activations produce a 39% give-up rate that a Python-only eval never surfaces.</p>
+        <p><b>NVIDIA's Java/JS weakness is invisible on Python.</b> It resolves 73% of Python but only 50% of Java/JS — a Python-only eval (like SWE-bench Lite) shows you its <em>best</em> face and hides the gap. Benchmark the languages you actually run.</p>
+      </div>
+      <div class="trap">
+        <div class="stripe">bench</div>
+        <p><b>A cold Docker cache fabricates "give-ups".</b> An uncached eval image blows mini-swe-agent's 120s <span class="mono">pull_timeout</span>; the instance is never attempted but is recorded as an <b>empty patch</b> and scored as a failure. This produced — and then destroyed — this page's original headline. Pre-pull images; subtract <span class="mono">"Error processing instance"</span> from any empty-patch count.</p>
       </div>
       <div class="trap">
         <div class="stripe">tools</div>

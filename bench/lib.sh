@@ -43,11 +43,22 @@ sampling_for() {
     gemma-4-26B-A4B)     echo "1.0 1.0  64 0    0.1" ;;
     gemma-4-31B)         echo "1.0 0.95 64 0    0"   ;;
     qwen36-27b)          echo "1.0 0.95 20 0    0"   ;;
+    # qwen3.8-27b: vendor generation_config.json == the model card's THINKING-mode set
+    # (temp 1.0, top_p 0.95, top_k 20, min_p 0, presence 0). Thinking is ON by default and
+    # the template's default reasoning_effort is xhigh, so it is a REASONING model: give it
+    # generous max_tokens or it burns the budget in <think> and scores a FAIL it never
+    # earned. The card's NON-thinking set is different (0.7 / 0.80 / 20 / presence 1.5).
+    qwen38-27b)          echo "1.0 0.95 20 0    0"   ;;
     # step-37: card documents only temp 1.0; top_p/top_k/min_p unspecified, so
     # mild neutral nucleus. Heaviest model in the roster (Q3_K_XL ~84 GB, swaps) and
     # a reasoning model (needs generous max_tokens) — not in the run-all.sh default
     # sweep; run it explicitly.
     step-37)             echo "1.0 0.95 64 0    0"   ;;
+    # laguna-s-2.1: vendor generation_config.json — temp 1.0, top_p 1.0 (nucleus
+    # off), top_k 20, min_p 0. Like step-37 it is a REASONING model
+    # (enable_thinking: true by default), so give it generous max_tokens or it
+    # returns empty content and scores a FAIL it never earned.
+    laguna-s-2.1)        echo "1.0 1.0  20 0    0"   ;;
     *)                   echo "${BENCH_TEMP:-0.7} ${BENCH_TOPP:-0.95} ${BENCH_TOPK:-40} 0 0" ;;
   esac
 }
@@ -65,15 +76,21 @@ call_model() {
   [ -n "${BENCH_FORCE_TOPP:-}" ] && topp="$BENCH_FORCE_TOPP"
   [ -n "${BENCH_FORCE_TOPK:-}" ] && topk="$BENCH_FORCE_TOPK"
   [ -n "${BENCH_FORCE_MINP:-}" ] && minp="$BENCH_FORCE_MINP"
-  echo ">>> $model  temp=$temp top_p=$topp top_k=$topk min_p=$minp repeat=$rep  max_tokens=$maxtok" >&2
+  # Reasoning models whose template exposes a thinking budget (step-37: low|medium|high).
+  # Unset = send nothing, i.e. the model's own default. step-37 unconditioned spends its
+  # whole token budget in <think> and returns empty content — see bench/README.md.
+  local effort="${BENCH_REASONING_EFFORT:-}"
+  echo ">>> $model  temp=$temp top_p=$topp top_k=$topk min_p=$minp repeat=$rep  max_tokens=$maxtok${effort:+ reasoning_effort=$effort}" >&2
   local body
   body=$(jq -n --rawfile p "$prompt" --arg m "$model" \
     --argjson temp "$temp" --argjson topp "$topp" --argjson topk "$topk" \
-    --argjson rep "$rep" --argjson minp "$minp" --argjson mt "$maxtok" '
+    --argjson rep "$rep" --argjson minp "$minp" --argjson mt "$maxtok" \
+    --arg effort "$effort" '
     {model:$m, messages:[{role:"user",content:$p}],
      temperature:$temp, top_p:$topp, top_k:$topk, max_tokens:$mt, stream:false}
     + (if $rep  > 0 then {repeat_penalty:$rep} else {} end)
-    + (if $minp > 0 then {min_p:$minp} else {} end)')
+    + (if $minp > 0 then {min_p:$minp} else {} end)
+    + (if $effort != "" then {chat_template_kwargs:{reasoning_effort:$effort}} else {} end)')
   # Pass the key via a --config fd (process substitution) so it never appears
   # in the process list / argv. Only the prompt body goes on the command line.
   curl -s --max-time 2400 "$HOST/v1/chat/completions" \
@@ -81,10 +98,14 @@ call_model() {
     --config <(printf 'header = "Authorization: Bearer %s"\n' "$key") \
     -d "$body" > "$out"
   # surface finish reason / token usage
+  # NOTE: llama.cpp and older vLLM expose the thinking pass as `reasoning_content`;
+  # vLLM 0.26 renamed it to `reasoning`. Check both or reasoning models read as
+  # has_reasoning=false while burning their whole budget in the thinking pass.
   jq -r '{finish:.choices[0].finish_reason,
           completion_tokens:.usage.completion_tokens,
-          has_reasoning:((.choices[0].message.reasoning_content//"")|length>0),
-          content_len:(.choices[0].message.content|length)}' "$out" >&2
+          has_reasoning:(((.choices[0].message.reasoning_content // .choices[0].message.reasoning) // "")|length>0),
+          reasoning_len:(((.choices[0].message.reasoning_content // .choices[0].message.reasoning) // "")|length),
+          content_len:((.choices[0].message.content // "")|length)}' "$out" >&2
   local finish; finish=$(jq -r '.choices[0].finish_reason // "ERROR"' "$out")
   if [[ "$finish" != "stop" ]]; then
     echo "WARN: finish_reason=$finish (not 'stop'); raise max_tokens and re-run for a fair sample." >&2

@@ -20,10 +20,32 @@ echo "=== Task A (Go) :: $MODEL ==="
 call_model "$MODEL" "$BENCH_DIR/prompts/cache.txt" "$MAXTOK" "$OUT" || exit 1
 
 jq -r '.choices[0].message.content' "$OUT" > "$MD"
-block() { awk -v n="$1" '/^```/{f=!f; if(f)c++; next} f&&c==n' "$MD"; }
 rm -rf "$SRC"; mkdir -p "$SRC"
-block 1 > "$SRC/cache.go"
-block 2 > "$SRC/cache_test.go"
+# Select blocks by CONTENT and keep the LAST revision of each.
+# The old code took fenced blocks positionally (block 1 -> cache.go, block 2 ->
+# cache_test.go). Models that revise their answer in-line emit several drafts of
+# the same file: laguna-s-2.1 emitted 6 blocks (3x cache.go, 3x cache_test.go),
+# so block 2 was cache.go revision 2 and got written as cache_test.go — producing
+# a bogus "entry redeclared in this block" cascade that scored as a model failure.
+python3 - "$MD" "$SRC" <<'PY'
+import os, re, sys
+md = open(sys.argv[1]).read(); out = sys.argv[2]
+# The language tag must be its OWN group: with `\w*` ungrouped the pattern has a single
+# group, so asking for group(2) raised IndexError on every response that actually contained
+# a fenced block -- i.e. this extractor crashed for any model that emitted code, and only
+# appeared to "work" when the response was empty.
+blocks = [m.group(2) for m in re.finditer(r"^```(\w*)\n(.*?)^```", md, re.S | re.M)]
+impl = test = None
+for b in blocks:
+    if re.search(r'^\s*func\s+Test\w*\s*\(', b, re.M) or '"testing"' in b:
+        test = b            # last test block wins
+    elif re.search(r'^\s*package\s+\w+', b, re.M):
+        impl = b            # last implementation block wins
+open(os.path.join(out, 'cache.go'), 'w').write(((impl or '').rstrip()) + "\n")
+open(os.path.join(out, 'cache_test.go'), 'w').write(((test or '').rstrip()) + "\n")
+print("  extractor: %d blocks -> impl=%s test=%s" % (
+    len(blocks), "yes" if impl else "MISSING", "yes" if test else "MISSING"))
+PY
 printf 'module cachetest\n\ngo 1.22\n' > "$SRC/go.mod"
 
 echo "--- extracted ---"
