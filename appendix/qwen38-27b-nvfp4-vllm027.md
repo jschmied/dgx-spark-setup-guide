@@ -420,18 +420,115 @@ Paired against MTP n=3 (same util, `--max-model-len 32768`, `usage` tokens, 3 ru
 **`k=14` is worse than `k=7` here**, contradicting the published recommendation, and the reported
 72–75 tok/s single-stream did not reproduce — our best single figure is 43.8 on one code prompt.
 
-Two candidate explanations, neither yet separated:
-1. **Workload.** Published DSpark numbers come from an *edit-heavy* harness, where a drafter
-   predicts echoed text cheaply; the probe above generates fresh short text. This cuts both ways —
-   agent traffic echoes file contents constantly, so real-work gain may exceed +12 %.
-2. **Quantization mismatch.** The drafter was trained against the FP8 target, not this NVFP4 one
-   (see provenance above), so its layer taps see activations it was not fitted to.
+#### Measured on real agent traffic — DSpark loses by 27 %
 
-**Unmeasured on real agent traffic; measure before adopting.** We stay on MTP n=3 — which has the
-advantage of shipping *inside* the target checkpoint, so it carries no separate provenance question.
+The synthetic result above invited a workload explanation: published DSpark numbers come from an
+*edit-heavy* harness, and agent traffic echoes file contents constantly, so the real-work gain
+should be larger. **It is not.** Replaying 24 genuine agent contexts from our SWE-bench
+trajectories (2 k–43 k tokens, median 10.7 k), paired, `usage.completion_tokens`:
+
+| | MTP n=3 | DSpark k=7 |
+|---|---|---|
+| median | **26.4 tok/s** | 18.9 tok/s |
+| mean | 26.3 | 20.1 |
+| wins | — | **3 / 24** |
+| median TTFT | 7.74 s | 7.39 s |
+
+> **Do not use tokens-per-SSE-delta as an acceptance measure.** A chunk can span several
+> verification steps, so the ratio exceeds the theoretical maximum — MTP `n=3` caps at 4 accepted
+> tokens per step, yet it measured 5.81. vLLM exposes the real counters:
+> `vllm:spec_decode_num_{drafts,draft_tokens,accepted_tokens}_total` and, most usefully,
+> `..._accepted_tokens_per_pos_total{position=N}`.
+
+**−27 % median, and the deficit is flat across context size** — −27.4 % below 8 k, −24.3 % at
+8–20 k, −27.4 % above 20 k. If the workload theory held, the gap would close as context grows; it
+does not move. Acceptance settles it: DSpark drafts 7 tokens and lands *fewer* than MTP's 3. TTFT
+is unchanged, so this is decode, not a prefill trade.
+
+There is also a capacity cost that the throughput number hides:
+
+| | KV | tokens | sessions @262 k |
+|---|---|---|---|
+| MTP n=3 | 66.74 GiB | 1,883,336 | **7.18×** |
+| DSpark k=7 | 27.06 GiB | 506,909 | **1.93×** |
+
+~40 GB leaves the KV pool for a 2.7 GB drafter, because `k=7` reserves buffers for seven
+speculative positions and scales `max_num_scheduled_tokens` with them.
+
+**We stay on MTP n=3.** It ships *inside* the target checkpoint, so it costs no extra memory, no
+capacity, and carries no separate provenance question. The remaining open question is whether the
+FP8-vs-NVFP4 training mismatch explains the deficit — testable by serving the FP8 target, with no
+training involved.
 
 Constraint: DSpark does **not** fit alongside the 262 k window at util 0.6 (needs ~14 GiB KV,
 6.5 available). Either shorten the context or raise utilisation.
+
+### What a drafter would actually have to deliver here
+
+Measured acceptance settles the DSpark question and, more usefully, sets the bar for any future
+drafter. vLLM's own counters (`vllm:spec_decode_num_accepted_tokens_per_pos_total`), 8 real agent
+contexts:
+
+| position | MTP n=3 | DSpark k=7 |
+|---|---|---|
+| 0 | **87.2 %** | 62.4 % |
+| 1 | 76.7 % | 41.2 % |
+| 2 | 67.2 % | 26.0 % |
+| 3–6 | — | 18.6 / 11.3 / 7.3 / 5.6 % |
+| **acceptance rate** | **77.0 %** | 24.7 % |
+| **tokens per step (incl. bonus)** | **3.31** | 2.73 |
+
+DSpark loses at *position 0* — it mispredicts the immediate next token 38 % of the time where MTP
+misses 13 %. Everything downstream follows from that.
+
+**This is why quantizing the drafter cannot rescue it.** MTP yields 3.31 tokens per step; DSpark
+yields 2.73. Shrink the drafter to *zero bytes* — physically impossible, but the limit — and DSpark
+still moves the same bytes as MTP while producing **17.5 % fewer tokens per step**. The deficit is
+prediction quality, not bandwidth. Bandwidth makes it worse (a bf16 drafter at `k=7` is 45 % of all
+bytes moved), but it is not the cause.
+
+Break-even, then. Assuming constant acceptance *p* per position, a drafter beats MTP only above:
+
+| drafter | k=2 | k=3 | k=4 | k=7 |
+|---|---|---|---|---|
+| 1.36 B bf16 (2.7 GB) | impossible | impossible | 98.5 % | 91.7 % |
+| 1.36 B fp8 (1.4 GB) | impossible | 97.9 % | 89.7 % | 83.7 % |
+| 1.36 B nvfp4 (0.7 GB) | impossible | 92.8 % | 84.7 % | 78.6 % |
+| 0.5 B nvfp4 (0.25 GB) | impossible | 89.1 % | 81.0 % | 74.4 % |
+| MTP-sized head (~0.05 GB) | impossible | 87.3 % | 79.2 % | 72.2 % |
+
+Three things fall out, and they are the design brief:
+
+1. **`k=2` is unwinnable at any acceptance.** MTP n=3 already emits 3.31 tokens/step; a 2-deep
+   drafter caps at 3 even at 100 %. Depth ≥ 3 is a hard floor.
+2. **A bf16 drafter against a 4-bit target is structurally uncompetitive** — it would need 91.7 %
+   sustained across seven positions. The better the target is quantized, the more a fat drafter
+   costs *relatively*. This is the reason recommendations tuned on FP8 targets do not transfer.
+3. **Sustained acceptance beats peak acceptance.** MTP holds 87/77/67 over three positions. A
+   drafter must hold ~75–80 % over *seven* — much harder than beating 87 % once.
+
+### Proposal: try n-gram / suffix drafting before training anything
+
+The table's bottom row is the interesting one: at near-zero drafter cost the bar drops to ~79 % at
+`k=4`. vLLM already ships two drafters that cost **no model bytes at all** —
+`--speculative-config '{"method":"ngram",...}'` and `{"method":"suffix",...}` — which predict by
+copying from the existing context rather than from a network.
+
+That matches this workload's dominant characteristic. Agent traffic is saturated with verbatim
+repetition: file contents echoed into tool results and then quoted back, diffs restated, paths and
+identifiers repeated across turns. Our own corpus makes the point — 100 SWE-bench trajectories hold
+1.34 M assistant tokens against 1.52 M prompt tokens, and the prompts are largely echoed source.
+Copy-based drafting is *exactly* the mechanism that regime rewards, and it has no training, no
+provenance question, no extra weights, and no separate checkpoint to keep in step with the target.
+
+It is not free of cost: `k` speculative positions still enlarge scheduler buffers, which is what
+took KV from 66.74 to 27.06 GiB at `k=7` — budget for that, or run a smaller `k`.
+
+**Test order:** `ngram` and `suffix` at `k=3` and `k=4`, measured with
+`/opt/llm/replay_bench.py` against the same 24 agent contexts, and acceptance read from the
+per-position counters. That is roughly an hour, needs no downloads, and — unlike a fine-tune —
+fails cheaply. Only if copy-based drafting also falls short is a trained drafter worth revisiting,
+and then it must be ≤ 4-bit and trained on **this** target's activations.
 
 ### Third-party claims we could not reproduce
 
