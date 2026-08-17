@@ -342,6 +342,72 @@ cached prefill, and the vendor default is the safer side of it.
 
 ---
 
+## 7b. What NVFP4 actually costs, measured against BF16
+
+The checkpoint is **not** uniformly NVFP4. `quantization_config` declares
+`format: mixed-precision` with two groups:
+
+| | group_1 — NVFP4 W4A4 | group_0 — FP8 W8A8 |
+|---|---|---|
+| targets | `mlp.(gate\|up\|down)_proj` | attention `q/k/v/o`, GDN `in_proj/out_proj`, **`lm_head`**, **MLP of layers 56–63** |
+| weights | 4-bit, `tensor_group`, group 16, scale in FP8-E4M3 | 8-bit, per-channel, `memoryless_minmax` |
+| activations | 4-bit, group 16, `dynamic: local` | 8-bit, per-token, `dynamic: True` |
+
+168 MLP tensors are packed to 4-bit; 27 stay at 8-bit. **The last eight layers and the
+`lm_head` are deliberately left at FP8** — the standard guard against damage nearest the output,
+and the reason the card notes it will not load in SGLang.
+
+### Weight error against the BF16 original
+
+Dequantized both checkpoints and compared them to `Qwen/Qwen3.8-27B` BF16, 12 MLP tensors
+(layers 0–3). Only **one 4 GB shard** of the 55.6 GB original is needed — shard 1 covers layers 0–4.
+
+| comparison | relative L2 |
+|---|---|
+| **NVFP4 ↔ BF16** | **0.1210** |
+| **FP8 ↔ BF16** | **0.0266** |
+| NVFP4 ↔ FP8 | 0.1238 |
+
+**NVFP4 sits 4.5× further from the original than FP8**, and remarkably evenly so (0.110–0.154
+across tensors). Note `N↔F ≈ N↔B`: the distance to FP8 *is* the distance to the truth, because FP8
+is so close — which is what makes FP8 a usable stand-in when the BF16 weights are not on disk.
+
+### Why this closes the recalibration question
+
+Of the 1,968 tensors, exactly **200 are calibrated**: 168 `input_global_scale` and 32 KV
+`k_scale`/`v_scale` (`observer: static_minmax`, `dynamic: False`). Everything else — including
+**all weight scales** — is derived from the weights themselves (`memoryless_minmax`), so **no
+calibration set touched them and none can change them**.
+
+That means 12.1 % of weight error is fixed before a single activation is computed. Recalibrating on
+our own agent traces would only move the activation and KV scales. **The dominant term is out of
+reach**, so a recalibration effort is aimed at the smaller lever.
+
+Two further measurements support leaving it alone:
+
+- **Teacher-forced logprob divergence NVFP4 vs FP8** on 17 real agent contexts (129,892 positions):
+  mean 1.11 nats, median 0.056, 30.4 % of positions above 0.5 — roughly **80× the fp8-vs-bf16
+  reference** of 0.014. But it is **flat across context depth** (0.90 → 1.08 from <512 to >8192
+  tokens), so the error does **not compound** as the KV cache fills. That is the reassuring half for
+  long agent runs.
+- The comparison cannot be settled on SWE-bench either: a paired McNemar test over 100 instances
+  resolves roughly **12 pp**; detecting the 2–3 pp a quantization change would plausibly produce
+  needs **1,700–3,900 instances**, six to thirteen times what SWE-bench Multilingual contains.
+
+### The honest framing
+
+The same checkpoint carrying 12.1 % weight error and 1.11 nats of distributional distance from FP8
+**solves 70 of 100 real repository bugs**. Quantization error does not translate linearly into task
+failure, which is exactly why neither number should be read as an alarm.
+
+**If you want more quality, change the format, not the calibration.** FP8 is 4.5× closer to the
+original — and costs 30.9 GB instead of 22.6, and ran measurably slower here (225 s vs 136 s for the
+same eight agent contexts). That is the real trade, now quantified rather than guessed.
+
+> Reproduce: `/tmp/weight_compare.py` (CPU only, one tensor at a time). One trap — NVFP4's
+> `weight_global_scale` is a **reciprocal** (amax-derived, value 6400). Multiplying instead of
+> dividing yields weights of ~1e7 and a relative error of 4e7; the absurd magnitude is the tell.
+
 ## 8. Notes, and what we did not test
 
 - **NVFP4 over FP8 for speed.** Two independent reports have FP8 costing ~30 % decode without
