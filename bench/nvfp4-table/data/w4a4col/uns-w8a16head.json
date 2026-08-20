@@ -1,0 +1,202 @@
+[
+ {
+  "id": "facebook__docusaurus-9897@29",
+  "ctx": 8168,
+  "tok_s": 21.12,
+  "ttft": 5.69,
+  "tokens": 70,
+  "deltas": 17,
+  "tok_per_delta": 4.12
+ },
+ {
+  "id": "mrdoob__three.js-25687@37",
+  "ctx": 7882,
+  "tok_s": 26.79,
+  "ttft": 4.61,
+  "tokens": 256,
+  "deltas": 26,
+  "tok_per_delta": 9.85
+ },
+ {
+  "id": "facebook__docusaurus-8927@132",
+  "ctx": 32911,
+  "error": "HTTPError: HTTP Error 400: Bad Request"
+ },
+ {
+  "id": "fluent__fluentd-3466@119",
+  "ctx": 34567,
+  "error": "HTTPError: HTTP Error 400: Bad Request"
+ },
+ {
+  "id": "google__gson-2479@11",
+  "ctx": 4856,
+  "tok_s": 28.02,
+  "ttft": 2.07,
+  "tokens": 78,
+  "deltas": 9,
+  "tok_per_delta": 8.67
+ },
+ {
+  "id": "apache__lucene-12022@55",
+  "ctx": 15835,
+  "tok_s": 24.28,
+  "ttft": 11.67,
+  "tokens": 125,
+  "deltas": 25,
+  "tok_per_delta": 5.0
+ },
+ {
+  "id": "preactjs__preact-4152@32",
+  "ctx": 10538,
+  "tok_s": 28.05,
+  "ttft": 8.01,
+  "tokens": 256,
+  "deltas": 8,
+  "tok_per_delta": 32.0
+ },
+ {
+  "id": "redis__redis-13338@22",
+  "ctx": 11116,
+  "tok_s": 24.4,
+  "ttft": 8.02,
+  "tokens": 94,
+  "deltas": 18,
+  "tok_per_delta": 5.22
+ },
+ {
+  "id": "gin-gonic__gin-2121@11",
+  "ctx": 3165,
+  "tok_s": 28.13,
+  "ttft": 1.49,
+  "tokens": 150,
+  "deltas": 10,
+  "tok_per_delta": 15.0
+ },
+ {
+  "id": "phpoffice__phpspreadsheet-4313@19",
+  "ctx": 7158,
+  "tok_s": 21.31,
+  "ttft": 4.29,
+  "tokens": 256,
+  "deltas": 84,
+  "tok_per_delta": 3.05
+ },
+ {
+  "id": "projectlombok__lombok-3594@103",
+  "ctx": 19993,
+  "tok_s": 27.51,
+  "ttft": 14.65,
+  "tokens": 93,
+  "deltas": 12,
+  "tok_per_delta": 7.75
+ },
+ {
+  "id": "hashicorp__terraform-35543@109",
+  "ctx": 41276,
+  "error": "HTTPError: HTTP Error 400: Bad Request"
+ },
+ {
+  "id": "micropython__micropython-15898@10",
+  "ctx": 3461,
+  "tok_s": 23.11,
+  "ttft": 1.88,
+  "tokens": 256,
+  "deltas": 88,
+  "tok_per_delta": 2.91
+ },
+ {
+  "id": "micropython__micropython-15898@16",
+  "ctx": 4129,
+  "tok_s": 25.69,
+  "ttft": 1.28,
+  "tokens": 239,
+  "deltas": 48,
+  "tok_per_delta": 4.98
+ },
+ {
+  "id": "apache__lucene-13704@40",
+  "ctx": 18310,
+  "tok_s": 26.03,
+  "ttft": 13.14,
+  "tokens": 135,
+  "deltas": 23,
+  "tok_per_delta": 5.87
+ },
+ {
+  "id": "prometheus__prometheus-9248@43",
+  "ctx": 10748,
+  "tok_s": 27.36,
+  "ttft": 8.11,
+  "tokens": 74,
+  "deltas": 9,
+  "tok_per_delta": 8.22
+ },
+ {
+  "id": "projectlombok__lombok-3312@174",
+  "ctx": 31228,
+  "tok_s": 24.86,
+  "ttft": 23.7,
+  "tokens": 256,
+  "deltas": 18,
+  "tok_per_delta": 14.22
+ },
+ {
+  "id": "preactjs__preact-3062@38",
+  "ctx": 6976,
+  "tok_s": 21.86,
+  "ttft": 4.24,
+  "tokens": 81,
+  "deltas": 18,
+  "tok_per_delta": 4.5
+ },
+ {
+  "id": "hashicorp__terraform-34900@150",
+  "ctx": 43486,
+  "error": "HTTPError: HTTP Error 400: Bad Request"
+ },
+ {
+  "id": "valkey-io__valkey-1499@85",
+  "ctx": 20575,
+  "tok_s": 26.91,
+  "ttft": 15.14,
+  "tokens": 70,
+  "deltas": 7,
+  "tok_per_delta": 10.0
+ },
+ {
+  "id": "caddyserver__caddy-6115@31",
+  "ctx": 10108,
+  "tok_s": 28.47,
+  "ttft": 6.97,
+  "tokens": 256,
+  "deltas": 35,
+  "tok_per_delta": 7.31
+ },
+ {
+  "id": "google__gson-1014@6",
+  "ctx": 4658,
+  "tok_s": 29.08,
+  "ttft": 2.71,
+  "tokens": 152,
+  "deltas": 18,
+  "tok_per_delta": 8.44
+ },
+ {
+  "id": "javaparser__javaparser-4538@8",
+  "ctx": 2008,
+  "tok_s": 30.68,
+  "ttft": 0.85,
+  "tokens": 74,
+  "deltas": 4,
+  "tok_per_delta": 18.5
+ },
+ {
+  "id": "babel__babel-16130@62",
+  "ctx": 22990,
+  "tok_s": 22.65,
+  "ttft": 16.58,
+  "tokens": 130,
+  "deltas": 31,
+  "tok_per_delta": 4.19
+ }
+]
