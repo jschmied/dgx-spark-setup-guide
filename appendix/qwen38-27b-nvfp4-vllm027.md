@@ -1011,28 +1011,29 @@ statistic that discards them.
 
 Depth costs nothing in prefill: TTFT is 9.6–9.8 s across all four settings.
 
-### The optimum is a property of the workload, not of the drafter
+### The optimum is a property of the workload — §4 already said so
 
-Splitting the same twenty contexts by how predictable their continuations are — classified by MTP's
-per-context rate on the same target, so the split does not come from the numbers being compared:
+**This was known and not carried across.** §4's MTP sweep is split by prompt type and shows the
+overall median peaking at n=4 while *code* prompts keep climbing to n=5. The DFlash2 sweep one
+section later was aggregated as a single median and lost exactly that.
+
+Splitting the same twenty contexts by predictability — classified by MTP's per-context rate on the
+same target, so the split is independent of what is compared:
 
 | | n=3 | n=7 | n=11 | n=15 |
 | :--- | ---: | ---: | ---: | ---: |
 | less predictable (MTP 19.9 tok/s) | 24.5 | 36.4 | **38.7** | 36.2 |
 | more predictable (MTP 23.4 tok/s) | 25.2 | 35.6 | 38.3 | **38.5** |
 
-The optimum moves outward as acceptance rises: 11 on the harder half, 15 on the easier one. Deeper
-drafts only pay when the drafter keeps hitting, so the right depth depends on what the model is
-being asked to do — editing existing code accepts far more readily than writing new code.
+The optimum moves outward as acceptance rises: 11 on the harder half, 15 on the easier one. That
+also settles a third-party `k=14` recommendation for edit-heavy work against our "collapses past
+11" — both describe their own corpus.
 
-This also explains a third-party report of `k=14` working well on this hardware for edit-heavy
-work while our sweep said the tail collapses past 11. Both are right about their own corpus.
-
-**Consequence for everything else in this document:** a single median over a mixed corpus hides a
-factor of two. Across twenty contexts one target ranges from 26.4 to 52.5 tok/s, and that spread
-correlates with neither context length (−0.10) nor completion length (−0.16) nor TTFT (−0.10) — it
-is a property of the content. Any tuning done against the median is tuning against the middle of a
-distribution whose ends behave differently.
+**The general form:** a single median over a mixed corpus hides a factor of two. One target ranges
+26.4 to 52.5 tok/s across the same twenty contexts, uncorrelated with context length (−0.10),
+completion length (−0.16) or TTFT (−0.10). It is a property of the content. Anything tuned against
+the median was tuned against the middle of a distribution whose ends behave differently — which
+includes the n-gram rejection below.
 
 ### With the guard gone: eleven cells, and the five fastest all have quantized heads
 
@@ -1299,7 +1300,7 @@ Paired against MTP n=3 (same util, `--max-model-len 32768`, `usage` tokens, 3 ru
 | code (bash) | 25.3 | 23.4 (−8 %) | 19.9 (−21 %) |
 | mean | 24.9 | **28.0 (+12 %)** | 26.0 |
 
-**`k=14` is worse than `k=7` here**, contradicting the published recommendation, and the reported
+**`k=14` is worse than `k=7` here** — but read the split, not the mean: on code (py) the two are within 2 % (43.8 against 42.8), and the whole deficit comes from prose (−23 %) and bash (−21 %). That is the same workload dependence §7g finds for DFlash2, and it reconciles this with third-party `k=14` recommendations for edit-heavy work: depth is nearly free where acceptance is high and expensive where it is not. Against the published recommendation, and the reported
 72–75 tok/s single-stream did not reproduce — our best single figure is 43.8 on one code prompt.
 
 #### Measured on real agent traffic — DSpark loses by 27 %
@@ -1389,7 +1390,11 @@ Three things fall out, and they are the design brief:
 3. **Sustained acceptance beats peak acceptance.** MTP holds 87/77/67 over three positions. A
    drafter must hold ~75–80 % over *seven* — much harder than beating 87 % once.
 
-### Measured: nothing available beats the MTP head that ships with the target
+### Measured: no *drafter model* beat the in-checkpoint MTP head — DFlash2 later did
+
+> Superseded in part. This section compares DSpark and n-gram against MTP and was right about
+> those. DFlash2, measured later (§7g), does beat MTP: 36.3 tok/s against 20.8 on the same
+> engine and target. Read the conclusion below as "nothing *available at the time*".
 
 Four configurations, same 8 agent contexts, acceptance from vLLM's per-position counters:
 
@@ -1447,6 +1452,13 @@ provenance question, no quantization mismatch, and no capacity loss. The MTP hea
 > where a deeper drafter needs to learn.
 
 ### Rejected after measurement: n-gram / suffix drafting
+
+> ⚠️ **Worth re-testing.** The rejection below turns on a 42.3 % position-0 hit rate measured on
+> the *mixed* corpus. Copy-based drafting is precisely the method whose hit rate rises with
+> verbatim repetition, and the corpus splits into halves that differ by a factor of two in
+> predictability (§7g). On the edit-heavy half the number would be higher, and n-gram costs no
+> weight bytes at all. The reasoning below is sound; the corpus it was measured on is not the
+> one it should have been measured on.
 
 The table's bottom row is the interesting one: at near-zero drafter cost the bar drops to ~79 % at
 `k=4`. vLLM already ships two drafters that cost **no model bytes at all** —
