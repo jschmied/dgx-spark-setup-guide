@@ -986,33 +986,53 @@ batch size 1. Under concurrent load the same request returns different text — 
 with no speculation flag involved. If you have been treating `temperature: 0` as a reproducibility
 guarantee for evals or regression tests, it is not one here unless you also pin concurrency to 1.
 
-### n=7 is the optimum — the model card is right, unusually
+### ⚠️ n=7 is not the optimum — that was an artefact of how the sweep was aggregated
 
-Unlike MTP, where the published recommendation of 7 was wrong here and 3 measured best, DFlash2's
-published block size holds up. Swept on the same target, same 20 contexts:
+An earlier version of this section concluded that DFlash2's published block size of 7 was right
+here. It rested on comparing **unpaired medians on paired data**: 36.5 tok/s at n=7 against 36.4 at
+n=11, a 0.2 difference. Re-read the same four runs correctly and the answer flips.
 
-| n | block | decode | accept length | steps/s |
-| ---: | ---: | ---: | ---: | ---: |
-| 3 | 4 | 25.3 tok/s | 3.01 | 8.39 |
-| **7** | 8 | **36.5 tok/s** | 4.05 | 9.02 |
-| 11 | 12 | 36.4 tok/s | **4.59** | 7.93 |
-| 15 | 16 | 35.5 tok/s | 4.47 | 7.95 |
+| n | block | median | mean | **throughput** Σtok/Σt | corpus wall time |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 3 | 4 | 25.3 | 24.9 | 23.8 | 135 s |
+| 7 | 8 | **36.5** | 36.0 | 31.4 | 103 s |
+| **11** | 12 | 36.4 | **38.5** | **33.8** | **91 s** |
+| 15 | 16 | 35.5 | 37.3 | 32.1 | 97 s |
 
-The curve is **flat between 7 and 11** — n=11 drafts longer runs (4.59 vs 4.05) and pays for it
-exactly, 7.93 steps/s against 9.02. Pick either. n=15 loses on both counts: at block 16 the
-drafter is past what it was trained for (block 8) and the tail collapses — `P10 6 %→4 %`,
-`P14 1 %` — while the mid positions degrade too. n=3 costs 31 %.
+Three readings, two answers. The median picks n=7 by 0.2; the mean picks n=11 by 1.1; total tokens
+over total decode time — the thing a single-stream user actually experiences — picks n=11 by 1.7,
+and finishes the same twenty contexts in **12 % less time**.
 
-Two things worth knowing about the per-position profile: it is **not** invariant in n at the small
-end (block 4 is an easier prediction problem — `P0 83 %` vs `79 %`, `P2 53 %` vs `47 %`), but it
-**is** essentially identical between block 8 and 12. And the headline "acceptance %" falls with n
-(67 → 44 → 33 → 23) purely because it divides by *drafted* tokens; accept length is the figure
-that means something.
+Paired, which is the comparison the data supports: **n=11 beats n=7 in 11 of 20 contexts**, median
+difference **+1.7 tok/s**, range −6.6 to +15.7. Note that the median of the per-context differences
+(+1.7, favouring n=11) has the opposite sign to the difference of the medians (−0.1, favouring
+n=7). The gain lives in a handful of high-acceptance contexts, and the median is precisely the
+statistic that discards them.
 
-`num_speculative_tokens` is genuinely free: vLLM derives `block_size = 1 + n`, the checkpoint
-declares no block size, and no drafter tensor has a block-dependent dimension (the conv kernels are
-`[2, 2, 5120]` — taps, groups, hidden). Block size only masks the two-tap convolution at block
-boundaries. Non-powers-of-two take a modulo path instead of a bitmask; n=11 shows no penalty from it.
+Depth costs nothing in prefill: TTFT is 9.6–9.8 s across all four settings.
+
+### The optimum is a property of the workload, not of the drafter
+
+Splitting the same twenty contexts by how predictable their continuations are — classified by MTP's
+per-context rate on the same target, so the split does not come from the numbers being compared:
+
+| | n=3 | n=7 | n=11 | n=15 |
+| :--- | ---: | ---: | ---: | ---: |
+| less predictable (MTP 19.9 tok/s) | 24.5 | 36.4 | **38.7** | 36.2 |
+| more predictable (MTP 23.4 tok/s) | 25.2 | 35.6 | 38.3 | **38.5** |
+
+The optimum moves outward as acceptance rises: 11 on the harder half, 15 on the easier one. Deeper
+drafts only pay when the drafter keeps hitting, so the right depth depends on what the model is
+being asked to do — editing existing code accepts far more readily than writing new code.
+
+This also explains a third-party report of `k=14` working well on this hardware for edit-heavy
+work while our sweep said the tail collapses past 11. Both are right about their own corpus.
+
+**Consequence for everything else in this document:** a single median over a mixed corpus hides a
+factor of two. Across twenty contexts one target ranges from 26.4 to 52.5 tok/s, and that spread
+correlates with neither context length (−0.10) nor completion length (−0.16) nor TTFT (−0.10) — it
+is a property of the content. Any tuning done against the median is tuning against the middle of a
+distribution whose ends behave differently.
 
 ### With the guard gone: eleven cells, and the five fastest all have quantized heads
 
