@@ -304,11 +304,15 @@
   <b>Two things the axes do not show.</b> The <code>A8</code>/<code>A16</code> in a row name is the
   <i>head's</i> activation precision, not the body's — and the column's <code>A4</code>/<code>A16</code>
   describes only the <b>MLP</b>. Attention tells a third story that neither axis carries: in
-  <i>every</i> checkpoint on this page — published and synthesized alike — the attention and
+  every checkpoint <i>of the grid</i> — published and synthesized alike — the attention and
   linear-attention projections are <b>W8A8</b>, FP8 weights with dynamic FP8 activations. Read from
-  each <code>config_groups</code>. It never varies, so it cannot be an axis; but it means no cell
-  here is a 4-bit model in the sense the column headers suggest, and the strip period below is the
-  only place where attention depth differs at all.
+  each <code>config_groups</code>. It never varies there, so it cannot be an axis; but it means no
+  grid cell is a 4-bit model in the sense the column headers suggest.
+  <br><br>
+  The <b>strip period</b> below is where that stops holding: those checkpoints target every
+  <code>Linear</code> and so quantize attention to 4-bit as well. That is the only structural
+  difference between them and the grid, and it is why their quality cannot be derived from the
+  grid's axes.
 </p>
 
 <div class="grid-scroll">
@@ -332,7 +336,7 @@
                             <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span>
       <div class="dq" style="color:var(--p3)">&minus;1.56<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">20.8 tok/s · TTFT 6.5 s</span></div><div class="turn">12.8 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s2)">34.7 tok/s · TTFT 5.6 s</span></div><div class="turn">9.3 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> Qwen original, untouched<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-                <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">no measurement in this column</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+                <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">derived &plusmn;0.13</div></div></td>
   </tr>
 
   <tr>
@@ -346,8 +350,7 @@
                     <td><div class="cell meas best dfl-yes"><span class="tag">built here</span>
       <div class="dq" style="color:var(--p3)">&minus;1.51<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">21.0 tok/s · TTFT 6.3 s</span></div><div class="turn">12.5 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">35.2 tok/s · TTFT 5.6 s</span></div><div class="turn">9.3 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-            <td><div class="cell model dfl-likely"><div class="dq" style="color:var(--muted)">—</div>
-      <div class="speed">&nbsp;</div><div class="who">not built<br>no static W4A4 body here</div></div></td>
+            <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
   </tr>
 
   <tr>
@@ -355,12 +358,11 @@
       <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">measured 19 Aug</span>
         <div class="dq" style="color:var(--p2)">&minus;1.29<span class="unit">pp</span></div>
         <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">27.0 tok/s · TTFT 9.9 s</span></div><div class="turn">14.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">41.7 tok/s · TTFT 9.6 s</span></div><div class="turn">12.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.23</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
-    <td><div class="cell model dfl-unlik" data-depth="a"><div class="dq" style="color:var(--muted)">—</div>
-      <div class="speed">&nbsp;</div><div class="who">not built</div></div></td>
+    <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
             <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span>
       <div class="dq" style="color:var(--p3)">&minus;1.60<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.4 tok/s · TTFT 6.3 s</span></div><div class="turn">11.2 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.9 tok/s · TTFT 5.6 s</span></div><div class="turn">9.1 s / turn<span class="acc2"> @130 tok &middot; accept 4.46</span></div></div>      <div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-        <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">no measurement in this column</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+        <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">derived &plusmn;0.13</div></div></td>
   </tr>
 
   <tr>
@@ -369,11 +371,11 @@
       <div class="dq" style="color:var(--p2)">&minus;1.33<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.4 tok/s · TTFT 9.9 s</span></div><div class="turn">14.8 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">41.2 tok/s · TTFT 9.6 s</span></div><div class="turn">12.8 s / turn<span class="acc2"> @130 tok &middot; accept 4.54</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
     <td><div class="cell dfl-unlik model" data-depth="a"><div class="dq" style="color:var(--q3)">&minus;1.31<span class="unit">pp</span></div>
-      <div class="speed">26.6 tok/s</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+      <div class="speed">26.6 tok/s &middot; derived &plusmn;0.13</div></div></td>
     <td><div class="cell dfl-yes orig" data-depth="a"><span class="tag o">original</span>
       <div class="dq" style="color:var(--p3)">&minus;1.53<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.6 tok/s · TTFT 6.4 s</span></div><div class="turn">11.3 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.5 tok/s · TTFT 5.6 s</span></div><div class="turn">9.2 s / turn<span class="acc2"> @130 tok &middot; accept 4.38</span></div></div><div class="who m"><span class="wk">Head</span> unsloth<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-        <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">no measurement in this column</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+        <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">derived &plusmn;0.13</div></div></td>
   </tr>
 
   <tr>
@@ -387,15 +389,15 @@
     <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">built here</span>
       <div class="dq" style="color:var(--p5)">&minus;2.06<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">29.2 tok/s · TTFT 6.2 s</span></div><div class="turn">10.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s4)">38.6 tok/s · TTFT 5.6 s</span></div><div class="turn">9.0 s / turn<span class="acc2"> @130 tok &middot; accept 4.26</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-        <td><div class="cell model"><div class="dq" style="color:var(--muted)">?</div><div class="speed"><div>no measurement in this column</div><div>vacant &middot; derived &plusmn;0.13</div></div><div class="who"><span class="wk">Head</span> &mdash;<br><span class="wk">Model</span> &mdash;</div></div></td>
+        <td><div class="cell model"><div class="dq" style="color:var(--muted)">?</div><div class="speed">derived &plusmn;0.13</div></div></td>
   </tr>
 
     <tr>
       <th class="row"><span class="rname">NVFP4 · A4</span><span class="riso" style="color:var(--q1)">fastest &middot; least faithful</span><span class="rbytes">0.64 GB · 10.29 % · 30.1 tok/s</span></th>
-      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div></div></div></td>
-      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div></div></div></td>
-      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div><div>the published W4A4 head is <i>static</i> &rarr;</div></div></div></td>
-      <td><div class="cell meas dfl-yes"><span class="tag">published</span><div class="dq" style="color:var(--p5)">&minus;2.19<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">30.1 tok/s · TTFT 4.6 s</span></div><div class="turn">8.9 s / turn<span class="acc2"> @130 tok &middot; accept 3.29</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">40.3 tok/s · TTFT 4.5 s</span></div><div class="turn">7.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.32</span></div></div><div class="who m"><span class="wk">Head</span> RadixArk<br><span class="wk">Model</span> RadixArk/…-NVFP4</div></div></td>
+      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+      <td><div class="cell meas dfl-yes"><span class="tag">published</span><div class="dq" style="color:var(--p5)">&minus;2.19<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">30.1 tok/s · TTFT 4.6 s</span></div><div class="turn">8.9 s / turn<span class="acc2"> @130 tok &middot; accept 3.29</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">40.3 tok/s · TTFT 4.5 s</span></div><div class="turn">7.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.32</span></div></div><div class="who m"><span class="wk">Head</span> RadixArk<br><span class="wk">Model</span> RadixArk/…-NVFP4<br><span style="color:var(--muted)">gittensor/…-RTX5090 <i>same head, attn also 4-bit</i></span></div></div></td>
     </tr>
 </table>
 
@@ -423,13 +425,13 @@
     <td></td>
   </tr>
   <tr>
-    <th class="row"><span class="rname" style="color:var(--q5)">+ attention + GDN</span><span class="rbytes">only 6 of ~64 attn, half the GDN spared</span></th>
+    <th class="row"><span class="rname" style="color:var(--q5)">+ attention + GDN</span><span class="rbytes">attention 4-bit too · only the MTP head spared</span></th>
     <td></td>
     <td></td>
     <td></td>
     <td><div class="cell model dfl-likely"><span class="tag">published</span>
       <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
-      <div class="speed">unmeasured</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> NVFP4 W4A4 <i>+ attn + half GDN</i><br><span class="wk">Model</span> sakamakismile/…-MTP-NVFP4<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gittensor/…-RTX5090 <i>(gated)</i></div></div></td>
+      <div class="speed">unmeasured</div><div class="who"><span class="wk">Head</span> BF16 <i>(in the ignore list)</i><br><span class="wk">Body</span> NVFP4 W4A4 <i>incl. attention</i> · dynamic<br><span class="wk">Model</span> sakamakismile/…-MTP-NVFP4</div></div></td>
   </tr>
   <tr>
     <th class="row"><span class="rname" style="color:var(--muted)">integer weights</span><span class="rbytes">off-family · columns do not apply</span></th>
@@ -898,8 +900,9 @@
 </p>
 <p class="note">
   Depth was read from each <code>config.json</code>, counting exceptions rather than looking for
-  them — the distinction matters. <code>sakamakismile</code> targets every <code>Linear</code> and
-  spares only <b>6 of ~64</b> attention modules and half the GDN, so both are effectively in 4-bit.
+  them — the distinction matters. <code>sakamakismile</code> targets every <code>Linear</code>, and
+  its six spared attention entries all sit in <code>mtp.layers.0</code> — the MTP head, not the model
+  — so the main attention stack is fully 4-bit.
   <code>huginnfork</code> targets every <code>Linear</code> too but spares <b>68</b> attention and
   <b>336</b> GDN entries — everything — which makes it an ordinary MLP-only checkpoint, and it has
   moved up into the main block as the published occupant of a previously derived W4A16 cell.
@@ -909,9 +912,15 @@
   weights are integers, not NVFP4, so the column headers above them mean nothing and their cells
   are placed by download rank, not by scheme. They are here because leaving them out would suggest
   this stack cannot run them.
-  <code>gittensor/…-RTX5090</code> is gated (HTTP 401) and is listed on its README's description
-  alone. None of the four is measured: quality in the strip is <b>unknown</b>, not derived — the
-  axes that produce the grid's derived numbers do not extend to attention or GDN.
+  <code>gittensor/…-RTX5090</code> was gated when this page was first written and has since been
+  opened. Reading its tensors moved it: its <code>lm_head</code> carries
+  <code>weight_scale_2</code> <i>and</i> <code>input_scale</code>, so the head is NVFP4 with 4-bit
+  activations — not BF16 as the README implied — and it now sits beside RadixArk in
+  <code>NVFP4 · A4</code>. It still differs from RadixArk in one way the grid cannot show: it
+  targets every <code>Linear</code>, so its attention is 4-bit too, and its activations are
+  <i>static</i> where Unsloth's are dynamic. None of the strip is measured: quality there is
+  <b>unknown</b>, not derived — the axes that produce the grid's derived numbers do not extend to
+  attention or GDN.
 </p>
 
 <h2>Sources</h2>
