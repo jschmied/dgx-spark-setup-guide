@@ -1,0 +1,941 @@
+<title>NVFP4 Periodic Table</title>
+<style>
+  :root {
+    --bg:#f4f7f8; --surface:#ffffff; --surface-2:#eaf0f2;
+    --ink:#0d1519; --ink-2:#3d525d; --muted:#6b8290;
+    --line:#d5e0e5; --line-2:#bdcdd4;
+    --accent:#0b8f83; --accent-dim:#8fc9c3; --accent-wash:#e6f4f2;
+    --q1:#0b8f83; --q2:#4e9e86; --q3:#8aa07e; --q4:#b8955a; --q5:#c07a43;
+    --meas:#0b8f83;
+    --shadow: 0 1px 2px rgba(13,21,25,.06), 0 8px 24px rgba(13,21,25,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0a0e11; --surface:#121a1f; --surface-2:#18232a;
+      --ink:#e4edf1; --ink-2:#a8bec9; --muted:#7590a0;
+      --line:#1f2c34; --line-2:#2c3d47;
+      --accent:#3fd3c0; --accent-dim:#1d6b64; --accent-wash:#12292b;
+      --q1:#3fd3c0; --q2:#67c3a0; --q3:#9db888; --q4:#d3a760; --q5:#e08a4c;
+      --meas:#3fd3c0;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0a0e11; --surface:#121a1f; --surface-2:#18232a;
+    --ink:#e4edf1; --ink-2:#a8bec9; --muted:#7590a0;
+    --line:#1f2c34; --line-2:#2c3d47;
+    --accent:#3fd3c0; --accent-dim:#1d6b64; --accent-wash:#12292b;
+    --q1:#3fd3c0; --q2:#67c3a0; --q3:#9db888; --q4:#d3a760; --q5:#e08a4c;
+    --meas:#3fd3c0;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+  .wrap { max-width:1320px; margin:0 auto; padding:56px 28px 80px; }
+
+  .eyebrow {
+    font-family:ui-monospace,Menlo,monospace; font-size:11.5px;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:14px;
+  }
+  h1 {
+    font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+    font-size:clamp(28px,4.4vw,42px); font-weight:600; letter-spacing:-.02em;
+    margin:0 0 12px; text-wrap:balance; line-height:1.12;
+  }
+  .lede { font-size:17px; color:var(--ink-2); margin:0; }
+  .conditions {
+    display:flex; flex-wrap:wrap; gap:0 26px; margin-top:26px; padding:14px 18px;
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:var(--muted);
+  }
+  .conditions b { color:var(--ink-2); font-weight:600; }
+
+  h2 {
+    font-family:ui-monospace,Menlo,monospace; font-size:13px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted); font-weight:600;
+    margin:56px 0 6px; padding-bottom:10px; border-bottom:1px solid var(--line);
+  }
+  .note { color:var(--ink-2); margin:14px 0 24px; }
+
+  /* --- anchor band --- */
+  .anchors { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); margin-bottom:8px; }
+  .anchor {
+    background:var(--accent-wash); border:1px solid var(--accent-dim);
+    border-radius:8px; padding:15px 17px;
+  }
+  .anchor .k {
+    font-family:ui-monospace,Menlo,monospace; font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--accent); margin-bottom:7px;
+  }
+  .anchor .n { font-family:ui-monospace,Menlo,monospace; font-size:13.5px; color:var(--ink); }
+  .anchor .v {
+    font-family:ui-monospace,Menlo,monospace; font-size:24px; font-weight:600;
+    font-variant-numeric:tabular-nums; margin:8px 0 2px;
+  }
+  .anchor .s {
+    font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--ink-2);
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* --- grid --- */
+  .grid-scroll { overflow-x:auto; padding-bottom:8px; }
+  table.pt { border-collapse:separate; border-spacing:6px; min-width:1243px; }
+  table.pt th {
+    font-family:ui-monospace,Menlo,monospace; font-weight:600; font-size:11.5px;
+    letter-spacing:.05em; color:var(--muted); text-align:left; vertical-align:bottom; padding:0 6px 6px;
+  }
+  table.pt th.col { text-align:center; }
+  table.pt th.col span { display:block; color:var(--ink-2); font-size:13px; letter-spacing:0; }
+  table.pt th.col .ciso {
+    font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; font-weight:600; margin-top:2px;
+  }
+  table.pt th.row { width:180px; padding-right:12px; vertical-align:middle; }
+  table.pt th.row .rname { display:block; color:var(--ink); font-size:13.5px; letter-spacing:0; }
+  table.pt th.row .rbytes { display:block; color:var(--muted); font-size:11.5px; margin-top:3px; }
+  table.pt th.row .riso {
+    display:block; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+    margin-top:2px; font-weight:600;
+  }
+
+  .cell {
+    position:relative; width:251px; height:176px; padding:10px 12px;
+    border-radius:8px; border:1px solid var(--line);
+    background:var(--surface); box-shadow:var(--shadow);
+  }
+  .cell.model { border-style:dashed; background:transparent; box-shadow:none; }
+  table.pt.strip { margin-top:26px; }
+  table.pt.strip th.row .rname { font-size:12.5px; }
+  table.pt.strip td:empty { border:0; }
+  table.pt.strip .cell { height:194px; }
+  .cell.meas { border-color:var(--accent-dim); }
+  .cell.orig { background:var(--accent-wash); border-color:var(--accent); border-width:2px; }
+  .cell.best { outline:2px solid var(--accent); outline-offset:1px; }
+  /* DFlash2-Eignung. MUSS hinter .meas/.orig stehen: die setzen border-color und
+     border-width fuer ALLE Seiten und wuerden diese Kante sonst ueberschreiben. */
+  .cell.dfl-yes    { border-left:5px solid var(--dfl-yes); }
+  .cell.dfl-likely { border-left:5px solid var(--dfl-likely); }
+  .cell.dfl-unlik  { border-left:5px solid var(--dfl-unlik); }
+  .cell.dfl-no     { border-left:5px solid var(--dfl-no); }
+  .cell .dq {
+    font-family:ui-monospace,Menlo,monospace; font-size:26px; font-weight:600;
+    letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1;
+  }
+  .cell .unit { font-size:12px; color:var(--muted); font-weight:400; margin-left:3px; }
+  .cell .speed {
+    font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:var(--muted);
+    font-variant-numeric:tabular-nums; margin-top:7px; line-height:1.5;
+  }
+  .cell .speed .spd { color:var(--ink-2); }
+  /* Akzeptanzlaenge: mittlere Tokens je Verifikationsschritt. Bewusst gedaempft --
+     sie erklaert die Dekodierrate darueber, sie konkurriert nicht mit ihr. */
+  /* Zeit je Agentenzug: die Entscheidungsgroesse fuer Werkzeugschleifen,
+     deshalb kraeftiger als die Akzeptanzlaenge daneben. */
+  .cell .speed .turn { color:var(--ink-2); padding-left:10px; }
+  .cell .speed .turn .acc2 { color:var(--muted); opacity:.8; }
+  .cell .speed .acc { color:var(--muted); opacity:.8; padding-left:10px; }
+  .cell .who {
+    position:absolute; left:12px; right:12px; bottom:8px;
+    font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--muted);
+    line-height:1.3; overflow-wrap:anywhere;
+  }
+  .cell .who.m { color:var(--meas); }
+  .cell .who .wk { display:inline-block; width:40px; color:var(--muted); opacity:.75; }
+  .tag {
+    position:absolute; top:8px; right:10px; font-family:ui-monospace,Menlo,monospace;
+    font-size:9px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted);
+  }
+  .tag.o { color:var(--accent); font-weight:600; }
+
+  .legend {
+    display:flex; flex-wrap:wrap; gap:18px; margin:16px 0 0;
+    font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:var(--muted);
+  }
+  /* NUR ausgezeichnete Kaestchen. Ein blosses ".legend i" trifft auch die
+     kursiven Woerter im Legendentext und rendert sie als leeres Kaestchen. */
+  .legend i.key { display:inline-block; width:18px; height:11px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+  .lg-o { background:var(--accent-wash); border:2px solid var(--accent); }
+  .lg-p { background:var(--surface); border:1px solid var(--accent-dim); }
+  .lg-b { background:var(--surface); border:1px solid var(--line); }
+  .lg-d { background:transparent; border:1px dashed var(--line-2); }
+
+  .axes { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(255px,1fr)); }
+  .axis {
+    background:var(--surface); border:1px solid var(--line);
+    border-left:3px solid var(--accent); border-radius:7px; padding:14px 16px;
+  }
+  .axis .name { font-family:ui-monospace,Menlo,monospace; font-size:13px; color:var(--ink); }
+  .axis .val {
+    font-family:ui-monospace,Menlo,monospace; font-size:21px; font-weight:600;
+    color:var(--accent); font-variant-numeric:tabular-nums; margin:6px 0 4px;
+  }
+  .axis .cost { font-size:12.5px; color:var(--muted); }
+
+  .tbl-scroll { overflow-x:auto; }
+  table.data { border-collapse:collapse; width:100%; min-width:640px; font-size:13.5px; }
+  table.data th {
+    text-align:left; font-family:ui-monospace,Menlo,monospace; font-size:11px;
+    letter-spacing:.07em; text-transform:uppercase; color:var(--muted); font-weight:600;
+    padding:0 14px 9px 0; border-bottom:1px solid var(--line-2);
+  }
+  table.data td { padding:9px 14px 9px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.data td.num { font-family:ui-monospace,Menlo,monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  table.data tr:last-child td { border-bottom:none; }
+  code { font-family:ui-monospace,Menlo,monospace; font-size:.93em; background:var(--surface-2); padding:1px 5px; border-radius:4px; }
+  .warn {
+    background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--q4);
+    border-radius:7px; padding:16px 18px; margin:22px 0; color:var(--ink-2);
+  }
+  .warn b { color:var(--ink); }
+  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; }
+
+  /* Messwerte farbig, Berechnetes neutral — Tempo blau→rot, Treue rot→grün */
+  :root {
+    --s1:#1d4ed8; --s2:#6d4bc9; --s3:#a34a9a; --s4:#c94a63; --s5:#c81e1e;
+    --p0:#0f6b34; --p1:#2f7d31; --p2:#5f8a2c; --p3:#96852a; --p4:#c07030; --p5:#c62d2d;
+    --dfl-yes:#1a7f37; --dfl-likely:#8fbf7a; --dfl-unlik:#e0a58a; --dfl-no:#c62d2d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --s1:#6ea8fe; --s2:#a08ae8; --s3:#d087c4; --s4:#ef8496; --s5:#ff6b6b;
+      --p0:#4ade80; --p1:#7bd66a; --p2:#a9cf5c; --p3:#d9c256; --p4:#f0a45f; --p5:#ff7b72;
+    --dfl-yes:#3fb950; --dfl-likely:#7bc96f; --dfl-unlik:#d98b6a; --dfl-no:#f85149;
+      --dfl-yes:#3fb950; --dfl-likely:#7bc96f; --dfl-unlik:#d98b6a; --dfl-no:#f85149;
+    }
+  }
+  :root[data-theme="dark"] {
+    --s1:#6ea8fe; --s2:#a08ae8; --s3:#d087c4; --s4:#ef8496; --s5:#ff6b6b;
+    --p0:#4ade80; --p1:#7bd66a; --p2:#a9cf5c; --p3:#d9c256; --p4:#f0a45f; --p5:#ff7b72;
+    --dfl-yes:#3fb950; --dfl-likely:#7bc96f; --dfl-unlik:#d98b6a; --dfl-no:#f85149;
+  }
+  .cell.model .dq { color: var(--muted) !important; font-weight:500; }
+  .cell.model .speed { color: var(--muted); }
+  .spd { font-weight:600; }
+  .scale { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px;
+    font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--muted); }
+  .scale b { font-weight:600; color:var(--ink-2); }
+  .quellen { display:grid; gap:0; }
+  .quellen .q {
+    display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);
+    gap:4px 22px; padding:13px 0; border-top:1px solid var(--line);
+  }
+  .quellen .q:last-child { border-bottom:1px solid var(--line); }
+  .quellen a { color:var(--accent); text-decoration:none; border-bottom:1px solid var(--accent-dim); }
+  .quellen a:hover { border-bottom-color:var(--accent); }
+  .quellen a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .quellen .qn { font-family:ui-monospace,Menlo,monospace; font-size:12.5px; overflow-wrap:anywhere; }
+  .quellen .qw { color:var(--ink-2); font-size:13.5px; }
+  @media (max-width:720px) { .quellen .q { grid-template-columns:1fr; } }
+
+  .sw { display:inline-block; width:34px; height:9px; border-radius:2px; vertical-align:-1px; margin-right:5px; }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow mono">Qwen3.8-27B · GB10 / vLLM 0.27.1</div>
+  <h1>NVFP4 Periodic Table</h1>
+  <p class="lede">
+    Nine public quantizations, some 1,900 possible recipes, four axes that measurably move
+    anything — and one finding that reorders the rest: <b>which NVFP4 you pick costs almost
+    three times as much fidelity as the decision to use NVFP4 at all.</b> Nine cells are now
+    measured; all three built to test the model's extrapolation broke it, and the fourth axis
+    collapsed to noise the moment it was measured directly.
+  </p>
+  <div class="conditions">
+    <span><b>Fidelity</b> Δtop-1 vs BF16, teacher-forced, 20 agent contexts</span>
+    <span><b>Speed</b> MTP n=3, util 0.60, paired — DFlash2 figures marked per cell</span>
+    <span><b>As of</b> 2026-08-19</span>
+  </div>
+</header>
+
+<h2>Anchors — the three you can just download</h2>
+<p class="note">
+  Everything below is measured against these. The step from FP8 to the <i>best</i> NVFP4
+  costs <b>0.34 pp</b> and buys 48 % throughput. The spread <i>within</i> NVFP4 is
+  <b>0.95 pp</b> — so the variant choice is the larger decision, and it is the one most
+  people never make.
+</p>
+<div class="anchors">
+  <div class="anchor">
+    <div class="k">original · reference</div>
+    <div class="n">Qwen/Qwen3.8-27B &nbsp;BF16</div>
+    <div class="v" style="color:var(--q1)">&plusmn;0.00<span class="unit" style="font-size:12px;color:var(--muted)"> pp</span></div>
+    <div class="s">55.6 GB · zero by definition · ~4 tok/s w/o spec</div>
+  </div>
+  <div class="anchor">
+    <div class="k">original · 8-bit</div>
+    <div class="n">Qwen/Qwen3.8-27B-FP8</div>
+    <div class="v" style="color:var(--q1)">&minus;0.77<span class="unit" style="font-size:12px;color:var(--muted)"> pp</span></div>
+    <div class="s">30.9 GB · 18.0 tok/s · TTFT 11.2 s<br><span style="color:var(--dfl-yes)">· 28.8 tok/s with DFlash2 (+60 %)</span></div>
+  </div>
+  <div class="anchor">
+    <div class="k">original · the default 4-bit</div>
+    <div class="n">unsloth/Qwen3.8-27B-NVFP4</div>
+    <div class="v" style="color:var(--q3)">&minus;1.53<span class="unit" style="font-size:12px;color:var(--muted)"> pp</span></div>
+    <div class="s">23.4 GB · 26.6 tok/s · TTFT 6.4 s</div>
+  </div>
+</div>
+
+<h2>The map</h2>
+<p class="note">
+  The kernel is a property of the column, not of a cell: W4A4 forces CUTLASS, W4A16 forces
+  Marlin. It is deliberately <i>not</i> repeated in every cell — at equal head size both
+  deliver the same decode rate, and labelling all sixteen would imply a per-cell effect the
+  measurements rule out. Where the kernel does show is prefill: 6.4 s against 8.4 s TTFT.
+</p>
+<p class="note">
+  <b>Columns are the element, rows are its isotopes.</b> A column fixes the body — the same
+  weights, the same kernel, the same chemistry. Moving down a column changes only the <code>lm_head</code>: 2.54 GB, then 1.27, then 0.64,
+  and finally 0.64 again with its <i>activations</i> in 4-bit too. Same element, heavier or lighter
+  nucleus.
+  Most of the isotopes here do not occur in the wild — they were synthesized by swapping a head
+  onto a published body, which is also why three cells are marked <i>transuranium</i>: nobody
+  publishes them, they only exist because we made them.
+  <br><br>
+  Rows are the <b>lm_head</b>, ordered by its distance from BF16. It holds 4.6 % of the
+  parameters yet sets the decode rate alone, because under speculative decoding it runs once
+  per draft position while the body runs once per step. Columns are the <b>body</b>.
+  <br><br>
+  <b>Two things the axes do not show.</b> The <code>A8</code>/<code>A16</code> in a row name is the
+  <i>head's</i> activation precision, not the body's — and the column's <code>A4</code>/<code>A16</code>
+  describes only the <b>MLP</b>. Attention tells a third story that neither axis carries: in
+  <i>every</i> checkpoint on this page — published and synthesized alike — the attention and
+  linear-attention projections are <b>W8A8</b>, FP8 weights with dynamic FP8 activations. Read from
+  each <code>config_groups</code>. It never varies, so it cannot be an axis; but it means no cell
+  here is a 4-bit model in the sense the column headers suggest, and the strip period below is the
+  only place where attention depth differs at all.
+</p>
+
+<div class="grid-scroll">
+<table class="pt">
+  <tr>
+    <th></th>
+    <th class="col">W4A16 · Marlin<span>MLP, dynamic act.</span><span class="ciso" style="color:var(--q4)">slow prefill · TTFT ~10 s</span></th>
+    <th class="col">W4A16 · Marlin<span>MLP, static act.</span><span class="ciso" style="color:var(--q4)">slow prefill · TTFT ~8.5 s</span></th>
+    <th class="col">W4A4 · CUTLASS<span>MLP, dynamic act.</span><span class="ciso" style="color:var(--q1)">fast prefill · TTFT ~6.3 s</span></th>
+    <th class="col">W4A4 · CUTLASS<span>MLP, static act.</span><span class="ciso" style="color:var(--q1)">fastest prefill · 4.6 s</span></th>
+  </tr>
+
+  <tr>
+    <th class="row"><span class="rname">BF16 · A16</span><span class="riso" style="color:var(--q5)">heaviest · slowest</span><span class="rbytes">2.54 GB · 0.00 % · ~22 tok/s</span></th>
+    <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">built here</span>
+      <div class="dq" style="color:var(--p2)">&minus;1.27<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">~22 tok/s <span style='opacity:.6'>not benched</span></span></div><div>DFlash2 <span class="spd" style="color:var(--s4)">37.5 tok/s · TTFT 9.6 s</span></div><div class="turn">13.1 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> Qwen original, untouched<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
+        <td><div class="cell model dfl-likely" data-depth="a"><span class="tag">published</span>
+      <div class="dq" style="color:var(--muted)">&minus;1.29<span class="unit">pp</span></div>
+      <div class="speed">~22 tok/s</div><div class="who"><span class="wk">Head</span> huginnfork<br><span class="wk">Model</span> huginnfork/…-NVFP4A16</div></div></td>
+                            <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span>
+      <div class="dq" style="color:var(--p3)">&minus;1.56<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">20.8 tok/s · TTFT 6.5 s</span></div><div class="turn">12.8 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s2)">34.7 tok/s · TTFT 5.6 s</span></div><div class="turn">9.3 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> Qwen original, untouched<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
+                <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">no measurement in this column</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+  </tr>
+
+  <tr>
+    <th class="row"><span class="rname">FP8 · A16 — stored wide</span><span class="riso" style="color:var(--q4)">heavy · slow</span><span class="rbytes">2.54 GB · 3.05 % · ~22 tok/s</span></th>
+    <td><div class="cell dfl-yes meas best" data-depth="a"><span class="tag">best fidelity</span>
+      <div class="dq" style="color:var(--p1)">&minus;1.11<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">22.2 tok/s · TTFT 10.0 s</span></div><div class="turn">15.9 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.5 tok/s · TTFT 9.6 s</span></div><div class="turn">13.2 s / turn<span class="acc2"> @130 tok &middot; accept 4.05<sup>†</sup></span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
+    <td><div class="cell meas dfl-likely" data-depth="a"><span class="tag">built here</span>
+      <div class="dq" style="color:var(--p2)">&minus;1.33<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">21.8 tok/s · TTFT 8.6 s</span></div><div class="turn">14.6 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s4)">37.8 tok/s · TTFT 8.5 s</span></div><div class="turn">11.9 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> r0b0tlab/…-NVFP4-MTP-sm121</div></div></td>
+                    <td><div class="cell meas best dfl-yes"><span class="tag">built here</span>
+      <div class="dq" style="color:var(--p3)">&minus;1.51<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">21.0 tok/s · TTFT 6.3 s</span></div><div class="turn">12.5 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">35.2 tok/s · TTFT 5.6 s</span></div><div class="turn">9.3 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
+            <td><div class="cell model dfl-likely"><div class="dq" style="color:var(--muted)">—</div>
+      <div class="speed">&nbsp;</div><div class="who">not built<br>no static W4A4 body here</div></div></td>
+  </tr>
+
+  <tr>
+    <th class="row"><span class="rname">FP8 · A16</span><span class="riso" style="color:var(--q3)">medium</span><span class="rbytes">1.27 GB · 3.05 % · 26.6 tok/s</span></th>
+      <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">measured 19 Aug</span>
+        <div class="dq" style="color:var(--p2)">&minus;1.29<span class="unit">pp</span></div>
+        <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">27.0 tok/s · TTFT 9.9 s</span></div><div class="turn">14.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">41.7 tok/s · TTFT 9.6 s</span></div><div class="turn">12.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.23</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
+    <td><div class="cell model dfl-unlik" data-depth="a"><div class="dq" style="color:var(--muted)">—</div>
+      <div class="speed">&nbsp;</div><div class="who">not built</div></div></td>
+            <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span>
+      <div class="dq" style="color:var(--p3)">&minus;1.60<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.4 tok/s · TTFT 6.3 s</span></div><div class="turn">11.2 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.9 tok/s · TTFT 5.6 s</span></div><div class="turn">9.1 s / turn<span class="acc2"> @130 tok &middot; accept 4.46</span></div></div>      <div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
+        <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">no measurement in this column</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+  </tr>
+
+  <tr>
+    <th class="row"><span class="rname">FP8 · A8</span><span class="riso" style="color:var(--q3)">medium</span><span class="rbytes">1.27 GB · + quantized input</span></th>
+    <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">built here</span>
+      <div class="dq" style="color:var(--p2)">&minus;1.33<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.4 tok/s · TTFT 9.9 s</span></div><div class="turn">14.8 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">41.2 tok/s · TTFT 9.6 s</span></div><div class="turn">12.8 s / turn<span class="acc2"> @130 tok &middot; accept 4.54</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
+    <td><div class="cell dfl-unlik model" data-depth="a"><div class="dq" style="color:var(--q3)">&minus;1.31<span class="unit">pp</span></div>
+      <div class="speed">26.6 tok/s</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+    <td><div class="cell dfl-yes orig" data-depth="a"><span class="tag o">original</span>
+      <div class="dq" style="color:var(--p3)">&minus;1.53<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.6 tok/s · TTFT 6.4 s</span></div><div class="turn">11.3 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.5 tok/s · TTFT 5.6 s</span></div><div class="turn">9.2 s / turn<span class="acc2"> @130 tok &middot; accept 4.38</span></div></div><div class="who m"><span class="wk">Head</span> unsloth<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
+        <td><div class="cell model dfl-unlik"><div class="dq" style="color:var(--muted)">?</div><div class="speed">no measurement in this column</div><div class="who">vacant<br>derived ±0.13</div></div></td>
+  </tr>
+
+  <tr>
+    <th class="row"><span class="rname">NVFP4 · A16</span><span class="riso" style="color:var(--q1)">lightest · fastest</span><span class="rbytes">0.64 GB · 10.29 % · 29.6 tok/s</span></th>
+    <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">built here</span>
+      <div class="dq" style="color:var(--p4)">&minus;1.81<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">29.6 tok/s · TTFT 9.9 s</span></div><div class="turn">14.3 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">39.1 tok/s · TTFT 9.6 s</span></div><div class="turn">12.9 s / turn<span class="acc2"> @130 tok &middot; accept 4.06</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
+    <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">published</span>
+      <div class="dq" style="color:var(--p4)">&minus;1.69<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">29.6 tok/s · TTFT 8.4 s</span></div><div class="turn">12.8 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">40.6 tok/s · TTFT 8.5 s</span></div><div class="turn">11.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.23</span></div></div><div class="who m"><span class="wk">Head</span> r0b0tlab<br><span class="wk">Model</span> r0b0tlab/…-NVFP4-MTP-sm121</div></div></td>
+    <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">built here</span>
+      <div class="dq" style="color:var(--p5)">&minus;2.06<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">29.2 tok/s · TTFT 6.2 s</span></div><div class="turn">10.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s4)">38.6 tok/s · TTFT 5.6 s</span></div><div class="turn">9.0 s / turn<span class="acc2"> @130 tok &middot; accept 4.26</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
+        <td><div class="cell model"><div class="dq" style="color:var(--muted)">?</div><div class="speed"><div>no measurement in this column</div><div>vacant &middot; derived &plusmn;0.13</div></div><div class="who"><span class="wk">Head</span> &mdash;<br><span class="wk">Model</span> &mdash;</div></div></td>
+  </tr>
+
+    <tr>
+      <th class="row"><span class="rname">NVFP4 · A4</span><span class="riso" style="color:var(--q1)">fastest &middot; least faithful</span><span class="rbytes">0.64 GB · 10.29 % · 30.1 tok/s</span></th>
+      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div></div></div></td>
+      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div></div></div></td>
+      <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div><div>the published W4A4 head is <i>static</i> &rarr;</div></div></div></td>
+      <td><div class="cell meas dfl-yes"><span class="tag">published</span><div class="dq" style="color:var(--p5)">&minus;2.19<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">30.1 tok/s · TTFT 4.6 s</span></div><div class="turn">8.9 s / turn<span class="acc2"> @130 tok &middot; accept 3.29</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">40.3 tok/s · TTFT 4.5 s</span></div><div class="turn">7.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.32</span></div></div><div class="who m"><span class="wk">Head</span> RadixArk<br><span class="wk">Model</span> RadixArk/…-NVFP4</div></div></td>
+    </tr>
+</table>
+
+<table class="pt strip">
+  <tr>
+    <th class="row"><span class="rname" style="color:var(--accent)">no 4-bit body</span><span class="rbytes">the originals · columns do not apply</span></th>
+    <td><div class="cell orig dfl-likely"><span class="tag o">original</span>
+      <div class="dq" style="color:var(--q1)">&plusmn;0.00<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd">not measured · OOM at util 0.50</span></div></div>
+      <div class="who m"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> none — BF16 throughout<br><span class="wk">Model</span> Qwen/Qwen3.8-27B<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; unsloth/Qwen3.8-27B <i>(mirror)</i></div></div></td>
+    <td><div class="cell orig meas dfl-yes"><span class="tag o">original</span>
+      <div class="dq" style="color:var(--p0)">&minus;0.77<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">18.0 tok/s · TTFT 11.2 s</span></div><div class="turn">18.4 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s1)">28.8 tok/s · TTFT 10.6 s</span></div><div class="turn">15.1 s / turn<span class="acc2"> @130 tok</span></div></div>
+      <div class="who m"><span class="wk">Head</span> BF16, untouched<br><span class="wk">Body</span> FP8 W8A8<br><span class="wk">Model</span> Qwen/Qwen3.8-27B-FP8</div></div></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <th class="row"><span class="rname" style="color:var(--q4)">+ attention</span><span class="rbytes">quantization reaches past the MLP</span></th>
+    <td></td>
+    <td></td>
+    <td><div class="cell model dfl-likely"><span class="tag">published</span>
+      <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
+      <div class="speed">unmeasured</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> NVFP4 W4A4 <i>+ attention</i><br><span class="wk">Model</span> Inferact/…-NVFP4 <i>· 26.4 GB</i></div></div></td>
+    <td></td>
+  </tr>
+  <tr>
+    <th class="row"><span class="rname" style="color:var(--q5)">+ attention + GDN</span><span class="rbytes">only 6 of ~64 attn, half the GDN spared</span></th>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td><div class="cell model dfl-likely"><span class="tag">published</span>
+      <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
+      <div class="speed">unmeasured</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> NVFP4 W4A4 <i>+ attn + half GDN</i><br><span class="wk">Model</span> sakamakismile/…-MTP-NVFP4<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; gittensor/…-RTX5090 <i>(gated)</i></div></div></td>
+  </tr>
+  <tr>
+    <th class="row"><span class="rname" style="color:var(--muted)">integer weights</span><span class="rbytes">off-family · columns do not apply</span></th>
+    <td><div class="cell model dfl-likely"><span class="tag">published</span>
+      <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
+      <div class="speed">AWQ W4A16 int</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> AWQ W4A16 <i>int</i><br><span class="wk">Model</span> cyankiwi/…-AWQ-INT4 <i>· 112 k</i></div></div></td>
+    <td><div class="cell model dfl-likely"><span class="tag">published</span>
+      <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
+      <div class="speed">AWQ W4A16 int</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> AWQ W4A16 <i>int</i><br><span class="wk">Model</span> philbert440/…-W4A16-AWQ <i>· 70 k</i></div></div></td>
+    <td><div class="cell model dfl-likely"><span class="tag">published</span>
+      <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
+      <div class="speed">AWQ/GPTQ W4A16 int</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> AWQ/GPTQ W4A16 <i>int</i><br><span class="wk">Model</span> soyrsoyr/…-W4A16-AWQ-GPTQ <i>· 42 k</i></div></div></td>
+    <td><div class="cell model dfl-likely"><span class="tag">published</span>
+      <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
+      <div class="speed">W8A16 int</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> W8A16 <i>int</i><br><span class="wk">Model</span> lued/…-INT8-W8A16-MTP <i>· 43 k</i></div></div></td>
+  </tr>
+</table>
+</div>
+
+<div class="legend">
+  <span><b style="color:var(--ink-2)">cell:</b></span>
+  <span><i class="key lg-o"></i>original — download and serve</span>
+  <span><i class="key lg-p"></i>published checkpoint</span>
+  <span><i class="key lg-b"></i>built here — <i>transuranic</i>: synthesized, never published</span>
+  <span><i class="key lg-d"></i>derived from the axes, ±0.4 pp</span>
+  <span>dashed and blank = nobody builds it</span>
+</div>
+<div class="scale">
+  <span><b>tok/s</b> <i class="sw" style="background:linear-gradient(90deg,var(--s1),var(--s3),var(--s5))"></i>shaded <i>within each method</i>: MTP 18→30, DFlash2 29→41</span>
+  <span><b>Δtop-1</b> <i class="sw" style="background:linear-gradient(90deg,var(--p5),var(--p3),var(--p0))"></i>−2.06 worse → 0.00 reference</span>
+  <span>derived values stay grey on purpose</span>
+</div>
+<div class="legend">
+  <span><b style="color:var(--ink-2)">DFlash2 (left edge):</b></span>
+  <span><i class="key" style="background:var(--dfl-yes)"></i>runs &mdash; measured</span>
+  <span><i class="key" style="background:var(--dfl-likely)"></i>should run &mdash; untested</span>
+  <span><i class="key" style="background:var(--dfl-unlik)"></i>untested &mdash; quantized head, needs the guard removed</span>
+  <span><i class="key" style="background:var(--dfl-no)"></i>pending &mdash; measurement queued</span>
+</div>
+<div class="legend">
+  <span><b style="color:var(--ink-2)">s / turn @130 tok:</b></span>
+  <span>TTFT plus a <b>130-token</b> completion at that rate &mdash; the median agent turn, held fixed</span>
+  <span>normalized on purpose: a 20-request median completion is unstable (95 % range 104&ndash;252)</span>
+  <span>an index for ranking, not a wall clock &mdash; rank tool loops by this, not by tok/s</span></div>
+<div class="legend">
+  <span><b style="color:var(--ink-2)">within a cell:</b></span><span>MTP is vLLM 0.27.1, DFlash2 is the #52816 branch &mdash; different builds, so the gap is a floor</span>
+</div>
+<div class="legend">
+  <span><b style="color:var(--ink-2)">accept length:</b></span>
+  <span>mean tokens per verification step at n&nbsp;=&nbsp;7 &mdash; ceiling 8.00, no speculation 1.00</span>
+  <span>it is what the decode rate above it is <i>made of</i>: rate &asymp; steps/s &times; length</span>
+  <span><sup>†</sup> from the n-sweep, before FP32 top-k ranking &mdash; measured to change nothing (4.26 either way)</span>
+  <span>blank = the run predates the counter being saved</span>
+</div>
+
+
+
+<div class="warn">
+  <b>Why there are two 2.54 GB rows.</b> Storage width and head precision are separate axes, and
+  exactly one checkpoint separates them: <code>ours-w4a16</code> carries an FP8-precision head at
+  full BF16 width — 2.253 % relative L1 from the pristine head, against 2.248 % for a simulated
+  per-output-channel FP8 e4m3 round-trip (0.438 % from that simulation itself). Reading the two
+  wide rows against each other gives the axis-saturation result directly: the <i>pristine</i> head
+  measures &minus;1.27, the FP8 one &minus;1.11 — a perfect head is worse. Reading down the FP8
+  column gives the storage cost: &minus;1.11 at 22.2 tok/s wide, &minus;1.29 at 27.0 tok/s narrow —
+  <b>0.18 pp for 4.8 tok/s</b>.
+  <br><br>
+  Both 2.54 GB rows were long thought to be the only <i>grid</i> rows DFlash2 could draft for,
+  because stock vLLM refuses a quantized target head and every narrower row quantizes it.
+  <b>That restriction is gone.</b> Deleting the eight-line guard makes every row here draftable,
+  and the six cells measured on 19 Aug prove it: quantized heads draft at
+  <b>38.6 to 41.2 tok/s</b>, faster than any unquantized one. The guard never described the
+  method — see the box below. On stock vLLM the ordering still held, and there
+  <b>the first-party <code>Qwen/Qwen3.8-27B-FP8</code> release runs it at
+  28.8 tok/s</b> — 60 % over its own 18.0 with MTP — because the legacy <code>fp8</code> path leaves <code>ParallelLMHead</code>
+  alone (vllm#40999 asks for opting <i>into</i> quantizing it). Lifting the restriction for
+  compressed-tensors heads is open upstream (sgl#35462, sgl#35496).
+</div>
+
+<div class="warn">
+  <b>And the requirement is an implementation artifact, not a property of the method.</b> The
+  candidate selector needs logits to rank, and it reached for the head's raw weights — which a
+  quantized head does not expose. <a href="https://github.com/Weschera/Qwen3.8-27B-NVFP4-DFlash2-DGX-Spark">A
+  public recipe</a> routes it through the generic interface instead, calling
+  <code>quant_method.apply(lm_head, hidden, None)</code> — the quantization scheme's own GEMM, which
+  every scheme implements. Nothing is dequantized, so the head stays at 0.64 GB; hidden states are
+  chunked at 256 tokens, logits truncated to <code>org_vocab_size</code>, and
+  <code>tp_size&nbsp;=&nbsp;1</code> is required. It serves <code>RadixArk/…-NVFP4</code>, whose head
+  <i>is</i> NVFP4 — the exact case both engines refuse unpatched. <b>Reproduced here on vLLM</b>
+  on 19 Aug: the same eight lines deleted, and NVFP4 heads draft at 38.6–40.6 tok/s.
+  <br><br>
+  That is the same class of defect as the vLLM one above: code reaching past the interface at a
+  concrete layer type. It also named a lever this map never touched — ranking the top-k in
+  <b>FP32</b> rather than in the head's own precision, credited there with lifting accept length
+  from 3.01 to 3.24, about 8 %. <b>It does not reproduce here.</b> Tested both ways on the same
+  NVFP4 head, same 20 contexts, 19 Aug: <b>4.26 either way</b> — 38.6 tok/s with and without, and
+  on the FP8 production head +0.1 %. Whatever that 8 % came from, it was not the ranking precision
+  on this stack. The patch is left in because it costs nothing, not because it earns anything. Their caveat matches our own measurement: <i>"its output hash does not match
+  speculation-off byte for byte."</i> So the eleven cells marked as refused are refused by
+  <i>today's code</i>, not by the method.
+</div>
+
+<div class="warn">
+  <b>The derived cells failed every honest test, and the failure is locatable.</b> Three cells were
+  built to check whether the axes keep adding up away from the points that define them:
+  <code>unsloth-nvfp4head</code> (said &minus;1.67, measured <b>&minus;2.06</b>),
+  <code>ours + NVFP4 head</code> (&minus;1.47 → <b>&minus;1.81</b>) the W8A16 head
+  (&minus;1.11 → <b>&minus;1.29</b>) and the wide FP8 head on a W4A4 body
+  (&minus;1.31 → <b>&minus;1.51</b>). All four optimistic, by 0.18 to 0.39 pp — as much as the
+  largest single axis. The first two both involve the <b>NVFP4 head</b>: starting from r0b0tlab
+  (&minus;1.69, static) and applying the measured "static → dynamic = +0.22 pp" predicts
+  &minus;1.47, but the measurement is &minus;1.81 — <b>&minus;0.12 instead of +0.22</b>. With a
+  coarse head, finer activation scaling stops helping. The axes are not orthogonal there, which is
+  why the last cell in that row is anchored on its measured neighbour instead: &minus;2.06 plus
+  this row's own dynamic→static delta (+0.12) gives <b>&minus;1.94</b>, not the model's
+  &minus;1.89. Where a row has measurements, derive from them.
+</div>
+
+<div class="warn">
+  <b>The once-blocked W8A16 cell is measured, and it is not the optimum.</b> Reaching it meant
+  working around three defects — two in vLLM
+  (<a href="https://github.com/vllm-project/vllm/pull/48856">#48856</a>, still open) and one in
+  <code>humming-kernels</code> 0.1.10, which cannot compute GPU bandwidth on GB10 at all and was
+  fixed by the vendor in 0.1.12. The result: <b>&minus;1.29 pp at 27.0 tok/s</b>, against the plain
+  FP8 head's &minus;1.33 at 26.4. <b>0.04 pp and 0.6 tok/s — noise.</b> The head's activation
+  precision is not where the loss lives; its weights are, and W8A8 needs no patched vLLM.
+</div>
+
+<div class="warn">
+  <b>Speculation is not orthogonal to this map — it inverts it.</b> Every speed figure in the grid
+    is vLLM with MTP n=3, where head bytes set the decode rate and the wide BF16 head is the slow
+    row. Swap the drafter and that ordering breaks: <b>DFlash2 reaches 36.5 tok/s</b>, faster than
+    any cell here. Stock vLLM refuses a quantized <code>lm_head</code>, which appeared to restrict
+    it to the top row; removing that guard opens every row, and the quantized heads then decode
+    <i>faster</i> than the wide one — up to <b>41.2 tok/s</b>. Measured on
+    <a href="https://github.com/vllm-project/vllm/pull/52816">vllm#52816</a> + #52883, same target,
+    same 20 contexts: MTP n=3 20.8 → DFlash2 n=7 <b>36.5</b> (+75 %); the pristine-head
+    row measures <b>37.5</b>, and the first-party FP8 release <b>28.8</b>. Those all sit on a
+    <b>W4A16</b> body and pay ~9.6 s of prefill for it. Putting the same wide head on a
+    <b>W4A4</b> body gives <b>35.2 tok/s at 5.6 s</b> — 1.3 tok/s slower to decode, 4 s faster to
+    first token, and the only point measured here that is fast at both ends. Against the
+    production checkpoint under MTP that is <b>+32 % decode and −12 % TTFT at the same fidelity</b>
+    (&minus;1.51 vs &minus;1.53). n=7 is the measured optimum,
+    flat to n=11, and the published default for once holds. For reference the previous best was
+    SGLang + DSpark at 30.1 tok/s; SGLang cannot run DFlash2 yet (two merges short).
+    <br><br>
+    And it is the <i>same checkpoint</i> that holds the best fidelity in this field. At −1.11 pp
+    and 36.5 tok/s it <b>dominates every other cell on both axes at once</b> — better than
+    Unsloth's −1.53 and faster than its 26.6. The whole premise that fidelity must be bought with
+    throughput holds only as long as the drafter is fixed. One caveat keeps this out of production:
+    DFlash2 departs from unspeculated output measurably further than MTP does at equal draft depth
+    (0.469 vs 0.722 similarity), and it runs on an unmerged PR.
+  </div>
+
+<h2>The four axes</h2>
+<p class="note">
+  Each isolated by its own paired measurement. The <i>t</i> value says whether it survives
+  n=20 — the head ceiling does not, and that is the interesting one.
+</p>
+<div class="axes">
+  <div class="axis">
+    <div class="name">lm_head &nbsp;NVFP4 → anything else</div>
+    <div class="val">+0.50 pp</div>
+    <div class="cost">the only head step that pays</div>
+  </div>
+  <div class="axis">
+    <div class="name">body &nbsp;W4A4 → W4A16</div>
+    <div class="val">+0.28 pp</div>
+    <div class="cost">and 3.6 s more prefill: 6.3 s → 10.0 s</div>
+  </div>
+  <div class="axis" style="border-left-color:var(--q4)">
+    <div class="name">lm_head &nbsp;among BF16 / FP8 wide / FP8 narrow / A8</div>
+    <div class="val" style="color:var(--q4)">≤ 0.08 pp</div>
+    <div class="cost">four variants inside 0.08 pp &mdash; <b>flat</b></div>
+  </div>
+  <div class="axis" style="border-left-color:var(--q4)">
+    <div class="name">activations &nbsp;static → dynamic</div>
+    <div class="val" style="color:var(--q4)">+0.03 pp</div>
+    <div class="cost">was +0.22 from one pair &mdash; <b>noise across ten</b></div>
+  </div>
+</div>
+<p class="note">
+  <b>Refit on all ten measured cells, two of the four axes collapse.</b> The head axis is flat
+  everywhere except NVFP4: BF16, FP8 stored wide, FP8 stored narrow and FP8 with quantized
+  activations all sit inside 0.08 pp of each other, while NVFP4 drops 0.5 pp below them. The
+  strongest form of that: a head that was <i>never quantized at all</i> is not better. On the
+  W4A16 body it measures &minus;1.27 against &minus;1.11 for an FP8 round-trip; on the W4A4 body
+  &minus;1.56 against &minus;1.51 and &minus;1.53. Two independent bodies, and the pristine head
+  loses both times &mdash; and under DFlash2 as well, 34.7 tok/s against 35.2 at identical TTFT.
+  The drafter, like the decoder, responds to the head's <i>size</i> and not to what is in it:
+  two heads of the same width land within 0.5 tok/s whether or not they ever passed through a
+  quantizer. And
+  static → dynamic activations, published above as +0.22 pp from a single pair, is +0.03 pp across
+  ten &mdash; noise. What is left is one real quality axis (do not put the head in NVFP4) and one
+  real speed axis (the body's kernel sets prefill, the head's bytes set decode).
+  <br><br>
+  <b>One column now tests this end to end.</b> All five heads were measured on a single body
+  (unsloth's W4A4): pristine BF16 &minus;1.56, FP8 stored wide &minus;1.51, FP8 narrow W8A16
+  &minus;1.60, FP8 narrow W8A8 &minus;1.53, NVFP4 &minus;2.06. The four non-NVFP4 heads span
+  <b>0.09 pp</b> against the predicted ≤&nbsp;0.08, and NVFP4 sits <b>0.50 pp</b> below them
+  against the predicted +0.50. Three of those five are builds that exist nowhere else.
+  <br><br>
+  Leave-one-out over the ten cells puts this fit at <b>±0.13 pp mean error, 0.27 worst case</b> —
+  against the 0.18 to 0.39 pp misses recorded above, which were derived when only four to six
+  cells were measured. More measurements did make the derivation better. They also removed its
+  basis in one place: <b>the W4A4 · static column has no measurement at all</b>, so its four cells
+  now carry a question mark instead of a number.</p>
+<p class="note">
+  <b>The activation axis went the same way.</b> A8 &rarr; A16 was derived at +0.22 pp and was the
+  reason the W8A16 cell looked worth chasing. Measured head-to-head on the same body it is
+  <b>+0.04 pp</b> &mdash; noise. Two of the four axes therefore saturate at FP8: neither wider
+  weights nor wider activations buy anything back. What the head loses, it loses in its
+  <i>weights</i>, and only NVFP4 storage loses enough to matter.
+</p>
+<p class="note">
+  <b>The two metrics disagree at this scale.</b> On NLL the unquantized head is closer to
+  BF16, as it must be; on top-1 it is behind. Top-1 counts argmax flips and gets loud wherever
+  the first two candidates nearly tie. Below about 0.2 pp, trust NLL.
+</p>
+
+<h2>Throughput is one number</h2>
+<p class="note">
+  Six measurements, three head sizes, <b>both formats, both MLP schemes, both activation
+  modes</b> — within each row the spread is at most 2 % while everything else changes.
+</p>
+<div class="tbl-scroll">
+<table class="data">
+  <tr><th>lm_head</th><th>bytes</th><th>measured</th><th>varying across those runs</th></tr>
+  <tr><td class="mono">NVFP4</td><td class="num">0.64 GB</td><td class="num">29.6 / 29.2</td><td>modelopt ↔ compressed-tensors, W4A16 ↔ W4A4, static ↔ dynamic</td></tr>
+  <tr><td class="mono">FP8</td><td class="num">1.27 GB</td><td class="num">26.6 / 26.4</td><td>W4A4 ↔ W4A16</td></tr>
+  <tr><td class="mono">BF16 (wide)</td><td class="num">2.54 GB</td><td class="num">22.2 / 21.8</td><td>compressed-tensors ↔ modelopt, dynamic ↔ static</td></tr>
+</table>
+</div>
+<p class="note">
+  Predicted from bytes alone: 1.323 and 1.107 for the two ratios; measured 1.333 and 1.113.
+  Implied bandwidth 211 GB/s against a 273 GB/s peak. This is the one part of the map that
+  extrapolates.
+</p>
+
+<h2>The two extra periods</h2>
+<p class="note">
+  Four checkpoints quantize deeper than the MLP, and they used to sit in a footnote because they
+  broke the grid's two axes. They now sit <b>below the main block</b>, the way the lanthanides do —
+  their own periods, only the occupied positions drawn. Reading the strip is reading a third axis:
+  <i>how far past the MLP the quantization reaches</i>. With 48 of 64 layers being gated DeltaNet,
+  that axis runs straight through the recurrent state path.
+</p>
+
+
+<h2>One cell is not one thing</h2>
+<p class="note">
+  The grid names a row by the head's <i>precision</i>. That is enough for FP8 and not enough for
+  NVFP4, and the difference is measurable without serving anything: dequantize each head back to
+  BF16 and compare it against the untouched original. Pure tensor arithmetic, seconds, no GPU.
+</p>
+<div class="tbl-scroll">
+<table class="data">
+  <tr><th>Head</th><th>Format</th><th>Relative L1 vs the pristine BF16 head</th></tr>
+  <tr><td class="mono">unsloth/…-NVFP4</td><td>FP8 E4M3, per-channel</td><td class="num">2.256 %</td></tr>
+  <tr><td class="mono">ours-fp8head</td><td>FP8 E4M3, per-channel</td><td class="num">2.256 %</td></tr>
+  <tr><td class="mono">ours-w8a16head</td><td>FP8 E4M3, per-channel</td><td class="num">2.256 %</td></tr>
+  <tr><td class="mono">ours-w4a16 · uns-widefp8head</td><td>the same values, stored BF16</td><td class="num">2.253 %</td></tr>
+  <tr><td class="mono"><b>r0b0tlab</b></td><td>NVFP4, modelopt</td><td class="num"><b>8.987 %</b></td></tr>
+  <tr><td class="mono">ours-nvfp4head · unsloth-nvfp4head</td><td>NVFP4, compressed-tensors</td><td class="num">9.272 %</td></tr>
+</table>
+</div>
+<p class="note">
+  <b>Three independently produced FP8 heads land on the same number to three decimals.</b> That is
+  not luck: E4M3 carries three mantissa bits and takes one scale per output channel from the
+  absolute maximum, so the quantization is essentially forced — there is a right answer and
+  everyone finds it. Craft has nowhere to enter.
+  <br><br>
+  NVFP4 leaves room. One mantissa bit and <i>two</i> levels of scaling — an FP8 scale per group of
+  16, plus a global FP32 — means real choices: how the group scale is set, whether values are
+  merely rounded or fitted, how outliers are handled. <b>r0b0tlab's head reconstructs about 3 %
+  more accurately than ours.</b> So the NVFP4 row is under-specified: behind one cell sit at least
+  two builds of different quality, and the better one is not ours. The FP8 rows can stay one cell
+  per combination; that row cannot.
+  <br><br>
+  This also cleans up a comparison made carelessly earlier in this document: r0b0tlab's published
+  checkpoint (&minus;1.69) against our NVFP4-head build (&minus;1.81) differs in <i>head and body
+  at once</i> and says nothing about either alone. The weight-space figures above isolate the head;
+  the clean body comparison is our own head on two bodies, &minus;1.81 against &minus;2.06.
+  Ranking other published NVFP4 heads this way costs about 1.3 GB each — the header trick used for
+  placement is not enough, the tensors themselves are needed.
+</p>
+
+<div class="warn">
+  <b>Head bytes do not have a single effect &mdash; and this is where the map stops generalizing.</b>
+  Under speculation the decode rate factors into two terms: verification <b>steps/s</b> times
+  <b>accept length</b>. Six cells measured under identical conditions on 19&nbsp;Aug let both be
+  read off separately, two heads sizes and two head activation paths on two bodies.
+  <div class="tbl-scroll" style="margin:12px 0 4px">
+  <table class="data">
+    <tr><th>body</th><th>head</th><th>tok/s</th><th>accept length</th><th>steps/s</th></tr>
+    <tr><td>ours W4A16</td><td class="mono">FP8 &middot; A8 &middot; 1.27 GB</td><td class="num">41.2</td><td class="num"><b>4.54</b></td><td class="num">9.08</td></tr>
+    <tr><td>ours W4A16</td><td class="mono">FP8 &middot; A16 &middot; 1.27 GB</td><td class="num"><b>41.7</b></td><td class="num">4.23</td><td class="num"><b>9.86</b></td></tr>
+    <tr><td>ours W4A16</td><td class="mono">NVFP4 &middot; A16 &middot; 0.64 GB</td><td class="num">39.1</td><td class="num">4.06</td><td class="num">9.63</td></tr>
+    <tr><td>unsloth W4A4</td><td class="mono">FP8 &middot; A8 &middot; 1.27 GB</td><td class="num">36.5</td><td class="num">4.38</td><td class="num">8.33</td></tr>
+    <tr><td>unsloth W4A4</td><td class="mono">FP8 &middot; A16 &middot; 1.27 GB</td><td class="num">36.9</td><td class="num">4.46</td><td class="num">8.28</td></tr>
+    <tr><td>unsloth W4A4</td><td class="mono">NVFP4 &middot; A16 &middot; 0.64 GB</td><td class="num"><b>38.6</b></td><td class="num">4.26</td><td class="num">9.06</td></tr>
+  </table>
+  </div>
+  Hold the activation path fixed at <b>A16</b> and halve the head, 1.27&nbsp;GB to 0.64: on
+  Unsloth's body that buys <b>+0.78</b> steps/s, exactly as fewer weight bytes should. On ours it
+  <i>costs</i> <b>&minus;0.23</b>. Hold the size fixed instead and move A8&nbsp;&rarr;&nbsp;A16:
+  <b>+0.78</b> steps/s on our body, <b>&minus;0.05</b> on Unsloth's. Neither factor has a
+  body-independent sign.
+  <br><br>
+  <b>So "head bytes set the decode rate" is not a law here, and neither is its repair.</b> An
+  earlier reading of four of these cells had bytes buying steps and precision buying length, each
+  cleanly; the two W8A16 cells break both halves. The likely reason is that A8 and A16 are not the
+  same arithmetic at two resolutions but <i>different kernels</i> &mdash; W8A8 against Humming's
+  W8A16 &mdash; whose relative cost depends on what else is competing for bandwidth. That makes
+  head precision not an axis at all, but a kernel choice wearing an axis's label.
+  <br><br>
+  One thing does survive on every pairing: accept length is <b>not</b> a property of the head. The
+  same 0.64&nbsp;GB NVFP4 head accepts 4.26 on one body and 4.06 on the other; the same FP8 A16
+  head, 4.46 and 4.23. The drafter's hit rate depends on the target's weights &mdash; which the
+  two-axis reading did not anticipate, since the body was supposed to own prefill and nothing else.
+</div>
+
+<h2>Which cell is fastest for agent work</h2>
+<p class="note">
+  Every speed figure on this page is a decode rate, and for agent work that is the wrong number to
+  rank by. An agent turn is a long prompt and a <i>short</i> completion: across the 20 real agent
+  contexts replayed here the median completion is <b>130 tokens</b> (range 60&ndash;256) against a
+  median context of <b>9,138</b> (range 2,008&ndash;31,228). At ~40 tok/s those 130 tokens take
+  about 3 s, while the prefill takes 5.6 to 9.6. What you wait for is the prompt, not the answer.
+</p>
+<div class="tbl-scroll">
+<table class="data">
+  <tr><th>cell</th><th>TTFT</th><th>tok/s</th><th>s / turn @130 tok</th><th>of which TTFT</th></tr>
+  <tr><td class="mono">NVFP4 <b>A4</b> head &middot; RadixArk W4A4</td><td class="num">4.5 s</td><td class="num">40.3</td><td class="num"><b>7.7 s</b></td><td class="num">58 %</td></tr>
+  <tr><td class="mono">NVFP4 head &middot; unsloth W4A4</td><td class="num">5.6 s</td><td class="num">38.6</td><td class="num">9.0 s</td><td class="num">62 %</td></tr>
+  <tr><td class="mono">FP8 A16 head &middot; unsloth W4A4</td><td class="num">5.6 s</td><td class="num">36.9</td><td class="num">9.1 s</td><td class="num">61 %</td></tr>
+  <tr><td class="mono">NVFP4 head &middot; r0b0tlab W4A16</td><td class="num">8.5 s</td><td class="num">40.6</td><td class="num">11.7 s</td><td class="num">73 %</td></tr>
+  <tr><td class="mono">FP8 A16 head &middot; ours W4A16</td><td class="num">9.6 s</td><td class="num"><b>41.7</b></td><td class="num">12.7 s</td><td class="num">75 %</td></tr>
+  <tr><td class="mono">FP8 A8 head &middot; ours W4A16</td><td class="num">9.6 s</td><td class="num">41.2</td><td class="num">12.8 s</td><td class="num">75 %</td></tr>
+  <tr><td class="mono">NVFP4 head &middot; ours W4A16</td><td class="num">9.6 s</td><td class="num">39.1</td><td class="num">12.9 s</td><td class="num">74 %</td></tr>
+</table>
+</div>
+<div class="warn">
+  <b>The tok/s ranking is not merely imprecise here &mdash; it is inverted.</b> The fastest cell by
+  decode rate (41.7) is fifth of seven per turn. The <i>slowest</i> row of all, RadixArk at
+  <b>30.1 tok/s</b>, takes first place &mdash; it decodes 28 % slower than the leader and still
+  finishes the turn first, on a 5-second prefill advantage. TTFT is 52&ndash;75 % of the turn, and
+  no plausible decode advantage outruns that.
+  <br><br>
+  RadixArk wins on <i>both</i> terms at once, which nothing else here manages: the fastest prefill
+  (4.5 s) and the second-fastest decode (40.3). It is also the <i>least faithful</i> cell on the page
+  at &minus;2.19 pp &mdash; the same property seen from the other side, since its head quantizes
+  weights <i>and</i> activations to 4-bit. It moves the fewest bytes and keeps the least of BF16.
+  <br><br>
+  <b>Why the figure is normalized rather than measured.</b> Wall time as it actually occurred is not
+  comparable between runs &mdash; and not because one drafter talks more. Paired over the same 20
+  prompts the median difference in completion length is <b>+1 token</b>, and six of the twenty hit
+  the 256-token cap in each run alike. What moves is the <i>median itself</i>: bootstrapped at
+  n&nbsp;=&nbsp;20 these completions give a 95 % range of <b>104&ndash;252</b> tokens, so two runs of
+  the same model can differ by 35 tokens in median output for no reason at all. That lands straight
+  in a measured turn time &mdash; in one cell it turned a real 10 % gain into an apparent 3 %.
+  Holding the completion at 130 removes it. The result is an index for ranking, not a duration to
+  quote: real turns run 60 to 256 tokens, and a measured turn averages about 13 % longer than the
+  index because long contexts carry both a high TTFT <i>and</i> a long completion.
+  <br><br>
+  <b>One comparison the cells do not support.</b> Within a cell the MTP and DFlash2 lines come from
+  <i>different engine builds</i>: MTP from vLLM 0.27.1, DFlash2 from the
+  <a href="https://github.com/vllm-project/vllm/pull/52816">#52816</a> branch at 0.26.1rc1, the only
+  build that runs it. That branch's own MTP is slower &mdash; <b>20.8</b> against <b>22.2</b> tok/s
+  on the same target &mdash; so reading the two lines against each other <b>understates</b> DFlash2.
+  Where both were measured on the branch the saving is <b>19.5 %</b>, against 17.5 % for the mixed
+  pair. Compare cells along a row or column, where the engine is constant; treat the within-cell gap
+  as a floor.
+  <br><br>
+  <b>Unifying the two engines was tried, and did not work.</b> 0.27.1 already ships DFlash; adding
+  DFlash2 took two modules and four hooks, and it runs — same engine banner, sane output. But it
+  decodes <b>5.7 %</b> slower with <b>0.24</b> less accept length than the branch, identically on
+  both bodies, and repeat runs reproduce to ±0.01 so that is real. Three of the four missing pieces
+  were found only by diffing <code>qwen3_dflash.py</code> in full: none of them contains the string
+  "dflash2", because they are changes to <i>DFlash1</i> that DFlash2 depends on. One is a defect in
+  0.27.1 in its own right — the drafter is never told the target's RoPE layout, which the branch
+  calls out as silent: acceptance falls, nothing errors, output stays correct. Restoring it recovered
+  0.08 of the 0.24. The rest is a context-parallel-entangled kernel guard that cannot be lifted
+  cleanly, so the port was abandoned and the caveat above stands.
+  <br><br>
+  <b>Where the crossover sits.</b> A faster body wins only once the completion is long enough to pay
+  back its prefill:
+  <div style="margin:10px 0 10px 14px" class="mono">N &gt; &Delta;TTFT / (1/r<sub>slow</sub> &minus; 1/r<sub>fast</sub>)</div>
+  For the two bodies measured here that is (9.6 &minus; 5.6) / (1/38.6 &minus; 1/41.7) =
+  <b>2,077 output tokens</b>. Real agent turns emit 130 &mdash; a factor of sixteen short. At 1,000
+  tokens the W4A4 body is still ahead (31.5 s against 33.6); the two only draw level at 2,000.
+  <br><br>
+  <b>And the gap widens as a session runs.</b> TTFT grows with context, and not at the same rate on
+  both bodies: below 8k context it is <b>2.0 s</b> against <b>4.1 s</b>, at 15k and above
+  <b>15.3 s</b> against <b>23.8 s</b>. The penalty grows from 2.1 s to 8.5 s per turn. Since an
+  agent session accumulates context monotonically, the slow-prefill body loses ground with every
+  turn it takes.
+</div>
+
+<h2>Who can actually run DFlash2</h2>
+<p class="note">
+  Stock vLLM and SGLang both refuse a quantized <code>lm_head</code>, so that looked like the one
+  requirement deciding eligibility. <b>It is not a property of the method</b> — the guard is
+  removable in eight lines and every quantized head measured here drafts fine. The column below
+  therefore records what each checkpoint does on an <i>unpatched</i> engine, which is still what
+  most people will meet. Below are the <b>ten
+  most-downloaded Qwen3.8-27B releases this stack can serve</b> — GGUF and MLX filtered out, since
+  those are llama.cpp and Apple Silicon and belong to different runtimes entirely (they also
+  dominate the raw charts: the top GGUF alone has 4.3 M pulls). Of the eight that are actually
+  target models, <b>six leave the head alone</b>. The two that do not are Unsloth's and RadixArk's
+  — the production default and one of the measured cells above. Read from each
+  <code>quantization_config</code> and each head tensor's dtype, not inferred.
+</p>
+<div class="tbl-scroll">
+<table class="data">
+  <tr><th>#</th><th>Checkpoint</th><th>Downloads</th><th>lm_head tensor</th><th>Where it sits</th><th>DFlash2</th></tr>
+  <tr><td class="num">1</td><td class="mono">Qwen/Qwen3.8-27B-FP8</td><td class="num">1 063 646</td><td class="mono">BF16</td><td>anchor · W8A8 body</td><td><b style="color:var(--dfl-yes)">28.8 tok/s — measured</b></td></tr>
+  <tr><td class="num">2</td><td class="mono">Qwen/Qwen3.8-27B</td><td class="num">1 006 235</td><td class="mono">BF16</td><td>anchor · unquantized</td><td>trivially eligible</td></tr>
+  <tr><td class="num">3</td><td class="mono">unsloth/…-NVFP4</td><td class="num">653 042</td><td class="mono"><b>F8_E4M3</b></td><td>FP8 · A8 × W4A4</td><td><b style="color:var(--dfl-no)">refuses unpatched — measured</b><br><span style="color:var(--dfl-yes)">36.5 tok/s patched</span></td></tr>
+  <tr><td class="num">4</td><td class="mono">Inferact/…-NVFP4</td><td class="num">318 159</td><td class="mono">BF16</td><td>period <i>+ attention</i></td><td>should run</td></tr>
+  <tr><td class="num">5</td><td class="mono">RadixArk/…-NVFP4</td><td class="num">315 942</td><td class="mono"><b>U8</b> +scale_2 +input_scale</td><td>NVFP4 · <b>A4</b> × W4A4</td><td>refuses unpatched; <b style="color:var(--dfl-yes)">30.1 tok/s patched</b></td></tr>
+  <tr><td class="num">6</td><td class="mono">cyankiwi/…-AWQ-INT4</td><td class="num">111 528</td><td class="mono">BF16</td><td>period <i>integer</i></td><td>should run</td></tr>
+  <tr><td class="num">7</td><td class="mono">unsloth/Qwen3.8-27B</td><td class="num">72 959</td><td class="mono">BF16</td><td>mirror of #2</td><td>trivially eligible</td></tr>
+  <tr><td class="num">8</td><td class="mono">philbert440/…-W4A16-AWQ</td><td class="num">70 413</td><td class="mono">BF16</td><td>period <i>integer</i></td><td>should run</td></tr>
+  <tr><td class="num">9</td><td class="mono">RadixArk/…-DSpark</td><td class="num">68 392</td><td>—</td><td><b>not a target</b> — <code>DSparkDraftModel</code>, 5 layers</td><td>n/a — it <i>is</i> a drafter</td></tr>
+  <tr><td class="num">10</td><td class="mono">orcarouter/…-Uncensored-FP8</td><td class="num">60 078</td><td>—</td><td>gated (HTTP 401)</td><td>unknown</td></tr>
+</table>
+</div>
+<p class="note">
+  Two caveats on reading this. The four AWQ/GPTQ/INT8 rows are a <i>different weight family</i> —
+  integer, not NVFP4 — so they are outside this map's axes even though they are eligible; they are
+  listed because "which checkpoints can use the fastest decoder" is a separate question from "which
+  NVFP4 is best". And <code>Inferact</code> and <code>sakamakismile</code> would fill vacant W4A4
+  cells in the top row, but both also quantize attention or GDN (see below), so putting them in the
+  grid would smuggle in a third axis. GGUF and MLX releases dominate the download charts and are
+  excluded throughout: llama.cpp and Apple Silicon respectively, not this stack.
+</p>
+
+
+<h2>What the map does not say</h2>
+<p class="note">
+  <b>Fidelity is not capability.</b> The reference continuation was generated <i>by</i> BF16,
+  so a model that mimics BF16 wins by construction — including where BF16 is wrong. A task
+  benchmark could separate the two, but a paired McNemar test over 100 SWE-bench instances
+  resolves roughly 12 percentage points, while 0.2 to 0.4 is what is at stake here.
+</p>
+<p class="note">
+  <b>Unsloth's calibrated KV scales are outside the model.</b> It is the only checkpoint
+  shipping 32 <code>k_scale</code>/<code>v_scale</code>; every other one silently falls back
+  to a scaling factor of 1.0 under <code>--kv-cache-dtype fp8</code>. That advantage is baked
+  into its measured −1.53 and missing from every derived cell.
+</p>
+
+<h2>How this was measured</h2>
+<p class="note">
+  <b>Placing a checkpoint costs about 200 KB, not 25 GB.</b> The column comes from
+  <code>config.json</code> — but read <i>every</i> <code>config_groups</code> entry, not the first:
+  in mixed-precision releases the first group is the FP8 attention group and the NVFP4 body is the
+  second, which will put the checkpoint in the wrong column if you stop early. The row comes from
+  the head tensor's dtype, and that can be read remotely: fetch
+  <code>model.safetensors.index.json</code>, find the shard holding <code>lm_head.weight</code>,
+  then two HTTP <code>Range</code> requests — eight bytes for the header length, then the header
+  itself. <code>BF16</code> means an untouched 2.54 GB head, <code>F8_E4M3</code> means FP8,
+  <code>U8</code> with a <code>weight_scale_2</code> means NVFP4. Validated against a checkpoint we
+  hold locally: the remote read returns the same dtypes as the file on disk.
+</p>
+<p class="note">
+  Depth was read from each <code>config.json</code>, counting exceptions rather than looking for
+  them — the distinction matters. <code>sakamakismile</code> targets every <code>Linear</code> and
+  spares only <b>6 of ~64</b> attention modules and half the GDN, so both are effectively in 4-bit.
+  <code>huginnfork</code> targets every <code>Linear</code> too but spares <b>68</b> attention and
+  <b>336</b> GDN entries — everything — which makes it an ordinary MLP-only checkpoint, and it has
+  moved up into the main block as the published occupant of a previously derived W4A16 cell.
+  A first pass here checked only whether exceptions <i>existed</i> and put both in the wrong place.
+  The last period holds the <b>integer</b> quantizations — AWQ, GPTQ, INT8. They serve on this
+  stack and all four leave <code>lm_head</code> free, so they draft with DFlash2 even unpatched; but their
+  weights are integers, not NVFP4, so the column headers above them mean nothing and their cells
+  are placed by download rank, not by scheme. They are here because leaving them out would suggest
+  this stack cannot run them.
+  <code>gittensor/…-RTX5090</code> is gated (HTTP 401) and is listed on its README's description
+  alone. None of the four is measured: quality in the strip is <b>unknown</b>, not derived — the
+  axes that produce the grid's derived numbers do not extend to attention or GDN.
+</p>
+
+<h2>Sources</h2>
+<div class="quellen">
+  <div class="q"><div class="qn"><a href="https://github.com/vllm-project/vllm/pull/52816">vllm#52816</a></div><div class="qw">Adds DFlash2 to vLLM. Every DFlash2 figure on this page was measured on this branch, and its two modules are what we forward-ported onto 0.27.1.</div></div>
+  <div class="q"><div class="qn"><a href="https://github.com/vllm-project/vllm/pull/48856">vllm#48856</a></div><div class="qw">The <code>ParallelLMHead</code> fix for Humming&rsquo;s W8A16 path. Without it the two FP8&nbsp;A16 head cells refuse to load.</div></div>
+  <div class="q"><div class="qn"><a href="https://github.com/vllm-project/vllm/pull/40999">vllm#40999</a></div><div class="qw">Asks for opting <i>into</i> quantizing <code>lm_head</code> on the legacy <code>fp8</code> path &mdash; which is why the first-party FP8 release drafts unpatched.</div></div>
+  <div class="q"><div class="qn"><a href="https://github.com/vllm-project/vllm/issues/42505">vllm#42505</a></div><div class="qw">Reports DFlash slower than baseline above ~8 concurrent streams. Every number here is single-stream, so this page says nothing about that regime.</div></div>
+  <div class="q"><div class="qn"><a href="https://github.com/Weschera/Qwen3.8-27B-NVFP4-DFlash2-DGX-Spark">Weschera / …-DFlash2-DGX-Spark</a></div><div class="qw">The recipe that routes the candidate selector through <code>quant_method.apply()</code>, showing the quantized-head ban was removable. Its FP32 top-k claim did not reproduce here.</div></div>
+  <div class="q"><div class="qn"><a href="https://github.com/MiaAI-Lab/Qwen3.8-27B-SGLang-DGX-Spark">MiaAI-Lab / …-SGLang-DGX-Spark</a></div><div class="qw">The SGLang side of this box: launch flags taken verbatim for the DSpark arm, and the version combination we fall back to when a nightly breaks.</div></div>
+  <div class="q"><div class="qn"><a href="https://huggingface.co/incoai/Qwen3.8-27B-DFlash2">incoai / Qwen3.8-27B-DFlash2</a></div><div class="qw">The drafter itself. Its published accept lengths (4.10&ndash;5.46) are H200 BF16; against a 4-bit target we measure 4.06&ndash;4.54.</div></div>
+  <div class="q"><div class="qn"><a href="https://github.com/sgl-project/sglang/pull/35462">sgl#35462, sgl#35496</a></div><div class="qw">The same quantized-head restriction on SGLang, still open there.</div></div>
+</div>
+
+<footer>
+  Measured on a DGX Spark (GB10, sm_121a, 128 GB unified), vLLM 0.27.1, stock.
+  Fidelity: <b>teacher-forced</b> logprob divergence against <code>Qwen/Qwen3.8-27B</code> BF16 —
+  the token sequence is forced, so no argmax can flip and the figures are reproducible. Free-running
+  text comparison would not be: at temperature 0 this box is deterministic only at batch size 1,
+  and merely running other requests alongside changes the output (0.873 similarity, no speculation
+  involved). That is also why speculative decoding is never byte-identical despite "lossless".
+  Divergence measured over
+  20 agent contexts, 768-token continuations. Speed: 24 real agent contexts, paired,
+  <code>usage.completion_tokens</code>. BF16 throughput not measured — the attempt took the
+  box into OOM at util 0.50 and was abandoned.
+</footer>
+</div>

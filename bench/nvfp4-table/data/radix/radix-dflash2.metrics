@@ -1,0 +1,3 @@
+vllm:spec_decode_num_drafts_total{engine="0",model_name="qwen38-27b"} 759.0
+vllm:spec_decode_num_draft_tokens_total{engine="0",model_name="qwen38-27b"} 5313.0
+vllm:spec_decode_num_accepted_tokens_total{engine="0",model_name="qwen38-27b"} 2523.0

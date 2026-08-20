@@ -1,0 +1,16 @@
+head_quant,body,column,dtop1_pp,mtp_tok_s,mtp_ttft_s,dflash2_tok_s,dflash2_ttft_s,accept_length,head_source,checkpoint
+BF16 · A16,"W4A16 · Marlin / MLP, dynamic act.",1,-1.27,,,37.5,9.6,,"Qwen original, untouched",ours-w4a16 (NVIDIA recipe)
+BF16 · A16,"W4A16 · Marlin / MLP, static act.",2,-1.29,,,,,,huginnfork,huginnfork/…-NVFP4A16
+BF16 · A16,"W4A4 · CUTLASS / MLP, dynamic act.",3,-1.56,20.8,6.5,34.7,5.6,,"Qwen original, untouched",unsloth/Qwen3.8-27B-NVFP4
+FP8 · A16 — stored wide,"W4A16 · Marlin / MLP, dynamic act.",1,-1.11,22.2,10.0,36.5,9.6,4.05,ours,ours-w4a16 (NVIDIA recipe)
+FP8 · A16 — stored wide,"W4A16 · Marlin / MLP, static act.",2,-1.33,21.8,8.6,37.8,8.5,,ours,r0b0tlab/…-NVFP4-MTP-sm121
+FP8 · A16 — stored wide,"W4A4 · CUTLASS / MLP, dynamic act.",3,-1.51,21.0,6.3,35.2,5.6,,ours,unsloth/Qwen3.8-27B-NVFP4
+FP8 · A16,"W4A16 · Marlin / MLP, dynamic act.",1,-1.29,27.0,9.9,41.7,9.6,4.23,ours,ours-w4a16 (NVIDIA recipe)
+FP8 · A16,"W4A4 · CUTLASS / MLP, dynamic act.",3,-1.60,26.4,6.3,36.9,5.6,4.46,ours,unsloth/Qwen3.8-27B-NVFP4
+FP8 · A8,"W4A16 · Marlin / MLP, dynamic act.",1,-1.33,26.4,9.9,41.2,9.6,4.54,ours,ours-w4a16 (NVIDIA recipe)
+FP8 · A8,"W4A16 · Marlin / MLP, static act.",2,-1.31,,,,,,,
+FP8 · A8,"W4A4 · CUTLASS / MLP, dynamic act.",3,-1.53,26.6,6.4,36.5,5.6,4.38,unsloth,unsloth/Qwen3.8-27B-NVFP4
+NVFP4 · A16,"W4A16 · Marlin / MLP, dynamic act.",1,-1.81,29.6,9.9,39.1,9.6,4.06,ours,ours-w4a16 (NVIDIA recipe)
+NVFP4 · A16,"W4A16 · Marlin / MLP, static act.",2,-1.69,29.6,8.4,40.6,8.5,4.23,r0b0tlab,r0b0tlab/…-NVFP4-MTP-sm121
+NVFP4 · A16,"W4A4 · CUTLASS / MLP, dynamic act.",3,-2.06,29.2,6.2,38.6,5.6,4.26,ours,unsloth/Qwen3.8-27B-NVFP4
+NVFP4 · A4,"W4A4 · CUTLASS / MLP, static act.",4,-2.19,30.1,4.6,40.3,4.5,3.29,RadixArk,RadixArk/…-NVFP4
