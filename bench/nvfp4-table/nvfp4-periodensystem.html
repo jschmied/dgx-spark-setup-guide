@@ -240,24 +240,24 @@
   <div class="eyebrow mono">Qwen3.8-27B · GB10 / vLLM 0.27.1</div>
   <h1>NVFP4 Periodic Table</h1>
   <p class="lede">
-    Nine public quantizations, some 1,900 possible recipes, four axes that measurably move
-    anything — and one finding that reorders the rest: <b>which NVFP4 you pick costs almost
-    three times as much fidelity as the decision to use NVFP4 at all.</b> Nine cells are now
-    measured; all three built to test the model's extrapolation broke it, and the fourth axis
-    collapsed to noise the moment it was measured directly.
+    Many public quantizations, many more possible recipes, four axes worth testing and three
+    that measurably move anything — and one finding that reorders the rest: <b>which NVFP4 you
+    pick costs more than three times as much fidelity as the decision to use NVFP4 at all.</b>
+    Seventeen cells are now measured; all four built to test the model's extrapolation broke
+    it, and the fourth axis collapsed to noise the moment it was measured directly.
   </p>
   <div class="conditions">
     <span><b>Fidelity</b> Δtop-1 vs BF16, teacher-forced, 20 agent contexts</span>
     <span><b>Speed</b> MTP n=3, util 0.60, paired — DFlash2 figures marked per cell</span>
-    <span><b>As of</b> 2026-08-19</span>
+    <span><b>As of</b> 2026-08-20</span>
   </div>
 </header>
 
 <h2>Anchors — the three you can just download</h2>
 <p class="note">
   Everything below is measured against these. The step from FP8 to the <i>best</i> NVFP4
-  costs <b>0.34 pp</b> and buys 48 % throughput. The spread <i>within</i> NVFP4 is
-  <b>0.95 pp</b> — so the variant choice is the larger decision, and it is the one most
+  costs <b>0.34 pp</b> and buys 23 % throughput. The spread <i>within</i> NVFP4 is
+  <b>1.08 pp</b> — so the variant choice is the larger decision, and it is the one most
   people never make.
 </p>
 <div class="anchors">
@@ -336,7 +336,7 @@
                             <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span>
       <div class="dq" style="color:var(--p3)">&minus;1.56<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">20.8 tok/s · TTFT 6.5 s</span></div><div class="turn">12.8 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s2)">34.7 tok/s · TTFT 5.6 s</span></div><div class="turn">9.3 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> Qwen original, untouched<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-                <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+                <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span><div class="dq" style="color:var(--p5)">&minus;1.96<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">21.7 tok/s &middot; TTFT 4.4 s</span></div><div class="turn">10.4 s / turn<span class="acc2"> @130 tok &middot; accept 3.27</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.2 tok/s &middot; TTFT 4.3 s</span></div><div class="turn">7.9 s / turn<span class="acc2"> @130 tok &middot; accept 4.19</span></div></div><div class="who m"><span class="wk">Head</span> Qwen original<br><span class="wk">Model</span> RadixArk/…-NVFP4 <i>(body)</i></div></div></td>
   </tr>
 
   <tr>
@@ -344,13 +344,13 @@
     <td><div class="cell dfl-yes meas best" data-depth="a"><span class="tag">best fidelity</span>
       <div class="dq" style="color:var(--p1)">&minus;1.11<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">22.2 tok/s · TTFT 10.0 s</span></div><div class="turn">15.9 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.5 tok/s · TTFT 9.6 s</span></div><div class="turn">13.2 s / turn<span class="acc2"> @130 tok &middot; accept 4.05<sup>†</sup></span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
-    <td><div class="cell meas dfl-likely" data-depth="a"><span class="tag">built here</span>
+    <td><div class="cell meas dfl-yes" data-depth="a"><span class="tag">built here</span>
       <div class="dq" style="color:var(--p2)">&minus;1.33<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">21.8 tok/s · TTFT 8.6 s</span></div><div class="turn">14.6 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s4)">37.8 tok/s · TTFT 8.5 s</span></div><div class="turn">11.9 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> r0b0tlab/…-NVFP4-MTP-sm121</div></div></td>
                     <td><div class="cell meas best dfl-yes"><span class="tag">built here</span>
       <div class="dq" style="color:var(--p3)">&minus;1.51<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">21.0 tok/s · TTFT 6.3 s</span></div><div class="turn">12.5 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">35.2 tok/s · TTFT 5.6 s</span></div><div class="turn">9.3 s / turn<span class="acc2"> @130 tok</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-            <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+            <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>no synthesis route</div><div style="opacity:.75">head and body are different reagents:<br>compressed-tensors vs modelopt</div></div></div></td>
   </tr>
 
   <tr>
@@ -358,11 +358,11 @@
       <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">measured 19 Aug</span>
         <div class="dq" style="color:var(--p2)">&minus;1.29<span class="unit">pp</span></div>
         <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">27.0 tok/s · TTFT 9.9 s</span></div><div class="turn">14.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">41.7 tok/s · TTFT 9.6 s</span></div><div class="turn">12.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.23</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
-    <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+    <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>no synthesis route</div><div style="opacity:.75">head and body are different reagents:<br>compressed-tensors vs modelopt</div></div></div></td>
             <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span>
       <div class="dq" style="color:var(--p3)">&minus;1.60<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.4 tok/s · TTFT 6.3 s</span></div><div class="turn">11.2 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.9 tok/s · TTFT 5.6 s</span></div><div class="turn">9.1 s / turn<span class="acc2"> @130 tok &middot; accept 4.46</span></div></div>      <div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-        <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+        <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>no synthesis route</div><div style="opacity:.75">head and body are different reagents:<br>compressed-tensors vs modelopt</div></div></div></td>
   </tr>
 
   <tr>
@@ -371,11 +371,11 @@
       <div class="dq" style="color:var(--p2)">&minus;1.33<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.4 tok/s · TTFT 9.9 s</span></div><div class="turn">14.8 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">41.2 tok/s · TTFT 9.6 s</span></div><div class="turn">12.8 s / turn<span class="acc2"> @130 tok &middot; accept 4.54</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> ours-w4a16 <i>(NVIDIA recipe)</i></div></div></td>
     <td><div class="cell dfl-unlik model" data-depth="a"><div class="dq" style="color:var(--q3)">&minus;1.31<span class="unit">pp</span></div>
-      <div class="speed">26.6 tok/s</div></div></td>
+      <div class="speed"><div>26.6 tok/s</div><div style="opacity:.75">predicted by the periodic law,<br>no synthesis route to confirm it</div></div></div></td>
     <td><div class="cell dfl-yes orig" data-depth="a"><span class="tag o">original</span>
       <div class="dq" style="color:var(--p3)">&minus;1.53<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s3)">26.6 tok/s · TTFT 6.4 s</span></div><div class="turn">11.3 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s3)">36.5 tok/s · TTFT 5.6 s</span></div><div class="turn">9.2 s / turn<span class="acc2"> @130 tok &middot; accept 4.38</span></div></div><div class="who m"><span class="wk">Head</span> unsloth<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-        <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+        <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>no synthesis route</div><div style="opacity:.75">head and body are different reagents:<br>compressed-tensors vs modelopt</div></div></div></td>
   </tr>
 
   <tr>
@@ -389,7 +389,7 @@
     <td><div class="cell dfl-yes meas" data-depth="a"><span class="tag">built here</span>
       <div class="dq" style="color:var(--p5)">&minus;2.06<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">29.2 tok/s · TTFT 6.2 s</span></div><div class="turn">10.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s4)">38.6 tok/s · TTFT 5.6 s</span></div><div class="turn">9.0 s / turn<span class="acc2"> @130 tok &middot; accept 4.26</span></div></div><div class="who m"><span class="wk">Head</span> ours<br><span class="wk">Model</span> unsloth/Qwen3.8-27B-NVFP4</div></div></td>
-        <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
+        <td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span><div class="dq" style="color:var(--p5)">&minus;2.15<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">30.1 tok/s &middot; TTFT 4.6 s</span></div><div class="turn">8.9 s / turn<span class="acc2"> @130 tok &middot; accept 3.20</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">39.2 tok/s &middot; TTFT 4.3 s</span></div><div class="turn">7.6 s / turn<span class="acc2"> @130 tok &middot; accept 4.15</span></div></div><div class="who m"><span class="wk">Head</span> r0b0tlab <i>(A16)</i><br><span class="wk">Model</span> RadixArk/…-NVFP4 <i>(body)</i></div></div></td>
   </tr>
 
     <tr>
@@ -403,26 +403,40 @@
 
 <table class="pt strip">
   <tr>
-    <th class="row"><span class="rname" style="color:var(--accent)">no 4-bit body</span><span class="rbytes">the originals · columns do not apply</span></th>
+    <th class="row"><span class="rname" style="color:var(--accent)">unquantized</span><span class="rbytes">the reference &mdash; everything is measured against it</span></th>
     <td><div class="cell orig dfl-likely"><span class="tag o">original</span>
       <div class="dq" style="color:var(--q1)">&plusmn;0.00<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd">not measured · OOM at util 0.50</span></div></div>
-      <div class="who m"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> none — BF16 throughout<br><span class="wk">Model</span> Qwen/Qwen3.8-27B<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; unsloth/Qwen3.8-27B <i>(mirror)</i></div></div></td>
+      <div class="who m"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> &mdash; unquantized &middot; BF16 throughout<br><span class="wk">Model</span> Qwen/Qwen3.8-27B<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; unsloth/Qwen3.8-27B <i>(mirror)</i></div></div></td><td></td><td></td><td></td>
+  </tr>
+  <tr class="axis">
+    <th class="row"><span class="rname" style="color:var(--accent)">W8A8 body &middot; published</span><span class="rbytes">columns: what stays in BF16</span></th>
+    <th class="col">GDN spared<span>MLP + attention FP8</span></th><th class="col">nothing spared<span>GDN quantized too</span></th><th class="col"></th><th class="col"></th>
+  </tr>
+  <tr>
+    <th class="row"></th>
     <td><div class="cell orig meas dfl-yes"><span class="tag o">original</span>
+      <div class="dq" style="color:var(--p0)">&minus;0.62<span class="unit">pp</span></div>
+      <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">17.6 tok/s &middot; TTFT 9.4 s</span></div><div class="turn">16.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s1)">28.0 tok/s &middot; TTFT 8.0 s</span></div><div class="turn">12.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.30</span></div></div>
+      <div class="who m"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> FP8 W8A8 &middot; GDN in BF16<br><span class="wk">Model</span> cyankiwi/…-AWQ-FP8</div></div></td><td><div class="cell orig meas dfl-yes"><span class="tag o">original</span>
       <div class="dq" style="color:var(--p0)">&minus;0.77<span class="unit">pp</span></div>
       <div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">18.0 tok/s · TTFT 11.2 s</span></div><div class="turn">18.4 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s1)">28.8 tok/s · TTFT 10.6 s</span></div><div class="turn">15.1 s / turn<span class="acc2"> @130 tok</span></div></div>
-      <div class="who m"><span class="wk">Head</span> BF16, untouched<br><span class="wk">Body</span> FP8 W8A8<br><span class="wk">Model</span> Qwen/Qwen3.8-27B-FP8</div></div></td>
-    <td></td>
-    <td></td>
+      <div class="who m"><span class="wk">Head</span> BF16, untouched<br><span class="wk">Body</span> FP8 W8A8<br><span class="wk">Model</span> Qwen/Qwen3.8-27B-FP8</div></div></td><td></td><td></td>
+  </tr>
+  <tr class="axis">
+    <th class="row"><span class="rname" style="color:var(--accent)">W8A8 body &middot; head swapped</span><span class="rbytes">columns: the head, as in the grid&rsquo;s rows</span></th>
+    <th class="col">BF16 &middot; A16<span>2.54 GB</span></th><th class="col">FP8<span>1.27 GB</span></th><th class="col">NVFP4 &middot; A16<span>0.64 GB</span></th><th class="col">NVFP4 &middot; A4<span>0.64 GB</span></th>
+  </tr>
+  <tr>
+    <th class="row"></th>
+    <td><div class="cell orig meas dfl-no"><span class="tag o">as shipped</span><div class="dq" style="color:var(--p0)">&minus;0.62<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">17.6 tok/s &middot; TTFT 9.4 s</span></div><div class="turn">16.7 s / turn<span class="acc2"> @130 tok</span></div><div>DFlash2 <span class="spd" style="color:var(--s1)">28.0 tok/s &middot; TTFT 8.0 s</span></div><div class="turn">12.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.30</span></div></div><div class="who m"><span class="wk">Head</span> BF16, untouched<br><span class="wk">Model</span> cyankiwi/…-AWQ-FP8</div></div></td><td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div><div style="opacity:.75">the head matters <i>more</i> here,<br>not less &mdash; see the row note</div></div></div></td><td><div class="cell meas dfl-yes"><span class="tag" style="color:var(--q4)">transuranium</span><div class="dq" style="color:var(--p4)">&minus;1.64<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">23.1 tok/s &middot; TTFT 9.2 s</span></div><div class="turn">14.8 s / turn<span class="acc2"> @130 tok &middot; accept 3.22</span></div><div>DFlash2 <span class="spd" style="color:var(--s2)">31.0 tok/s &middot; TTFT 7.9 s</span></div><div class="turn">12.1 s / turn<span class="acc2"> @130 tok &middot; accept 4.30</span></div></div><div class="who"><span class="wk">Head</span> ours-nvfp4head<br><span class="wk">Model</span> cyankiwi/…-AWQ-FP8 <i>(body)</i></div></div></td><td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed"><div>not built</div></div></div></td>
   </tr>
   <tr>
       <th class="row"><span class="rname" style="color:var(--q4)">+ attention</span><span class="rbytes">quantization reaches past the MLP</span></th>
       <td></td>
       <td></td>
       <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
-      <td><div class="cell model dfl-likely"><span class="tag">published</span>
-      <div class="dq" style="color:var(--muted)">?<span class="unit">pp</span></div>
-      <div class="speed">unmeasured</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> NVFP4 W4A4 <i>+ attention</i><br><span class="wk">Model</span> Inferact/…-NVFP4 <i>· 26.4 GB</i></div></div></td>
+      <td><div class="cell meas dfl-likely"><span class="tag">published</span><div class="dq" style="color:var(--p5)">&minus;4.21<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s1)">20.2 tok/s · TTFT 4.9 s</span></div><div class="turn">11.3 s / turn<span class="acc2"> @130 tok &middot; accept 3.23</span></div><div>DFlash2 <span class="spd" style="color:var(--s2)">31.1 tok/s · TTFT 4.4 s</span></div><div class="turn">8.6 s / turn<span class="acc2"> @130 tok &middot; accept 4.16</span></div></div><div class="who m"><span class="wk">Head</span> BF16<br><span class="wk">Model</span> Inferact/…-NVFP4</div></div></td>
     </tr>
   <tr>
       <th class="row"><span class="rname" style="color:var(--q5)">+ attention + GDN</span><span class="rbytes">attention 4-bit too · only the MTP head spared</span></th>
@@ -449,6 +463,16 @@
       <div class="speed">W8A16 int</div><div class="who"><span class="wk">Head</span> BF16<br><span class="wk">Body</span> W8A16 <i>int</i><br><span class="wk">Model</span> lued/…-INT8-W8A16-MTP <i>· 43 k</i></div></div></td>
   </tr>
 </table>
+<p class="note">
+  <b>The two axes are not independent.</b> Swapping BF16&nbsp;&rarr;&nbsp;NVFP4&nbsp;&middot;&nbsp;A16 at the head costs
+  <b>1.01&nbsp;pp</b> on this FP8 body but only <b>0.19&nbsp;pp</b> on a 4-bit one &mdash; a factor of 5.3. Errors do not
+  add; the largest one dominates. A 4-bit body carries ~9.5&nbsp;% weight deviation and swallows the head&rsquo;s
+  ~9.3&nbsp;%; an FP8 body carries ~2.6&nbsp;%, and the head becomes the limiting term. The grid looks additive
+  because all four of its columns are 4-bit bodies of similar error.
+  <br>Practical form: <b>accurate body &rarr; leave the head alone</b> (1.01&nbsp;pp for 0.6&nbsp;s of turn is the worst
+  trade on the map). <b>4-bit body &rarr; quantize it freely</b> (0.19&nbsp;pp for 0.3&nbsp;s).
+</p>
+
 </div>
 
 <div class="legend">
@@ -456,7 +480,7 @@
   <span><i class="key lg-o"></i>original — download and serve</span>
   <span><i class="key lg-p"></i>published checkpoint</span>
   <span><i class="key lg-b"></i>built here — <i>transuranic</i>: synthesized, never published</span>
-  <span><i class="key lg-d"></i>derived from the axes, &plusmn;0.13 pp mean</span>
+  <span><i class="key lg-d"></i>derived from the axes &mdash; the one out-of-sample test missed by 0.29 pp</span>
   <span>dashed and blank = nobody builds it</span>
 </div>
 <div class="scale">
@@ -770,6 +794,7 @@
 <table class="data">
   <tr><th>cell</th><th>TTFT</th><th>tok/s</th><th>s / turn @130 tok</th><th>of which TTFT</th></tr>
   <tr><td class="mono">NVFP4 <b>A4</b> head &middot; RadixArk W4A4</td><td class="num">4.5 s</td><td class="num">40.3</td><td class="num"><b>7.7 s</b></td><td class="num">58 %</td></tr>
+  <tr><td class="mono">BF16 head &middot; Inferact W4A4 <i>+ attn 4-bit</i></td><td class="num">4.4 s</td><td class="num">31.1</td><td class="num">8.6 s</td><td class="num">51 %</td></tr>
   <tr><td class="mono">NVFP4 head &middot; unsloth W4A4</td><td class="num">5.6 s</td><td class="num">38.6</td><td class="num">9.0 s</td><td class="num">62 %</td></tr>
   <tr><td class="mono">FP8 A16 head &middot; unsloth W4A4</td><td class="num">5.6 s</td><td class="num">36.9</td><td class="num">9.1 s</td><td class="num">61 %</td></tr>
   <tr><td class="mono">NVFP4 head &middot; r0b0tlab W4A16</td><td class="num">8.5 s</td><td class="num">40.6</td><td class="num">11.7 s</td><td class="num">73 %</td></tr>
@@ -785,8 +810,11 @@
   finishes the turn first, on a 5-second prefill advantage. TTFT is 52&ndash;75 % of the turn, and
   no plausible decode advantage outruns that.
   <br><br>
-  RadixArk wins on <i>both</i> terms at once, which nothing else here manages: the fastest prefill
-  (4.5 s) and the second-fastest decode (40.3). It is also the <i>least faithful</i> cell on the page
+  <b>The three fastest turns are the three least faithful cells.</b> Inferact (&minus;4.21 pp) and
+  RadixArk (&minus;2.19) take first and second place; the most faithful cell on the page
+  (&minus;1.11) is last of eight. RadixArk is the least bad of that trade &mdash; it wins on
+  <i>both</i> speed terms at once, fastest prefill among the grid (4.5 s) and second-fastest decode
+  (40.3), while Inferact buys its 0.1 s of prefill with 2 pp of fidelity. It is also the <i>least faithful</i> cell on the page
   at &minus;2.19 pp &mdash; the same property seen from the other side, since its head quantizes
   weights <i>and</i> activations to 4-bit. It moves the fewest bytes and keeps the least of BF16.
   <br><br>
@@ -926,9 +954,12 @@
   activations — not BF16 as the README implied — and it now sits beside RadixArk in
   <code>NVFP4 · A4</code>. It still differs from RadixArk in one way the grid cannot show: it
   targets every <code>Linear</code>, so its attention is 4-bit too, and its activations are
-  <i>static</i> where Unsloth's are dynamic. None of the strip is measured: quality there is
-  <b>unknown</b>, not derived — the axes that produce the grid's derived numbers do not extend to
-  attention or GDN.
+  <i>static</i> where Unsloth's are dynamic. <code>Inferact</code> is now the first strip cell measured, and it settles what the grid's
+  axes could not: <b>4-bit attention is expensive</b>. At &minus;4.21 pp it sits nearly twice as
+  far from BF16 as the worst grid cell (RadixArk, &minus;2.19) and almost four times the best
+  (&minus;1.11) — while its body earns the second-fastest prefill on the page at 4.9 s. Fastest
+  prefill and worst fidelity in one checkpoint. The remaining strip cells stay <b>unknown</b>,
+  not derived: the grid's axes still do not extend to attention or GDN.
 </p>
 
 <h2>Sources</h2>

@@ -986,7 +986,7 @@ batch size 1. Under concurrent load the same request returns different text — 
 with no speculation flag involved. If you have been treating `temperature: 0` as a reproducibility
 guarantee for evals or regression tests, it is not one here unless you also pin concurrency to 1.
 
-### ⚠️ n=7 is not the optimum — that was an artefact of how the sweep was aggregated
+### ⚠️ n=7 is not the optimum *of the swept corpus* — that was an artefact of how the sweep was aggregated
 
 An earlier version of this section concluded that DFlash2's published block size of 7 was right
 here. It rested on comparing **unpaired medians on paired data**: 36.5 tok/s at n=7 against 36.4 at
@@ -1034,6 +1034,36 @@ also settles a third-party `k=14` recommendation for edit-heavy work against our
 completion length (−0.16) or TTFT (−0.10). It is a property of the content. Anything tuned against
 the median was tuned against the middle of a distribution whose ends behave differently — which
 includes the n-gram rejection below.
+
+### …and it does not transfer to production — measured 2026-08-20
+
+The sweep above ran under **measurement** conditions: `MAXLEN=32768`, `gpu-memory-utilization
+0.66`, four concurrent sequences, and a 20-context corpus from which the four longest prompts were
+rejected outright as HTTP 400. Production runs full context, `util 0.76`, and serves those four.
+
+Setting the live server to n=11 and replaying the corpus against it — 24 contexts, paired against
+n=7 on the same server config immediately before:
+
+| | n=7 | n=11 | |
+| :--- | ---: | ---: | ---: |
+| median | 42.2 | 39.8 | −6 % |
+| mean | 42.8 | 40.6 | −5 % |
+| **throughput** Σtok/Σt | **40.0** | 34.9 | **−13 %** |
+| TTFT median | 5.7 s | 5.8 s | +1 % |
+| total decode time | 90.3 s | 113.5 s | **+26 %** |
+
+Paired, n=11 wins **12 of 24** — a coin flip — with a median difference of −0.5 tok/s and a range
+of −28.9 to +22.3. Splitting by context length does not rescue it: short contexts (<16k) lose
+*more* (+32 % decode time) than long ones (+16 %).
+
+**Production stays at n=7.** This does not contradict the sweep; it is the sweep's own conclusion
+applied one step further. The optimum is a property of the workload, and the production workload —
+full context, higher utilisation, the long prompts included — is not the one that was swept.
+
+⚠️ **Read the spread before the point estimate.** Production overrides generation config to
+`temperature 0.6`, so the two arms generate *different text of different length*. A single paired
+run therefore carries far more noise than the table suggests. What is supported is "no demonstrable
+advantage", not "n=11 is worse".
 
 ### With the guard gone: eleven cells, and the five fastest all have quantized heads
 
@@ -1093,6 +1123,45 @@ Two caveats that survive every pairing:
 - **Head activation precision is a kernel choice, not an axis.** A8 → A16 at *identical* head
   size moves steps/s by −0.05 on one body and +0.78 on the other. W8A8 and Humming's W8A16 are
   different kernels whose relative cost depends on what else competes for bandwidth.
+
+### ⚠️ The two axes are not independent — measured 2026-08-20
+
+Everything above reads the map additively: a head effect plus a body effect. Two predictions
+recorded *before* their measurements broke that reading, both in the same direction.
+
+| | predicted | measured | off by |
+| :--- | ---: | ---: | ---: |
+| NVFP4 · A16 head on RadixArk W4A4 (col 4) | −2.44 | **−2.15** | 0.29 pp |
+| NVFP4 · A16 head on cyankiwi W8A8 (strip) | −1.25 ± 0.3 | **−1.64** | 0.39 pp |
+
+The cause is visible once the *same* head swap is measured on two bodies of different accuracy:
+
+| BF16 · A16 → NVFP4 · A16 at the head | on a 4-bit body | on an FP8 body |
+| :--- | ---: | ---: |
+| divergence before | −1.96 (RadixArk) | −0.62 (cyankiwi) |
+| divergence after | −2.15 | −1.64 |
+| **cost of the swap** | **0.19 pp** | **1.01 pp** |
+
+A factor of **5.3**. Errors do not add; the largest one dominates. A 4-bit body carries ~9.5 %
+weight deviation and swallows the head's ~9.3 %; an FP8 body carries ~2.6 %, and the head becomes
+the limiting term. **The grid looks additive because all four of its columns are 4-bit bodies of
+similar error** — the head effect is uniformly suppressed there, and nothing in the grid could have
+revealed it.
+
+Practical form: **accurate body → leave the head alone** (1.01 pp bought 0.6 s of turn, the worst
+trade on the map). **4-bit body → quantize it freely** (0.19 pp for 0.3 s).
+
+The derived cell (FP8 · A8 × column 2, −1.31 pp) rests on the same additive fit. It stays usable
+*within* the 4-bit columns, which is where it sits — but the legend's "±0.13 pp" was the in-sample
+residual, and the two out-of-sample tests missed by 0.29 and 0.39.
+
+**Speed, same two cells — and the byte model misses here too.** Head 2.54 → 0.64 GB is 6 % of a
+31 GB body, so the bandwidth model predicts ~+6.5 % decode. Measured under MTP: **+31 %**
+(17.6 → 23.1 tok/s). At 248 320 vocabulary entries the head GEMM is large enough that on a slow
+body it costs compute, not just bytes. Under DFlash2 the same swap is worth only +11 %
+(28.0 → 31.0), because the head runs once per step and a step yields 4.3 tokens. Accept length is
+unchanged at 4.30 in both arms: the head does not change *what* the model wants, only what the
+answer costs.
 
 ### ⚠️ FP32 top-k ranking does not reproduce here
 
