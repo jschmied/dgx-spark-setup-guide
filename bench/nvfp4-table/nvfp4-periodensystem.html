@@ -463,6 +463,7 @@
   <span><b>tok/s</b> <i class="sw" style="background:linear-gradient(90deg,var(--s1),var(--s3),var(--s5))"></i>shaded <i>within each method</i>: MTP 18→30, DFlash2 29→41</span>
   <span><b>Δtop-1</b> <i class="sw" style="background:linear-gradient(90deg,var(--p5),var(--p3),var(--p0))"></i>&minus;2.19 worse &rarr; 0.00 reference</span>
   <span>derived values stay grey on purpose</span>
+    <span><b>each figure is a median over 20 mixed agent contexts</b> &mdash; one target spans 26.4&ndash;52.5 tok/s across them</span>
 </div>
 <div class="legend">
   <span><b style="color:var(--ink-2)">DFlash2 (left edge):</b></span>
@@ -574,8 +575,11 @@
     <b>W4A4</b> body gives <b>35.2 tok/s at 5.6 s</b> — 1.3 tok/s slower to decode, 4 s faster to
     first token, and the only point measured here that is fast at both ends. Against the
     production checkpoint under MTP that is <b>+32 % decode and −12 % TTFT at the same fidelity</b>
-    (&minus;1.51 vs &minus;1.53). n=7 is the measured optimum,
-    flat to n=11, and the published default for once holds. For reference the previous best was
+    (&minus;1.51 vs &minus;1.53). <b>n=7 is not the optimum</b> &mdash; that reading compared unpaired medians on paired
+    data (36.5 against 36.4). Paired, <b>n=11 wins 11 of 20 contexts</b>, and total tokens over
+    total decode time puts it 1.7 tok/s ahead, finishing the corpus in 91 s against 103. Every
+    DFlash2 figure on this page is measured at n=7, so <b>the column is a floor</b> &mdash;
+    about 7 % low if the sweep transfers. For reference the previous best was
     SGLang + DSpark at 30.1 tok/s; SGLang cannot run DFlash2 yet (two merges short).
     <br><br>
     And it is the <i>same checkpoint</i> that holds the best fidelity in this field. At −1.11 pp
