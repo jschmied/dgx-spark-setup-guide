@@ -45,8 +45,8 @@ a=got.double().flatten(); b=want.double().flatten()
 print(f"  Kosinus (float64): {(a@b/(a.norm()*b.norm())).item():.6f}")
 print(f"  Kosinus (float32, wie zuvor): {torch.nn.functional.cosine_similarity(got.float().flatten(), want.float().flatten(), dim=0).item():.6f}  <- >1 = Akkumulationsfehler")
 
-# Gegenprobe: waere der Scale ein KEHRWERT, muesste die Division passen
+# Counter-check: if the scale were a RECIPROCAL, dividing would be the right op
 inv = weight[q_size:].float() / scale[q_size//128:].float().repeat_interleave(128,0).repeat_interleave(128,1)[:got.shape[0],:got.shape[1]]
 rel_inv = ((inv-want.float()).abs()/want.float().abs().clamp_min(1e-6))
 print(f"\n  haette man DIVIDIERT: median rel. Fehler {rel_inv.median():.2%}"
-      f"  -> {'ebenfalls plausibel?!' if rel_inv.median()<0.1 else 'grob falsch, Multiplikation ist richtig'}")
+      f"  -> {'also plausible?!' if rel_inv.median()<0.1 else 'wildly wrong, so multiplication is correct'}")

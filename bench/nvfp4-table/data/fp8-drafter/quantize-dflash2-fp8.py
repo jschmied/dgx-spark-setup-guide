@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # DFlash2-Drafter nach FP8 quantisieren.
 #
-# Warum auf DIESER Box: wir sind bandbreitengebunden, nicht speichergebunden.
-# Gemessen 231.8 GB/s von 273 GB/s Spitze, und der Drafter macht 15.5 % der
-# Bytes je Schritt aus (er laeuft einmal je Schritt, Block-Diffusion).
-# Halbiert man seine Linear-Gewichte, fallen ~7 % der Bytes weg -> rechnerisch
-# +7.5 % Durchsatz, SOLANGE die Akzeptanzlaenge haelt (heute 4.32).
+# Why on THIS box: we are bandwidth-bound, not memory-bound. Measured 231.8 GB/s
+# of a 273 GB/s peak, and the drafter accounts for 15.5 % of the bytes read per
+# step (it runs once per step -- block diffusion). Halving its linear weights
+# removes ~7 % of the bytes, so ~+7.5 % throughput on paper, FOR AS LONG AS
+# acceptance length holds (4.32 at the time of writing).
 #
 # NICHT quantisiert werden:
-#   - die Zwei-Tap-Faltungen (attention_conv/mlp_conv): sie halten den Entwurf
-#     ueber die Blocklaenge, das ist der Kern des Verfahrens
-#   - der candidate_selector samt Codebuechern: er waehlt den Pfad
-#   - alle Normen
-# Zusammen 0.39 GB -- das Sparpotenzial dort ist klein, das Risiko nicht.
+#   - the two-tap convolutions (attention_conv/mlp_conv): they carry the draft
+#     across the block, which is the heart of the method
+#   - the candidate_selector and its codebooks: it picks the path
+#   - every norm
+# 0.39 GB together -- little to save there, and not little to risk.
 #
-# W8A8 dynamisch statt W8A16: fuer die Bandbreite zaehlen nur die
-# GEWICHTSbytes, und der fp8-Pfad ist besser eingefahren als der humming-Pfad.
+# W8A8 dynamic rather than W8A16: only the WEIGHT bytes matter for bandwidth,
+# and the fp8 path is better worn in than the humming path.
 import json, os, re, shutil, glob
 import torch
 from safetensors.torch import load_file, save_file
@@ -30,11 +30,11 @@ os.makedirs(Z, exist_ok=True)
 SHARDS = sorted(os.path.basename(f) for f in glob.glob(f"{Q}/*.safetensors"))
 assert SHARDS, "keine safetensors gefunden"
 neu_map = {}
-q_anz = b_alt = b_neu = 0
+q_anz = b_alt = b_new = 0
 
 for sh in SHARDS:
     t = load_file(f"{Q}/{sh}")
-    aus = {}
+    out = {}
     for k, v in t.items():
         b_alt += v.numel() * v.element_size()
         if ZIEL.search(k) and v.dim() == 2:
@@ -42,16 +42,16 @@ for sh in SHARDS:
             amax = w.abs().amax(dim=1, keepdim=True).clamp(min=1e-8)
             scale = amax / FP8_MAX
             qw = (w / scale).clamp(-FP8_MAX, FP8_MAX).to(torch.float8_e4m3fn)
-            aus[k] = qw
-            aus[k.replace(".weight", ".weight_scale")] = scale.squeeze(-1).to(torch.float32)
+            out[k] = qw
+            out[k.replace(".weight", ".weight_scale")] = scale.squeeze(-1).to(torch.float32)
             q_anz += 1
         else:
-            aus[k] = v
-    for k, v in aus.items():
-        b_neu += v.numel() * v.element_size()
+            out[k] = v
+    for k, v in out.items():
+        b_new += v.numel() * v.element_size()
         neu_map[k] = sh
-    save_file(aus, f"{Z}/{sh}", metadata={"format": "pt"})
-    print(f"  {sh}: {len(t)} -> {len(aus)} Tensoren")
+    save_file(out, f"{Z}/{sh}", metadata={"format": "pt"})
+    print(f"  {sh}: {len(t)} -> {len(out)} tensors")
 
 if len(SHARDS) > 1:
     json.dump({"metadata": {}, "weight_map": neu_map},
@@ -85,6 +85,6 @@ for f in os.listdir(Q):
         shutil.copy(f"{Q}/{f}", f"{Z}/{f}")
 
 print(f"\n  {q_anz} Gewichte quantisiert")
-print(f"  vorher {b_alt/1e9:.2f} GB  ->  nachher {b_neu/1e9:.2f} GB  ({(b_neu-b_alt)/b_alt*100:+.1f} %)")
-print(f"  Bytes je Schritt: 21.0 + {b_neu/1e9:.2f} = {21+b_neu/1e9:.2f} GB (heute 24.85)")
+print(f"  vorher {b_alt/1e9:.2f} GB  ->  nachher {b_new/1e9:.2f} GB  ({(b_new-b_alt)/b_alt*100:+.1f} %)")
+print(f"  bytes per step: 21.0 + {b_new/1e9:.2f} = {21+b_new/1e9:.2f} GB (24.85 before)")
 

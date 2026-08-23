@@ -57,9 +57,9 @@ if A.mode == "ref":
             print(f"  {p['id'][:40]:<42} uebersprungen ({len(pid)} Prompt-Token)")
             continue
         t0 = time.time()
-        # ignore_eos: ohne das stoppt Greedy im Median nach 144 Token -- zu kurz, um zu
-        # sehen, ob der Abstand mit der Tiefe waechst. Der Text nach dem natuerlichen Ende
-        # ist weiterhin autoregressiv erzeugt und genau dort haeufen sich Abweichungen.
+        # ignore_eos: without it greedy stops after a median of 144 tokens -- too short
+        # to see whether the gap widens with depth. Text past the natural end is still
+        # generated autoregressively, and that is where the divergences pile up.
         d = post("/v1/completions", {"model": A.model, "prompt": pid,
                                      "max_tokens": A.gen_tokens, "temperature": 0,
                                      "ignore_eos": True})
@@ -95,8 +95,8 @@ for r in ref:
             ranks.append(e[k].get("rank", 99))
         return lps, ranks
 
-    # Der KONTEXT ist echter Agententext (8k-30k Token) und faellt im selben Aufruf ab --
-    # riesige Stichprobe, aber Eingabetext. Die FORTSETZUNG ist das, was das Modell selbst
+    # The CONTEXT is real agent text (8k-30k tokens) and comes out of the same call --
+    # a huge sample, but input text. The CONTINUATION is what the model itself
     # erzeugt, also verhaltensrelevant. Beide getrennt, weil sie verschiedene Fragen
     # beantworten.
     clp, crk = collect(1, n_p)

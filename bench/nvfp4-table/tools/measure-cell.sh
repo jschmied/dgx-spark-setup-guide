@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# RadixArk/Qwen3.8-27B-NVFP4 durchmessen: Tempo unter MTP und unter DFlash2,
-# dazu die Divergenz gegen BF16.
+# Measure the RadixArk/Qwen3.8-27B-NVFP4 cell: speed under MTP and under DFlash2,
+# plus divergence against BF16.
 #
-# Motorwahl folgt der Karte, nicht der Bequemlichkeit: MTP auf 0.27.1 wie alle
-# anderen MTP-Werte, DFlash2 auf dem Zweig #52816 wie alle anderen DFlash2-Werte.
-# Der Port auf 0.27.1 waere verlockend, liefert aber systematisch -0.24
-# Akzeptanzlaenge (heute gemessen) und wuerde die Zelle unvergleichbar machen.
+# Engine choice follows the map, not convenience: MTP on 0.27.1 like every other
+# MTP figure, DFlash2 on branch #52816 like every other DFlash2 figure. Running
+# the port on 0.27.1 would be tempting, but it costs 0.24 acceptance length
+# systematically (measured), which would make this cell incomparable.
 #
-# Arm 1 und 2 teilen sich einen Server -- Divergenz braucht keinen eigenen Start.
+# Arms 1 and 2 share one server -- divergence does not need its own start.
 #
-# Der Kopf ist NVFP4 MIT input_scale, die Aktivierungen sind also mitquantisiert.
-# Ungepatchtes vLLM verweigert ihn; hier laeuft er, weil der Quantkopf-Guard
-# entfernt ist.
+# The head is NVFP4 WITH input_scale, so its activations are quantized too.
+# Stock vLLM refuses it; it runs here because the quantized-head guard has been
+# removed.
 set -uo pipefail
 : "${OPENAI_API_KEY:?set OPENAI_API_KEY (the vLLM server key) before running}"
 OUT=/tmp/radix; mkdir -p $OUT
@@ -30,8 +30,8 @@ serve(){  # $1=Label $2=venv $3=SPEC $4=NSPEC $5=DRAFT $6=Cache
     a=$(pgrep -cf "bin/vll[m]"); a=${a:-0}
     m=$(awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo)
     [ "$a" = "0" ] && [ "${m:-0}" -ge 90 ] && break
-    [ $((j % 30)) = 0 ] && log "  [$1] warte auf Abschaltung: ${m}GB frei, $a vLLM (${j}0s)"
-    [ $j = 180 ] && { log "  [$1] ABBRUCH Speicher (${m}GB, $a vLLM)"; return 1; }; sleep 10; done
+    [ $((j % 30)) = 0 ] && log "  [$1] waiting for shutdown: ${m}GB free, $a vLLM (${j}0s)"
+    [ $j = 180 ] && { log "  [$1] ABORT memory (${m}GB, $a vLLM)"; return 1; }; sleep 10; done
   sync; SUDO sh -c 'echo 3 > /proc/sys/vm/drop_caches'
   T0=$(date +%s)
   SUDO systemd-run --unit=rx --collect \
@@ -48,15 +48,15 @@ serve(){  # $1=Label $2=venv $3=SPEC $4=NSPEC $5=DRAFT $6=Cache
         -H "Authorization: Bearer $OPENAI_API_KEY")" = "200" ]; then
       VER=$(journalctl -u rx --no-pager --since "@$T0" -o cat | grep -oE "V1 LLM engine \(v[^)]*\)" | head -1)
       MET=$(journalctl -u rx --no-pager --since "@$T0" -o cat | grep -oE "'method': '[a-z0-9]+'" | head -1)
-      log "  [$1] geladen nach $((j*10))s  $VER $MET"
-      # Erwartete Methode pruefen -- ein stiller Rueckfall auf MTP saehe nur
-      # nach schlechtem DFlash2 aus.
+      log "  [$1] loaded after $((j*10))s  $VER $MET"
+      # Check the method actually loaded -- a silent fallback to MTP would just
+      # look like bad DFlash2.
       if [ "$3" != "off" ]; then
-        echo "$MET" | grep -q "'$3'" || { log "  [$1] ABBRUCH: Methode ist $MET, erwartet $3"; return 1; }
+        echo "$MET" | grep -q "'$3'" || { log "  [$1] ABORT: method is $MET, expected $3"; return 1; }
       fi
       $V27/bin/python /opt/llm/sanity_gate.py 2>&1 | sed 's/^/    /' || { log "  [$1] SANITY"; return 1; }
       return 0; fi
-    systemctl is-active --quiet rx || { log "  [$1] GESCHEITERT:"
+    systemctl is-active --quiet rx || { log "  [$1] FAILED:"
       journalctl -u rx --no-pager --since "@$T0" | grep -oE "(ValueError|RuntimeError|AssertionError|NotImplementedError|TypeError|AttributeError|KeyError):.*" | sort -u | head -4 | sed 's/^/      /'
       return 1; }
     [ $j = 180 ] && { log "  [$1] Timeout"; return 1; }; sleep 10; done
@@ -75,16 +75,16 @@ for l in open(sys.argv[2]):
     if m: t[m.group(1)]=float(m.group(2))
 d=t.get("vllm:spec_decode_num_drafts_total",0); a=t.get("vllm:spec_decode_num_accepted_tokens_total",0)
 v=statistics.median(x["tok_s"] for x in r); tt=statistics.median(x["ttft"] for x in r)
-L=f"  Laenge {a/d+1:.2f}" if d else ""
-print(f"ERGEBNIS {sys.argv[3]}: {v:.1f} tok/s  TTFT {tt:.1f}s ({len(r)}){L}  "
-      f"Zug@130 {tt+130/v:.1f}s")
+L=f"  length {a/d+1:.2f}" if d else ""
+print(f"RESULT {sys.argv[3]}: {v:.1f} tok/s  TTFT {tt:.1f}s ({len(r)}){L}  "
+      f"turn@130 {tt+130/v:.1f}s")
 PY
 }
 
-log "=== 1/3  MTP n=3 auf 0.27.1 (wie alle MTP-Werte der Karte)"
+log "=== 1/3  MTP n=3 on 0.27.1 (like every MTP figure on the map)"
 serve radix-mtp $V27 mtp 3 "" /opt/llm/.cache-027 && {
   bench radix-mtp
-  log "=== 2/3  Divergenz gegen BF16, selber Server"
+  log "=== 2/3  divergence against BF16, same server"
   MN=$(curl -s http://127.0.0.1:8080/v1/models -H "Authorization: Bearer $OPENAI_API_KEY" \
        | python3 -c "import sys,json;print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null || echo qwen38-27b)
   log "  Modellname laut Server: $MN"
@@ -92,12 +92,12 @@ serve radix-mtp $V27 mtp 3 "" /opt/llm/.cache-027 && {
     --ref /tmp/divergence/ref.json --out /tmp/divergence/radixark.json 2>&1 | tail -3 | sed 's/^/    /'
 }
 
-log "=== 3/3  DFlash2 n=7 auf dem Zweig (wie alle DFlash2-Werte der Karte)"
+log "=== 3/3  DFlash2 n=7 on the branch (like every DFlash2 figure on the map)"
 serve radix-dflash2 $VPR dflash 7 /opt/llm/models/qwen38-27b-dflash2 /opt/llm/.cache-pr \
   && bench radix-dflash2
 
 SUDO systemctl stop rx
-log "=== ERGEBNIS ==="
+log "=== RESULT ==="
 $V27/bin/python - <<'PY'
 import json, statistics, re, os
 def w(n):
@@ -116,9 +116,9 @@ def w(n):
             a/d+1 if d else None)
 for n,lbl in (("radix-mtp","MTP n=3"),("radix-dflash2","DFlash2 n=7")):
     v=w(n)
-    print(f"  {lbl:<14} " + ("— nicht gelaufen" if not v else
-          f"{v[0]:5.1f} tok/s  TTFT {v[1]:4.1f}s  Laenge {v[2]:.2f}  Zug@130 {v[1]+130/v[0]:.1f}s"
-          if v[2] else f"{v[0]:5.1f} tok/s  TTFT {v[1]:4.1f}s  Zug@130 {v[1]+130/v[0]:.1f}s"))
+    print(f"  {lbl:<14} " + ("— did not run" if not v else
+          f"{v[0]:5.1f} tok/s  TTFT {v[1]:4.1f}s  length {v[2]:.2f}  turn@130 {v[1]+130/v[0]:.1f}s"
+          if v[2] else f"{v[0]:5.1f} tok/s  TTFT {v[1]:4.1f}s  turn@130 {v[1]+130/v[0]:.1f}s"))
 p="/tmp/divergence/radixark.json"
 if os.path.exists(p):
     b={x["id"]:x for x in json.load(open("/tmp/divergence/bf16.json"))}
@@ -126,7 +126,7 @@ if os.path.exists(p):
     ids=sorted(set(b)&set(d))
     if ids:
         print(f"  Divergenz      dtop1 {statistics.fmean((d[i]['top1']-b[i]['top1'])*100 for i in ids):+.2f} pp "
-              f"ueber {len(ids)} Kontexte")
+              f"over {len(ids)} contexts")
 print("\n  Nachbarn: uns-nvfp4head 38.6/4.26 | ours-nvfp4head 39.1/4.06 | r0b0tlab 40.6/4.23")
 PY
 log "FERTIG"
