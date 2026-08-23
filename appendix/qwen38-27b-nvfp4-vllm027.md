@@ -794,6 +794,15 @@ script that documents an earlier attempt.
 
 ### The one head quantized further than ours — weights *and* activations in 4-bit
 
+> **⚠️ The upstream repo changed on 2026-08-22 and no longer matches this cell.** RadixArk
+> replaced the NVFP4 `lm_head` with the original BF16 weights (+1.7 GB), stating the reason as
+> *"unblocking DFlash2/DSpark drafters and improving draft acceptance"* — one day after
+> #52816 merged and removed exactly that restriction. Everything measured here is the
+> **pre-change revision `554ebba`**, which is what the local copy holds
+> (`lm_head.input_scale` + `weight_scale` + `weight_scale_2` present). Pull today and you get
+> a BF16 head, which belongs in the `BF16 · A16` row instead. Their own post-change figure is
+> GSM8K 96.36 % against 97.27 % before.
+
 `RadixArk/Qwen3.8-27B-NVFP4` goes a step past every head discussed above. From its
 `hf_quant_config.json`, `lm_head` sits in the NVFP4 group with **`W=float4, A=float4`** — weights
 *and* activations in 4-bit, where our NVFP4 heads leave activations at 16-bit. The tensor set gives
@@ -821,8 +830,12 @@ same knob.
 
 Two consequences worth carrying:
 
-- **It needs the quantized-head guard removed to draft at all.** On stock vLLM it refuses DFlash2 —
-  it is precisely the case §7g describes.
+- **It needed the quantized-head guard removed to draft at all — no longer true.** On the vLLM of
+  the time, stock refused DFlash2 with an NVFP4 head; that is the case §7g describes. **#52816 was
+  merged on 2026-08-21** and routes the candidate selector through
+  `LogitsProcessor.get_top_k_tokens(self.lm_head, …)` → `quant_method.apply()`, so a quantized head
+  now drafts on stock. Verified in the merged sources and in service: every DFlash2 arm measured on
+  2026-08-21 ran through this NVFP4 W4A4 head.
 - **The "dominated" column was not dominated.** Static W4A4 activations were treated here as an
   uninteresting corner; they save the per-token scale computation, and that is the most plausible
   source of the prefill lead. It went unmeasured because the label said not to bother.
@@ -987,6 +1000,7 @@ with no speculation flag involved. If you have been treating `temperature: 0` as
 guarantee for evals or regression tests, it is not one here unless you also pin concurrency to 1.
 
 ### ⚠️ n=7 is not the optimum *of the swept corpus* — that was an artefact of how the sweep was aggregated
+### ⚠️⚠️ …and the corrected answer does not survive either — see the note at the end of this section
 
 An earlier version of this section concluded that DFlash2's published block size of 7 was right
 here. It rested on comparing **unpaired medians on paired data**: 36.5 tok/s at n=7 against 36.4 at
@@ -998,6 +1012,25 @@ n=11, a 0.2 difference. Re-read the same four runs correctly and the answer flip
 | 7 | 8 | **36.5** | 36.0 | 31.4 | 103 s |
 | **11** | 12 | 36.4 | **38.5** | **33.8** | **91 s** |
 | 15 | 16 | 35.5 | 37.3 | 32.1 | 97 s |
+
+> ### ⚠️ Neither answer stands. The sweep confounds draft depth with two other variables.
+>
+> The `block` column is not a label — vLLM *derives* it, `block_size = 1 + num_speculative_tokens`
+> (`qwen3_dflash2.py`), and `_grouped_conv` uses that value as its **causal reset boundary**. Every
+> DFlash2 checkpoint used here declares `dflash_config.block_size = 8`. Only the **n=7** row matches
+> it. The n=11 and n=15 rows ran the convolution across a boundary the weights were never trained
+> for — silently, because `block_size` shapes no checkpoint parameter, so nothing fails at boot.
+>
+> A second confound landed the same week: the compile cache was **not keyed by draft depth**
+> ([vllm#53292](https://github.com/vllm-project/vllm/pull/53292),
+> [#53313](https://github.com/vllm-project/vllm/pull/53313), the latter naming
+> `block_size = 1 + num_speculative_tokens` explicitly). A depth sweep could therefore also reuse a
+> graph compiled for a different depth.
+>
+> So this table measures draft depth **plus** a shifted causal boundary **plus** possibly a stale
+> compiled graph. It is not a depth optimum in either direction, and the n=11 conclusion above is
+> withdrawn pending a re-run with both confounds excluded. Production runs **n=7**, which is the row
+> that matches the checkpoint, and is unaffected.
 
 Three readings, two answers. The median picks n=7 by 0.2; the mean picks n=11 by 1.1; total tokens
 over total decode time — the thing a single-stream user actually experiences — picks n=11 by 1.7,
@@ -1221,6 +1254,17 @@ Wholesale copy is blocked: the branch's `dflash/speculator.py` imports `cp_local
 footnote beats an unexplained 5.7 % deviation. Items 1–3 are worth carrying into 0.27.1 regardless
 of DFlash2, because item 3 costs plain DFlash1 acceptance there today.
 
+> **Update 2026-08-21 — the deviation did not survive a larger sample.** #52816 merged that day, so
+> "the branch" and `main` are now the same code plus a rebase. Measured with the same drafter,
+> engine-for-engine: at 6 requests the branch looked 4.1 % faster (34.2 vs 32.8 tok/s), which is
+> what the 5.7 % figure above rests on; **at 24 requests the branch itself measures 32.8** and the
+> gap disappears. The earlier number was sampling noise, not an engine deficit.
+>
+> Two limits on that: it was measured with `bench_client_real.py`, **not** with the 20-agent-context
+> harness the map's cells use, and the map's DFlash2 cells were all taken on the branch. So the
+> cells stay internally consistent as they are; there is simply no longer a reason to *avoid*
+> merged `main` for new ones.
+
 ### SGLang: blocked on two merges, not one
 
 SGLang merged DFlash2 support on 2026-08-19 ([sgl#35371](https://github.com/sgl-project/sglang/pull/35371),
@@ -1236,6 +1280,67 @@ alone would not be enough: SGLang's selector has the *same* quantized-`lm_head` 
 two PRs still open (sgl#35462, sgl#35496). Without them the NVFP4 production checkpoint is
 rejected there too, and our unquantized-head W4A16 build fails to load in SGLang for an unrelated
 reason (`AttributeError: 'NoneType' object has no attribute 'num_bits'`).
+
+## 7h. Quantizing the *drafter* — measured three ways, and what it does not buy
+
+Added 2026-08-21. Same target (`RadixArk/Qwen3.8-27B-NVFP4`, the NVFP4 W4A4 head of §7f), same
+engine, same session, 24 replayed agent contexts, n=7 — only the drafter changes.
+
+| drafter | decode | acceptance length | TTFT |
+| :--- | ---: | ---: | ---: |
+| BF16 `z-lab/Qwen3.8-27B-DFlash2` (3.85 GB) | 41.3 tok/s | 4.24 | 5.6 s |
+| INT8 W8A16 `lued/Qwen3.8-27B-DFlash2-W8` (2.02 GiB) | 43.2 tok/s | 4.16 | 5.6 s |
+| FP8 W8A8 `josch15366/Qwen3.8-27B-DFlash2-FP8` (2.25 GB) | **43.8 tok/s** | 4.24 | 5.6 s |
+
+**Both quantized drafters land ~5 % above BF16 at unchanged acceptance.** The drafter runs once per
+step, so its weight bytes are paid every step; halving them is a pure bandwidth win on a machine
+measured at 231.8 of 273 GB/s. **FP8 vs INT8 is 1.4 %, which is the same order as session drift —
+do not read a winner into it.** Expectations that FP8's native Blackwell support would beat
+Marlin-routed INT8 here were not confirmed.
+
+Serving a quantized drafter needed two vLLM fixes at the time, neither in #52816: the draft model's
+quant config never reached `packed_modules_mapping`
+([#53116](https://github.com/vllm-project/vllm/issues/53116)), and DFlash's fused context-KV
+projection sliced `qkv_proj.weight` raw and applied it with a bare `F.linear`, bypassing
+`quant_method` ([#51581](https://github.com/vllm-project/vllm/issues/51581)).
+
+**Both fixes have since been confirmed on other sm121 hardware** (2026-08-22, on #52816), on a
+different target and harness, including the storage form that fails most quietly: a per-tensor
+scheme on a *fused* `qkv_proj` stores one scalar **per shard**, so `weight_scale` has shape `(3,)`
+— neither a scalar nor one entry per row. Expanding each shard's scalar over the rows it owns has
+to happen *before* the `[q_size:]` slice, or K silently receives V's scale: no crash, only worse
+acceptance. Our branch now carries a regression test for all four storage forms plus both rejection
+paths (`tests/v1/spec_decode/test_dflash_context_kv_dequant.py`). The confirming numbers are not
+comparable to the table above and are deliberately not merged into it; what reproduces is the
+*direction* — quantizing the drafter buys throughput at no measurable acceptance cost.
+
+> **⚠️ DFlash2 does not load on vLLM `main` at all**, as of 2026-08-23.
+> [#52560](https://github.com/vllm-project/vllm/pull/52560) reverted an extension point that
+> [#52816](https://github.com/vllm-project/vllm/pull/52816) had added, so `DFlash2Qwen3Model`
+> builds the wrong decoder-layer class and the checkpoint's convolution weights find no
+> destination ([#53428](https://github.com/vllm-project/vllm/issues/53428); fix in
+> [#53435](https://github.com/vllm-project/vllm/pull/53435)). Build from the #52816 merge commit
+> until that lands — and note that this blocks any re-measurement *on* main.
+
+## 7i. Where an agent turn actually spends its time
+
+Added 2026-08-21. `bench_client_real.py`, single stream, 6 requests, 256 output tokens, n=7.
+
+| prompt tokens | decode | TTFT |
+| ---: | ---: | ---: |
+| 1 000 | 36.5 tok/s | 0.69 s |
+| 8 000 | 31.6 tok/s | 3.49 s |
+| 32 000 | 26.3 tok/s | **14.86 s** |
+
+**32× the context costs 21× the TTFT while decode falls only 28 %.** At 32k, a turn emitting ~140
+tokens spends roughly three quarters of its wall time in prefill. Every decode-side lever on this
+page is therefore working on the smaller half of the problem at long context.
+
+Two measurement traps met while producing this, both worth stating because both produce
+plausible-looking numbers: counting **SSE deltas** instead of tokens reads 10 tok/s instead of 41
+(one delta carries several tokens under spec-decode), and a **buffering HTTP client** reads
+141–171 tok/s. Repeating an identical prompt also hits the prefix cache and halves the apparent
+TTFT. Only `bench_client_real.py` is trustworthy for decode timing here.
 
 ## 8. Notes, and what we did not test
 

@@ -232,6 +232,46 @@
   .quellen .qw { color:var(--ink-2); font-size:13.5px; }
   @media (max-width:720px) { .quellen .q { grid-template-columns:1fr; } }
 
+
+
+  /* Kopfzelle: die schnellste gemessene Kombination. Bewusst NICHT im Anchor-Band --
+     die drei dort kann man herunterladen, diese hier muss man zusammensetzen. */
+  .fastest {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:0;
+    background:var(--accent-wash); border:2px solid var(--accent); border-radius:8px;
+    margin:14px 0 0; overflow:hidden;
+  }
+  .fastest .fx { padding:15px 18px; border-right:1px solid var(--accent-dim); }
+  .fastest .fx:last-child { border-right:0; }
+  .fastest .fk {
+    font-family:ui-monospace,Menlo,monospace; font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--accent); margin-bottom:7px;
+  }
+  .fastest .fv {
+    font-family:ui-monospace,Menlo,monospace; font-size:22px; font-weight:600;
+    font-variant-numeric:tabular-nums; color:var(--ink); line-height:1.1;
+  }
+  .fastest .fs {
+    font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:var(--ink-2);
+    margin-top:5px; line-height:1.45; overflow-wrap:anywhere;
+  }
+  /* Rotes Kopfbanner. Farben ueber --p5/--q5, die in ALLEN drei Theme-Bloecken
+     definiert sind; Hintergrund ueber --surface, damit nichts durchscheint. */
+  .alert {
+    background:var(--surface); border:1px solid var(--p5); border-left:6px solid var(--p5);
+    border-radius:8px; padding:18px 22px; margin:26px 0 0;
+  }
+  .alert .ah {
+    font-family:ui-monospace,Menlo,monospace; font-size:15px; font-weight:700;
+    color:var(--p5); letter-spacing:-.01em; margin-bottom:10px; line-height:1.3;
+  }
+  .alert p { margin:0 0 10px; color:var(--ink); font-size:14.5px; }
+  .alert p:last-child { margin-bottom:0; }
+  .alert .num {
+    font-family:ui-monospace,Menlo,monospace; font-variant-numeric:tabular-nums;
+    font-weight:600; color:var(--p5);
+  }
+  .alert code { background:var(--surface-2); }
   .sw { display:inline-block; width:34px; height:9px; border-radius:2px; vertical-align:-1px; margin-right:5px; }
 </style>
 
@@ -249,9 +289,68 @@
   <div class="conditions">
     <span><b>Fidelity</b> Δtop-1 vs BF16, teacher-forced, 20 agent contexts</span>
     <span><b>Speed</b> MTP n=3, util 0.60, paired — DFlash2 figures marked per cell</span>
-    <span><b>As of</b> 2026-08-20</span>
+    <span><b>As of</b> 2026-08-20 &middot; RadixArk pinned at <code>554ebba</code></span>
   </div>
 </header>
+
+
+<div class="alert">
+  <div class="ah">&#9888; The fastest cell on this map no longer describes what you download.</div>
+  <p>
+    <b>RadixArk changed <code>Qwen3.8-27B-NVFP4</code> on 2026-08-22</b>, replacing the NVFP4
+    <code>lm_head</code> with the original BF16 weights (+1.7&nbsp;GB). Everything measured here is
+    the pre-change revision <code>554ebba</code>. Pull the name today and you get a different
+    model — a BF16 head, which belongs in the <b>BF16 · A16</b> row of this very table.
+  </p>
+  <p>
+    <b>This map already measured that swap</b>, on the same body, same session. It costs
+    <span class="num">MTP 30.1 &rarr; 21.7 tok/s (&minus;28&nbsp;%)</span> and
+    <span class="num">DFlash2 40.3 &rarr; 36.2 tok/s (&minus;10&nbsp;%)</span>, and buys
+    0.23&nbsp;pp of fidelity (&minus;2.19 &rarr; &minus;1.96). The head is 4.6&nbsp;% of the
+    parameters and it is what made this cell the fastest one here.
+  </p>
+  <p>
+    Their stated reason is <i>&ldquo;unblocking DFlash2/DSpark drafters&rdquo;</i> &mdash; a
+    restriction that
+    <a href="https://github.com/vllm-project/vllm/pull/52816">vllm#52816</a> removed when it
+    merged one day earlier, on 2026-08-21. A quantized head drafts on stock vLLM now; the six
+    quantized-head cells below were all measured through one.
+  </p>
+</div>
+
+
+<h2>The fastest combination measured here</h2>
+<p class="note">
+  Not a cell you can download &mdash; it is a target, a drafter and a depth, assembled. The grid
+  below varies the checkpoint; this varies what drafts for it. Both halves are 4-bit.
+</p>
+<div class="fastest">
+  <div class="fx">
+    <div class="fk">decode</div>
+    <div class="fv">44.6 <span style="font-size:12px;color:var(--muted)">tok/s</span></div>
+    <div class="fs">acceptance 4.13 &middot; TTFT 5.5 s<br>vs <b>40.3</b> for the fastest published
+      cell &mdash; <b>+8 %</b> once the +1.0 session offset is taken out</div>
+  </div>
+  <div class="fx">
+    <div class="fk">target</div>
+    <div class="fv" style="font-size:14px">RadixArk/&hellip;-NVFP4</div>
+    <div class="fs"><code>@554ebba</code><br>NVFP4 · A4 head &times; W4A4 CUTLASS body,
+      static act. &mdash; the fastest row of the fastest column</div>
+  </div>
+  <div class="fx">
+    <div class="fk">drafter</div>
+    <div class="fv" style="font-size:14px">syvai/&hellip;-DFlash2-W4A16</div>
+    <div class="fs">INT4 group-128, 1.19 GiB<br>DFlash2 at <b>n=7</b>, the depth the checkpoint
+      declares</div>
+  </div>
+  <div class="fx">
+    <div class="fk">what it needs</div>
+    <div class="fv" style="font-size:14px">two patches</div>
+    <div class="fs">vllm <a href="https://github.com/vllm-project/vllm/issues/53116">#53116</a>
+      and <a href="https://github.com/vllm-project/vllm/issues/51581">#51581</a> &mdash; the head
+      restriction itself is merged</div>
+  </div>
+</div>
 
 <h2>Anchors — the three you can just download</h2>
 <p class="note">
@@ -298,8 +397,10 @@
   publishes them, they only exist because we made them.
   <br><br>
   Rows are the <b>lm_head</b>, ordered by its distance from BF16. It holds 4.6 % of the
-  parameters yet sets the decode rate alone, because under speculative decoding it runs once
-  per draft position while the body runs once per step. Columns are the <b>body</b>.
+  parameters yet moves the decode rate more than that share suggests: a step yields several
+  tokens, so the head's cost is spread over few tokens and its weight bytes are read every
+  step regardless.
+  Columns are the <b>body</b>.
   <br><br>
   <b>Two things the axes do not show.</b> The <code>A8</code>/<code>A16</code> in a row name is the
   <i>head's</i> activation precision, not the body's — and the column's <code>A4</code>/<code>A16</code>
@@ -397,7 +498,7 @@
       <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
       <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
       <td><div class="cell model"><div class="dq" style="color:var(--muted)">&mdash;</div><div class="speed">not built</div></div></td>
-      <td><div class="cell meas dfl-yes"><span class="tag">published</span><div class="dq" style="color:var(--p5)">&minus;2.19<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">30.1 tok/s · TTFT 4.6 s</span></div><div class="turn">8.9 s / turn<span class="acc2"> @130 tok &middot; accept 3.29</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">40.3 tok/s · TTFT 4.5 s</span></div><div class="turn">7.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.32</span></div></div><div class="who m"><span class="wk">Head</span> RadixArk<br><span class="wk">Model</span> RadixArk/…-NVFP4<br>gittensor/…-RTX5090</div></div></td>
+      <td><div class="cell meas dfl-yes"><span class="tag">published</span><div class="dq" style="color:var(--p5)">&minus;2.19<span class="unit">pp</span></div><div class="speed"><div>MTP <span class="spd" style="color:var(--s5)">30.1 tok/s · TTFT 4.6 s</span></div><div class="turn">8.9 s / turn<span class="acc2"> @130 tok &middot; accept 3.29</span></div><div>DFlash2 <span class="spd" style="color:var(--s5)">40.3 tok/s · TTFT 4.5 s</span></div><div class="turn">7.7 s / turn<span class="acc2"> @130 tok &middot; accept 4.32</span></div></div><div class="who m"><span class="wk">Head</span> RadixArk<br><span class="wk">Model</span> RadixArk/…-NVFP4 <b>@554ebba</b><br>gittensor-model-hub/…-NVFP4-RTX5090</div></div></td>
     </tr>
 </table>
 
@@ -526,8 +627,11 @@
   <br><br>
   Both 2.54 GB rows were long thought to be the only <i>grid</i> rows DFlash2 could draft for,
   because stock vLLM refuses a quantized target head and every narrower row quantizes it.
-  <b>That restriction is gone.</b> Deleting the eight-line guard makes every row here draftable,
-  and the six cells measured on 19 Aug prove it: quantized heads draft at
+  <b>That restriction is gone &mdash; and since 2026-08-21 it is gone upstream too.</b>
+  Deleting the eight-line guard made every row here draftable, and the six cells measured on
+  19 Aug prove it; <a href="https://github.com/vllm-project/vllm/pull/52816">vllm#52816</a> has
+  since merged the same fix, routing the selector through <code>quant_method.apply()</code>, so
+  <b>no local patch is needed any more</b>. Quantized heads draft at
   <b>38.6 to 41.2 tok/s</b>, faster than any unquantized one. The guard never described the
   method — see the box below. On stock vLLM the ordering still held, and there
   <b>the first-party <code>Qwen/Qwen3.8-27B-FP8</code> release runs it at
@@ -599,11 +703,11 @@
     <b>W4A4</b> body gives <b>35.2 tok/s at 5.6 s</b> — 1.3 tok/s slower to decode, 4 s faster to
     first token, and the only point measured here that is fast at both ends. Against the
     production checkpoint under MTP that is <b>+32 % decode and −12 % TTFT at the same fidelity</b>
-    (&minus;1.51 vs &minus;1.53). <b>n=7 is not the optimum</b> &mdash; that reading compared unpaired medians on paired
-    data (36.5 against 36.4). Paired, <b>n=11 wins 11 of 20 contexts</b>, and total tokens over
-    total decode time puts it 1.7 tok/s ahead, finishing the corpus in 91 s against 103. Every
-    DFlash2 figure on this page is measured at n=7, so <b>the column is a floor</b> &mdash;
-    about 7 % low if the sweep transfers. For reference the previous best was
+    (&minus;1.51 vs &minus;1.53). Every DFlash2 figure on this page is measured at <b>n=7</b>, the depth the checkpoints
+    declare (<code>dflash_config.block_size = 8</code>) &mdash; the DFlash2 chapter explains why that
+    is not a free knob. An earlier note here claimed n=11 beat it and that the column was therefore
+    a floor; <b>that claim is withdrawn</b>, because the sweep varied the causal reset boundary, and
+    possibly the compiled graph, along with the depth. For reference the previous best was
     SGLang + DSpark at 30.1 tok/s; SGLang cannot run DFlash2 yet (two merges short).
     <br><br>
     And it is the <i>same checkpoint</i> that holds the best fidelity in this field. At −1.11 pp
@@ -863,45 +967,85 @@
   turn it takes.
 </div>
 
-<h2>Who can actually run DFlash2</h2>
+<h2>DFlash2 — what it is, what it costs, and what it still needs</h2>
 <p class="note">
-  Stock vLLM and SGLang both refuse a quantized <code>lm_head</code>, so that looked like the one
-  requirement deciding eligibility. <b>It is not a property of the method</b> — the guard is
-  removable in eight lines and every quantized head measured here drafts fine. The column below
-  therefore records what each checkpoint does on an <i>unpatched</i> engine, which is still what
-  most people will meet. Below are the <b>ten
-  most-downloaded Qwen3.8-27B releases this stack can serve</b> — GGUF and MLX filtered out, since
-  those are llama.cpp and Apple Silicon and belong to different runtimes entirely (they also
-  dominate the raw charts: the top GGUF alone has 4.3 M pulls). Of the eight that are actually
-  target models, <b>six leave the head alone</b>. The two that do not are Unsloth's and RadixArk's
-  — the production default and one of the measured cells above. Read from each
-  <code>quantization_config</code> and each head tensor's dtype, not inferred.
+  Every cell above carries two speed rows because the drafter is a second, independent decision.
+  MTP is the head that ships inside the checkpoint; <b>DFlash2</b> is a separate 5-layer
+  block-diffusion drafter (<code>z-lab/Qwen3.8-27B-DFlash2</code>) that proposes a whole block in
+  <i>one</i> forward pass — which is also why the target's <code>lm_head</code> runs once per step over n rows per request, not once per draft position. Across the measured cells it is worth <b>+60 to +75 %</b> over MTP on the
+  same target &mdash; the single largest lever on this page, larger than any head or body choice.
+</p>
+<p class="note">
+  <b>Its depth is not a tuning knob.</b> vLLM derives the drafter's convolution block as
+  <code>1 + num_speculative_tokens</code> and uses that as the causal reset boundary; the published
+  checkpoints declare <code>block_size = 8</code>. Only <b>n=7</b> matches. A deeper n loads without
+  complaint and silently runs the convolution across a boundary the weights were never trained for
+  &mdash; which is why the depth sweep further down is withdrawn rather than corrected.
+</p>
+<p class="note">
+  <b>The drafter itself is a variable, and quantizing it is nearly free.</b> It runs once per step,
+  so its weight bytes are paid every step; on a machine measured at 231.8 of 273 GB/s that is a
+  bandwidth cost, not a compute one. Measured on GB10, same target
+  (<code>RadixArk/&hellip;-NVFP4 @554ebba</code>), same engine and session, 24 replayed agent
+  contexts, n=7 &mdash; only the drafter swapped:
 </p>
 <div class="tbl-scroll">
 <table class="data">
-  <tr><th>#</th><th>Checkpoint</th><th>Downloads</th><th>lm_head tensor</th><th>Where it sits</th><th>DFlash2</th></tr>
-  <tr><td class="num">1</td><td class="mono">Qwen/Qwen3.8-27B-FP8</td><td class="num">1 063 646</td><td class="mono">BF16</td><td>anchor · W8A8 body</td><td><b style="color:var(--dfl-yes)">28.8 tok/s — measured</b></td></tr>
-  <tr><td class="num">2</td><td class="mono">Qwen/Qwen3.8-27B</td><td class="num">1 006 235</td><td class="mono">BF16</td><td>anchor · unquantized</td><td>trivially eligible</td></tr>
-  <tr><td class="num">3</td><td class="mono">unsloth/…-NVFP4</td><td class="num">653 042</td><td class="mono"><b>F8_E4M3</b></td><td>FP8 · A8 × W4A4</td><td><b style="color:var(--dfl-no)">refuses unpatched — measured</b><br><span style="color:var(--dfl-yes)">36.5 tok/s patched</span></td></tr>
-  <tr><td class="num">4</td><td class="mono">Inferact/…-NVFP4</td><td class="num">318 159</td><td class="mono">BF16</td><td>period <i>+ attention</i></td><td>should run</td></tr>
-  <tr><td class="num">5</td><td class="mono">RadixArk/…-NVFP4</td><td class="num">315 942</td><td class="mono"><b>U8</b> +scale_2 +input_scale</td><td>NVFP4 · <b>A4</b> × W4A4</td><td>refuses unpatched; <b style="color:var(--dfl-yes)">30.1 tok/s patched</b></td></tr>
-  <tr><td class="num">6</td><td class="mono">cyankiwi/…-AWQ-INT4</td><td class="num">111 528</td><td class="mono">BF16</td><td>period <i>integer</i></td><td>should run</td></tr>
-  <tr><td class="num">7</td><td class="mono">unsloth/Qwen3.8-27B</td><td class="num">72 959</td><td class="mono">BF16</td><td>mirror of #2</td><td>trivially eligible</td></tr>
-  <tr><td class="num">8</td><td class="mono">philbert440/…-W4A16-AWQ</td><td class="num">70 413</td><td class="mono">BF16</td><td>period <i>integer</i></td><td>should run</td></tr>
-  <tr><td class="num">9</td><td class="mono">RadixArk/…-DSpark</td><td class="num">68 392</td><td>—</td><td><b>not a target</b> — <code>DSparkDraftModel</code>, 5 layers</td><td>n/a — it <i>is</i> a drafter</td></tr>
-  <tr><td class="num">10</td><td class="mono">orcarouter/…-Uncensored-FP8</td><td class="num">60 078</td><td>—</td><td>gated (HTTP 401)</td><td>unknown</td></tr>
+  <tr><th>drafter</th><th>size</th><th>decode</th><th>acceptance length</th><th>TTFT</th></tr>
+  <tr><td><code>z-lab/&hellip;-DFlash2</code> &middot; BF16</td><td class="num">3.85 GB</td><td class="num">41.3 tok/s</td><td class="num">4.24</td><td class="num">5.6 s</td></tr>
+  <tr><td><code>lued/&hellip;-DFlash2-W8</code> &middot; INT8 W8A16</td><td class="num">2.02 GiB</td><td class="num">43.2 tok/s</td><td class="num">4.16</td><td class="num">5.6 s</td></tr>
+  <tr><td><code>josch15366/&hellip;-DFlash2-FP8</code> &middot; FP8 W8A8</td><td class="num">2.25 GB</td><td class="num">43.8 tok/s</td><td class="num">4.24</td><td class="num">5.6 s</td></tr>
+  <tr><td><code>syvai/&hellip;-DFlash2-W4A16</code> &middot; INT4 group-128</td><td class="num">1.19 GiB</td><td class="num"><b>44.6 tok/s</b></td><td class="num">4.13</td><td class="num">5.5 s</td></tr>
 </table>
 </div>
 <p class="note">
-  Two caveats on reading this. The four AWQ/GPTQ/INT8 rows are a <i>different weight family</i> —
-  integer, not NVFP4 — so they are outside this map's axes even though they are eligible; they are
-  listed because "which checkpoints can use the fastest decoder" is a separate question from "which
-  NVFP4 is best". And <code>Inferact</code> and <code>sakamakismile</code> would fill vacant W4A4
-  cells in the top row, but both also quantize attention or GDN (see below), so putting them in the
-  grid would smuggle in a third axis. GGUF and MLX releases dominate the download charts and are
-  excluded throughout: llama.cpp and Apple Silicon respectively, not this stack.
+  <b>Throughput tracks drafter size, monotonically, down to 4 bits.</b> Halving the bytes read per
+  step is worth more than the acceptance it costs: 3.85&nbsp;GB &rarr; 1.19&nbsp;GiB buys
+  <b>+8.0 %</b> while acceptance drifts only 4.24 &rarr; 4.13. The drafter is the one component
+  where quantization is structurally low-risk &mdash; the target verifies every token it proposes,
+  so only speed and acceptance can move, never correctness. The middle two rows are 1.4 % apart,
+  the same order as session drift here, so FP8 and INT8 are not distinguishable; the 4-bit row is.
 </p>
-
+<p class="note">
+  Which checkpoints this even applies to: of the ten most-downloaded Qwen3.8-27B releases this
+  stack can serve, eight are target models and <b>six leave the <code>lm_head</code> alone</b>.
+  The two that do not are Unsloth's and RadixArk's &mdash; the production default and the fastest
+  cell above. Read from each <code>quantization_config</code> and each head tensor's dtype, not
+  inferred from the name.
+</p>
+<div class="warn">
+  <b>What a quantized drafter still needs.</b> The head restriction is gone &mdash; <a
+  href="https://github.com/vllm-project/vllm/pull/52816">vllm#52816</a> merged 2026-08-21 &mdash;
+  but two separate defects sit in front of a quantized <i>drafter</i>. The draft model's
+  quantization config never reaches <code>packed_modules_mapping</code>, so fused projections load
+  without a scheme (<a href="https://github.com/vllm-project/vllm/issues/53116">#53116</a>, PR
+  <a href="https://github.com/vllm-project/vllm/pull/53122">#53122</a>); and DFlash's fused
+  context-KV precompute slices <code>qkv_proj.weight</code> raw and applies it with a bare
+  <code>F.linear</code>, bypassing <code>quant_method</code>, so a drafter with quantized q/k/v dies
+  at startup profiling (<a href="https://github.com/vllm-project/vllm/issues/51581">#51581</a>).
+  The rows above were measured with both patched, and both patches now have independent
+  confirmation on other sm121 hardware &mdash; including the layout that fails most quietly, a
+  per-tensor scheme on a <i>fused</i> qkv, where <code>weight_scale</code> is one scalar per shard
+  and has to be expanded before the K/V slice or K silently receives V's scale. The direction
+  reproduces on that other target and harness: quantizing the drafter buys throughput and costs no
+  measurable acceptance. Those numbers are not comparable to the rows above and are deliberately
+  not folded into them.
+</div>
+<div class="warn">
+  <b>&#9888; DFlash2 does not load on vLLM <code>main</code> at all</b>, as of 2026-08-23.
+  <a href="https://github.com/vllm-project/vllm/pull/52560">#52560</a> reverted an extension point
+  that <a href="https://github.com/vllm-project/vllm/pull/52816">#52816</a> had added, so the
+  DFlash2 model builds the wrong decoder-layer class and its convolution weights find no
+  destination (<a href="https://github.com/vllm-project/vllm/issues/53428">#53428</a>; fix in
+  <a href="https://github.com/vllm-project/vllm/pull/53435">#53435</a>). Until that lands, build
+  from the #52816 merge commit rather than from <code>main</code>.
+</div>
+<p class="note">
+  <b>The cost side, stated plainly:</b> DFlash2 is the fastest thing here and also the least
+  faithful of the speculative paths &mdash; its output tracks the unspeculated reference less
+  closely than MTP's does. That is a separate axis from the fidelity column, which measures the
+  <i>checkpoint</i> against BF16, not the drafter against no-drafter.
+</p>
 
 <h2>What the map does not say</h2>
 <p class="note">
@@ -971,7 +1115,7 @@
   <div class="q"><div class="qn"><a href="https://github.com/Weschera/Qwen3.8-27B-NVFP4-DFlash2-DGX-Spark">Weschera / …-DFlash2-DGX-Spark</a></div><div class="qw">The recipe that routes the candidate selector through <code>quant_method.apply()</code>, showing the quantized-head ban was removable. Its FP32 top-k claim did not reproduce here.</div></div>
   <div class="q"><div class="qn"><a href="https://github.com/MiaAI-Lab/Qwen3.8-27B-SGLang-DGX-Spark">MiaAI-Lab / …-SGLang-DGX-Spark</a></div><div class="qw">The SGLang side of this box: launch flags taken verbatim for the DSpark arm, and the version combination we fall back to when a nightly breaks.</div></div>
   <div class="q"><div class="qn"><a href="https://huggingface.co/incoai/Qwen3.8-27B-DFlash2">incoai / Qwen3.8-27B-DFlash2</a></div><div class="qw">The drafter itself. Its published accept lengths (4.10&ndash;5.46) are H200 BF16; against a 4-bit target we measure 4.06&ndash;4.54.</div></div>
-  <div class="q"><div class="qn"><a href="https://github.com/sgl-project/sglang/pull/35462">sgl#35462, sgl#35496</a></div><div class="qw">The same quantized-head restriction on SGLang, still open there.</div></div>
+  <div class="q"><div class="qn"><a href="https://github.com/sgl-project/sglang/pull/35462">sgl#35462, sgl#35496</a></div><div class="qw">The same quantized-head restriction on SGLang, still open there &mdash; the vLLM side merged as #52816 on 2026-08-21.</div></div>
 </div>
 
 <footer>
