@@ -1,0 +1,1 @@
+{"concurrency": 1, "n": 24, "decode_tps_median": 39.1, "decode_tps_p10": 34.5, "aggregate_tps": 34.0, "ttft_median_s": 0.769, "wall_s": 135.4, "total_out_tokens": 4608}
