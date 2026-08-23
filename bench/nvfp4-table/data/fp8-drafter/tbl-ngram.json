@@ -1,0 +1,218 @@
+[
+ {
+  "id": "facebook__docusaurus-9897@29",
+  "ctx": 8168,
+  "tok_s": 5.02,
+  "ttft": 55.51,
+  "tokens": 103,
+  "deltas": 62,
+  "tok_per_delta": 1.66
+ },
+ {
+  "id": "mrdoob__three.js-25687@37",
+  "ctx": 7882,
+  "tok_s": 10.26,
+  "ttft": 3.52,
+  "tokens": 256,
+  "deltas": 44,
+  "tok_per_delta": 5.82
+ },
+ {
+  "id": "facebook__docusaurus-8927@132",
+  "ctx": 32911,
+  "tok_s": 18.22,
+  "ttft": 17.99,
+  "tokens": 256,
+  "deltas": 130,
+  "tok_per_delta": 1.97
+ },
+ {
+  "id": "fluent__fluentd-3466@119",
+  "ctx": 34567,
+  "tok_s": 22.42,
+  "ttft": 19.64,
+  "tokens": 113,
+  "deltas": 40,
+  "tok_per_delta": 2.83
+ },
+ {
+  "id": "google__gson-2479@11",
+  "ctx": 4856,
+  "tok_s": 22.18,
+  "ttft": 1.72,
+  "tokens": 114,
+  "deltas": 22,
+  "tok_per_delta": 5.18
+ },
+ {
+  "id": "apache__lucene-12022@55",
+  "ctx": 15835,
+  "tok_s": 21.04,
+  "ttft": 7.93,
+  "tokens": 256,
+  "deltas": 115,
+  "tok_per_delta": 2.23
+ },
+ {
+  "id": "preactjs__preact-4152@32",
+  "ctx": 10538,
+  "tok_s": 18.29,
+  "ttft": 5.59,
+  "tokens": 147,
+  "deltas": 55,
+  "tok_per_delta": 2.67
+ },
+ {
+  "id": "redis__redis-13338@22",
+  "ctx": 11116,
+  "tok_s": 10.37,
+  "ttft": 5.67,
+  "tokens": 256,
+  "deltas": 193,
+  "tok_per_delta": 1.33
+ },
+ {
+  "id": "gin-gonic__gin-2121@11",
+  "ctx": 3165,
+  "tok_s": 10.13,
+  "ttft": 1.21,
+  "tokens": 157,
+  "deltas": 27,
+  "tok_per_delta": 5.81
+ },
+ {
+  "id": "phpoffice__phpspreadsheet-4313@19",
+  "ctx": 7158,
+  "tok_s": 14.21,
+  "ttft": 3.1,
+  "tokens": 256,
+  "deltas": 206,
+  "tok_per_delta": 1.24
+ },
+ {
+  "id": "projectlombok__lombok-3594@103",
+  "ctx": 19993,
+  "tok_s": 24.46,
+  "ttft": 10.3,
+  "tokens": 110,
+  "deltas": 33,
+  "tok_per_delta": 3.33
+ },
+ {
+  "id": "hashicorp__terraform-35543@109",
+  "ctx": 41276,
+  "tok_s": 16.42,
+  "ttft": 22.57,
+  "tokens": 115,
+  "deltas": 64,
+  "tok_per_delta": 1.8
+ },
+ {
+  "id": "micropython__micropython-15898@10",
+  "ctx": 3461,
+  "tok_s": 22.69,
+  "ttft": 1.53,
+  "tokens": 99,
+  "deltas": 17,
+  "tok_per_delta": 5.82
+ },
+ {
+  "id": "micropython__micropython-15898@16",
+  "ctx": 4129,
+  "tok_s": 9.78,
+  "ttft": 0.51,
+  "tokens": 256,
+  "deltas": 215,
+  "tok_per_delta": 1.19
+ },
+ {
+  "id": "apache__lucene-13704@40",
+  "ctx": 18310,
+  "tok_s": 16.37,
+  "ttft": 8.98,
+  "tokens": 144,
+  "deltas": 39,
+  "tok_per_delta": 3.69
+ },
+ {
+  "id": "prometheus__prometheus-9248@43",
+  "ctx": 10748,
+  "tok_s": 16.84,
+  "ttft": 5.72,
+  "tokens": 256,
+  "deltas": 139,
+  "tok_per_delta": 1.84
+ },
+ {
+  "id": "projectlombok__lombok-3312@174",
+  "ctx": 31228,
+  "tok_s": 11.61,
+  "ttft": 16.21,
+  "tokens": 245,
+  "deltas": 29,
+  "tok_per_delta": 8.45
+ },
+ {
+  "id": "preactjs__preact-3062@38",
+  "ctx": 6976,
+  "tok_s": 17.58,
+  "ttft": 3.34,
+  "tokens": 100,
+  "deltas": 51,
+  "tok_per_delta": 1.96
+ },
+ {
+  "id": "hashicorp__terraform-34900@150",
+  "ctx": 43486,
+  "tok_s": 25.7,
+  "ttft": 25.9,
+  "tokens": 106,
+  "deltas": 20,
+  "tok_per_delta": 5.3
+ },
+ {
+  "id": "valkey-io__valkey-1499@85",
+  "ctx": 20575,
+  "tok_s": 24.19,
+  "ttft": 10.87,
+  "tokens": 67,
+  "deltas": 15,
+  "tok_per_delta": 4.47
+ },
+ {
+  "id": "caddyserver__caddy-6115@31",
+  "ctx": 10108,
+  "tok_s": 17.68,
+  "ttft": 4.75,
+  "tokens": 256,
+  "deltas": 115,
+  "tok_per_delta": 2.23
+ },
+ {
+  "id": "google__gson-1014@6",
+  "ctx": 4658,
+  "tok_s": 12.3,
+  "ttft": 2.36,
+  "tokens": 256,
+  "deltas": 238,
+  "tok_per_delta": 1.08
+ },
+ {
+  "id": "javaparser__javaparser-4538@8",
+  "ctx": 2008,
+  "tok_s": 24.5,
+  "ttft": 0.84,
+  "tokens": 76,
+  "deltas": 9,
+  "tok_per_delta": 8.44
+ },
+ {
+  "id": "babel__babel-16130@62",
+  "ctx": 22990,
+  "tok_s": 17.77,
+  "ttft": 11.32,
+  "tokens": 89,
+  "deltas": 29,
+  "tok_per_delta": 3.07
+ }
+]
