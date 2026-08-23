@@ -15,7 +15,8 @@ set -euo pipefail
 
 SRC=/opt/llm/models/qwen38-27b-dflash2-fp8
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HF="/home/jschmied/vllm-venv-branch-fp8/bin/hf"
+HF="${HF:-$(command -v hf)}"
+: "${HF:?the huggingface CLI (hf) is not on PATH; set HF=/path/to/hf}"
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 
 [ -f "$SRC/model.safetensors" ] || { echo "missing $SRC/model.safetensors" >&2; exit 1; }
