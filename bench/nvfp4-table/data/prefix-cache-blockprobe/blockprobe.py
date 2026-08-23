@@ -1,5 +1,9 @@
-"""Misst, wieviel cachebares Praefix ein Lauf zurueckgibt -- pro Blockgrenze.
-Aufruf: blockprobe.py <label> <ausgabedatei>"""
+"""How much reusable prefix a build actually returns, per block boundary.
+
+Usage: blockprobe.py <label> <output.json>. Prompts are calibrated to exact
+token counts through /tokenize + /detokenize, because a prompt landing on a
+block boundary behaves differently from one that does not.
+"""
 import json,os,re,sys,time,urllib.request
 KEY=os.environ["LLM_KEY"]; BASE="http://127.0.0.1:8080"
 def post(p,payload,timeout=300):
@@ -28,7 +32,8 @@ def exact(n, ids):
     return None
 label,out=sys.argv[1],sys.argv[2]
 res=[]
-# Jedes Ziel aus einem EIGENEN Korpusbereich -- sonst ist das zweite ein Praefix des ersten
+# Each target from its OWN corpus region: cut from the same one, the longer
+# prompt is a prefix of the shorter and hits the cache the first time it is sent.
 for target, off in ((4*BLK, OFF), (4*BLK+700, OFF+3000000)):
     p=exact(target, toks(off))
     if p is None: res.append({"target":target,"error":"Kalibrierung fehlgeschlagen"}); continue

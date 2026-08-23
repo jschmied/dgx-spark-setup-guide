@@ -1,5 +1,6 @@
 #!/bin/bash
-# Acceptance ueber die Nebenlaeufigkeit -- prueft #53323 (SWA-Eviction) auf unserem Stack.
+# Acceptance across concurrency levels -- checks vllm#53323 (evicted sliding-window
+# K/V collapsing draft acceptance under batching) on this stack.
 set -u
 : "${OPENAI_API_KEY:?set OPENAI_API_KEY (the vLLM server key) before running}"
 KEY="$OPENAI_API_KEY"
@@ -16,7 +17,7 @@ snap() { curl -sS -m 15 "$URL/metrics" -H "Authorization: Bearer $KEY" \
 
 echo "=== Acceptance vs. Nebenlaeufigkeit  (req=$REQ out=$OLEN in=$ILEN) ==="
 for C in 1 2 4 8; do
-  # eigener Vorlauf, damit der klientinterne Warmlauf nicht das ganze Delta faerbt
+  # Separate warmup, so the client's own warmup request does not colour the delta
   python3 "$BENCH" --url "$URL/v1/chat/completions" --key "$KEY" \
       --model qwen38-27b --requests 2 --concurrency "$C" --input-len $ILEN \
       --output-len 64 --temp 0.6 >/dev/null 2>&1

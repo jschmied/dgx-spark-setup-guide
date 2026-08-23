@@ -1,5 +1,5 @@
 #!/bin/bash
-# Faehrt die verbleibenden Arme. Erwartet SUDO_PW und LLM_KEY in der Umgebung.
+# Runs the measurement arms. Expects SUDO_PW and LLM_KEY in the environment.
 set -u
 S="${OUT:-/tmp/blockprobe}"; mkdir -p "$S"
 SP=/opt/llm/runtime/vllm-venv-maintest/lib/python3.12/site-packages/vllm
@@ -8,7 +8,8 @@ SUDO(){ printf '%s\n' "${SUDO_PW:?set SUDO_PW}" | sudo -S -p '' "$@" 2>/dev/null
 run_arm(){  # $1 label  $2 worktree  $3 extra-args  $4 blk
   echo "=== ARM $1 ($(date +%H:%M:%S)) ==="
   SUDO rsync -a --exclude='*.so' --exclude='*.pyd' --exclude='_version.py' "$2/vllm/" "$SP/"
-  # Beweis, dass der Code wirklich liegt: Datei-Identitaet, nicht Stichwortsuche
+  # Prove the arm's own code is loaded by comparing files, not by grepping for a
+  # keyword: the keyword may live in a file this arm does not touch.
   for f in v1/core/sched/scheduler.py v1/core/kv_cache_utils.py; do
     cmp -s "$2/vllm/$f" "$SP/$f" && echo "  $f == Baum" || echo "  !! $f WEICHT AB"
   done
