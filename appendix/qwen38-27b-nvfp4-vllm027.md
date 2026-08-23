@@ -1322,6 +1322,31 @@ comparable to the table above and are deliberately not merged into it; what repr
 > [#53435](https://github.com/vllm-project/vllm/pull/53435)). Build from the #52816 merge commit
 > until that lands — and note that this blocks any re-measurement *on* main.
 
+### Acceptance under concurrency — measured, no collapse
+
+Added 2026-08-23. Every acceptance figure above is single-stream.
+[#53323](https://github.com/vllm-project/vllm/issues/53323) reports DFlash2 acceptance collapsing
+under batching on ROCm, traced to a prefix-attention kernel reading **evicted sliding-window K/V** —
+and the DFlash2 drafter has five sliding-attention layers, so the exposure looked architectural
+rather than backend-specific. Isolated box, `bench_client_real.py`, 24 requests per arm, in 2000 /
+out 192, counters read from `/metrics` before and after each arm:
+
+| concurrency | accept length | draft accept rate | median decode | aggregate | TTFT |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 3.96 | 42.3 % | 39.1 tok/s | 34.0 tok/s | 0.77 s |
+| 2 | 4.08 | 44.0 % | 33.0 tok/s | 54.8 tok/s | 1.10 s |
+| 4 | 3.97 | 42.4 % | 22.3 tok/s | 74.0 tok/s | 1.45 s |
+| 8 | 3.89 | 41.3 % | 17.3 tok/s | 101.2 tok/s | 2.56 s |
+
+**±3 % around c=1 — session drift.** The load-bearing part is not the aggregate but the
+**per-position acceptance**: evicted K/V would cost the *deep* positions disproportionately, and
+they do not move — `0.80 0.63 0.50 0.39 0.29 0.21 0.15` at c=1 against
+`0.80 0.62 0.47 0.38 0.27 0.21 0.15` at c=8. Per-request decode falls as expected from queueing.
+
+Caveat: each arm includes one warmup request at c=1 (~4 % of drafts), which would *dampen* a
+collapse rather than manufacture a flat result. Posted as a negative data point on #53323, which
+narrows that bug to the ROCm path. Raw data in `bench/nvfp4-table/data/accept-vs-concurrency/`.
+
 ## 7i. Where an agent turn actually spends its time
 
 Added 2026-08-21. `bench_client_real.py`, single stream, 6 requests, 256 output tokens, n=7.

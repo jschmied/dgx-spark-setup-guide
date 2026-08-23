@@ -1041,6 +1041,17 @@
   from the #52816 merge commit rather than from <code>main</code>.
 </div>
 <p class="note">
+  <b>Acceptance holds when requests share the machine.</b> Every speed figure on this map is
+  single-stream, so it was worth checking whether the drafter still earns its keep under load —
+  <a href="https://github.com/vllm-project/vllm/issues/53323">vllm#53323</a> reports DFlash2
+  acceptance collapsing under batching on ROCm, traced to a kernel reading evicted sliding-window
+  K/V, and the DFlash2 drafter has five sliding-attention layers. Measured here at concurrency
+  1&nbsp;/&nbsp;4&nbsp;/&nbsp;8: accept length <b>3.96&nbsp;/&nbsp;3.97&nbsp;/&nbsp;3.89</b>,
+  aggregate <b>34&nbsp;&rarr;&nbsp;101 tok/s</b>. The per-position acceptance is what settles it —
+  evicted K/V should cost the <i>deep</i> positions first, and those are unchanged to the last one.
+  Per-request decode does fall (39.1 &rarr; 17.3 tok/s at c=8); that is queueing, not drafting.
+</p>
+<p class="note">
   <b>The cost side, stated plainly:</b> DFlash2 is the fastest thing here and also the least
   faithful of the speculative paths &mdash; its output tracks the unspeculated reference less
   closely than MTP's does. That is a separate axis from the fidelity column, which measures the
