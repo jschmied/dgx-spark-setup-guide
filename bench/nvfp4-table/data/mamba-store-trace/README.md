@@ -58,3 +58,28 @@ called into the block pool inside a log line (the logging module swallowed the e
 the raw format string, and every request 500'd), and a `logger` reference in
 `single_type_kv_cache_manager.py`, which has no module-level logger. **Check that the module you are
 instrumenting has a logger, and keep log arguments to scalars you already hold.**
+
+## What actually gates it: a default, not a defect
+
+`prefix_cache_retention_interval` defaults to **0**, and per its own docstring 0 "retains only
+semantic checkpoints, including the latest replay boundary and shared-prefix junctions". In
+`MambaManager.reachable_block_mask`, `retention_interval == 0` skips the segment branch, so only
+`reachable_boundaries` get masked `True` — every other boundary state is filed and then never
+hashed. That reconciles everything above: the chunks end where they should, the filings reach every
+boundary, and the mask throws all but the semantic ones away.
+
+Measured on production code with no PR applied, only the interval changed:
+
+| | default (0) | interval = block size |
+|---|---|---|
+| 7 292-token prompt, first hit on request | **3** | **2** |
+| 6 592 (block-aligned), first hit | 3 | 3 |
+| hit amounts | 3 296 / 4 944 | unchanged |
+
+One cold pass saved on unaligned prompts; hit amounts unchanged. The switch is verified by the
+deprecation warning appearing in exactly one of the two arms.
+
+**Not a bug.** A Mamba checkpoint is a full state page, so dense retention costs KV memory at every
+boundary; the default trades reuse depth for memory. But it caps what any store-side fix can show,
+which is worth knowing before reading a null result as a broken patch. Enabling it in production
+should wait for a measurement of what the dense states cost in the 47.5 GiB pool.
