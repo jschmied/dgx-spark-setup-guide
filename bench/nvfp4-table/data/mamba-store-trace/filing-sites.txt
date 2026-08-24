@@ -1,0 +1,8 @@
+FILE_B mgr=FullAttention computed=1600 reprefill=0 finalized=1600 aligned=1600 cached_computed=1600
+FILE_B mgr=FullAttention computed=3200 reprefill=0 finalized=3200 aligned=3200 cached_computed=3200
+FILE_B mgr=FullAttention computed=4800 reprefill=0 finalized=4800 aligned=4800 cached_computed=4800
+FILE_B mgr=FullAttention computed=6400 reprefill=0 finalized=6400 aligned=6400 cached_computed=6400
+FILE_B mgr=Mamba computed=1600 reprefill=0 finalized=1600 aligned=1600 cached_computed=1600
+FILE_B mgr=Mamba computed=3200 reprefill=0 finalized=3200 aligned=3200 cached_computed=3200
+FILE_B mgr=Mamba computed=4800 reprefill=0 finalized=4800 aligned=4800 cached_computed=4800
+FILE_B mgr=Mamba computed=6400 reprefill=0 finalized=6400 aligned=6400 cached_computed=6400
