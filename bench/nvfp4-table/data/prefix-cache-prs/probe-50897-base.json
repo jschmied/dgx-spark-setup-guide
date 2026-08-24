@@ -1,0 +1,56 @@
+{
+ "label": "50897-base",
+ "block": 1600,
+ "res": [
+  {
+   "target": 6400,
+   "aligned": true,
+   "vorhergesagt_mit_rueckstufung": 4800,
+   "runs": [
+    {
+     "n": 1,
+     "s": 55.14,
+     "queries": 6400,
+     "hits": 0
+    },
+    {
+     "n": 2,
+     "s": 2.7,
+     "queries": 6400,
+     "hits": 0
+    },
+    {
+     "n": 3,
+     "s": 1.39,
+     "queries": 6400,
+     "hits": 3200
+    }
+   ]
+  },
+  {
+   "target": 7100,
+   "aligned": false,
+   "vorhergesagt_mit_rueckstufung": 4800,
+   "runs": [
+    {
+     "n": 1,
+     "s": 3.15,
+     "queries": 7100,
+     "hits": 0
+    },
+    {
+     "n": 2,
+     "s": 1.0,
+     "queries": 7100,
+     "hits": 4800
+    },
+    {
+     "n": 3,
+     "s": 1.0,
+     "queries": 7100,
+     "hits": 4800
+    }
+   ]
+  }
+ ]
+}
