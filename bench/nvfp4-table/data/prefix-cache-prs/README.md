@@ -29,3 +29,26 @@ What catches it is a log line inside the code under test. Each arm here writes
 `SCHEDPROBE[<tag>] start=... last_cache=...` from inside `_mamba_block_aligned_split`, so the
 journal proves both *which* tree ran and *what it computed*. Read it **after** the probe: before
 the first request the path has not executed yet.
+
+## Diverged siblings (#53479's falsifiable predictions)
+
+kamb-code's reading of the identical-repeat numbers above is that they cannot show this PR's gains
+on a `0.26.1rc` lookup: the lookup-side drop always caps one block below the deepest state, so
+extra store-side depth is invisible to an exact repeat. He predicted movement on **partially**
+shared prefixes instead, which is the shape agent traffic actually has.
+
+Parent 6 400 tokens, sibling shares N leading tokens and diverges after. Each pair uses its **own**
+corpus region: with one shared parent, the first sibling caches blocks the second one then hits,
+which manufactures a base-line hit that is not there (seen, then removed).
+
+| pair | shared | predicted base | predicted with PR | measured base | measured PR |
+|---|---:|---:|---:|---:|---:|
+| A | 3 400 | 0 | 1 600 | **0** | **0** |
+| B | 5 000 | 0 | 3 200 | **3 200** | **3 200** |
+
+Neither prediction holds here: the PR does not move the sibling that should gain, and the base
+already hits on the sibling that should not. Both arms carry their own `SCHEDPROBE` line, so the
+`last_cache_position` of 4 800 (base) against 6 400 (PR) is on the record for each.
+
+Caveat unchanged: this build predates #52789, so `use_internal_checkpoint` does not exist and the
+PR is applied as its intent for that case rather than verbatim.
