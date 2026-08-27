@@ -565,3 +565,28 @@ The 2026-08-27 cleanup removed `vllm-venv-026`, `-maintest`, `-nightly`, `.cache
 `qwen3-coder-next.service`, recovering **33 GB**. `-nightly` held the DFlash FlashInfer fix;
 it was verified committed on `dflash-quantized-drafter` in `jschmied/vllm` with no unpushed
 commits before deletion.
+
+### PLE CPU offload needs CAP_SYS_PTRACE (yama), and torchcodec must be absent
+
+Two things bite on a bare-metal Flash-Next unit that do not bite in a container run by root:
+
+**1. `pidfd_getfd: Operation not permitted`.** `kernel.yama.ptrace_scope=1` (the DGX OS default)
+restricts `PTRACE_MODE_ATTACH` to descendants. vLLM's `PleOffloadWorker` and its GPU worker are
+*siblings*, so the CUDA-IPC tensor handoff is refused and the engine dies **after** loading all
+206 shards, reporting only `Failed core proc(s): {}`. Having `cap_sys_ptrace` in
+`CapabilityBoundingSet` is not enough — a `User=llm` service holds no effective capabilities:
+
+```ini
+[Service]
+AmbientCapabilities=CAP_SYS_PTRACE
+```
+
+Prefer that over `sysctl kernel.yama.ptrace_scope=0`, which weakens ptrace machine-wide.
+
+**2. Do not install `torchcodec`.** It needs system ffmpeg, which this host lacks. vLLM guards
+the import with `except (ImportError, RuntimeError)`, but an unloadable `.so` raises **`OSError`**
+— so an installed-but-broken torchcodec kills the server at import, while an *absent* one falls
+back cleanly to a placeholder. Only video input is affected.
+
+Verified: the clean bare-metal venv reproduces the container result exactly — 17.0–17.1 tok/s
+against the container's 17.1–17.3, same checkpoint and flags.
