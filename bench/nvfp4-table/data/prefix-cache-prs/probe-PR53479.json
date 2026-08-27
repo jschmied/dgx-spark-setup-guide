@@ -1,0 +1,56 @@
+{
+ "label": "PR53479",
+ "block": 1600,
+ "res": [
+  {
+   "target": 6400,
+   "aligned": true,
+   "vorhergesagt_mit_rueckstufung": 4800,
+   "runs": [
+    {
+     "n": 1,
+     "s": 3.53,
+     "queries": 6400,
+     "hits": 0
+    },
+    {
+     "n": 2,
+     "s": 2.77,
+     "queries": 6400,
+     "hits": 0
+    },
+    {
+     "n": 3,
+     "s": 1.43,
+     "queries": 6400,
+     "hits": 3200
+    }
+   ]
+  },
+  {
+   "target": 7100,
+   "aligned": false,
+   "vorhergesagt_mit_rueckstufung": 4800,
+   "runs": [
+    {
+     "n": 1,
+     "s": 3.15,
+     "queries": 7100,
+     "hits": 0
+    },
+    {
+     "n": 2,
+     "s": 3.12,
+     "queries": 7100,
+     "hits": 0
+    },
+    {
+     "n": 3,
+     "s": 1.08,
+     "queries": 7100,
+     "hits": 4800
+    }
+   ]
+  }
+ ]
+}

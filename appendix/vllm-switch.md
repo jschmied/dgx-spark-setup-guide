@@ -470,3 +470,123 @@ optimum, and consistent with the 35B.
 **Bottom line:** the 27B is a fine *fallback* but a poor primary on GB10 — at ~26 t/s
 (nspec=3) it is still ~3× slower than the 35B-A3B's MTP decode. Keep the 35B as prod;
 the 27B unit stays `disabled`.
+
+---
+
+## A.8 Runtime environment layout (rebuilt 2026-08-27)
+
+Experimental venvs accumulate fast on this box — each vLLM branch build, PR overlay and
+nightly is ~10 GB, and they are easy to leave behind. This is the state after a cleanup,
+and the rules that keep it from re-accumulating.
+
+### What exists
+
+| venv | vLLM | role |
+|---|---|---|
+| `vllm-venv-pr52816` | `0.26.1rc1.dev912+g19c935190` | **PROD** — `vllm-qwen38.service`, DFlash2 branch build |
+| `vllm-venv-027` | `0.27.1` | stable fallback; several `/opt/llm/*.sh` tools reference it |
+| `vllm-venv-fnext` | `0.1.dev20073+g8e685d198` | Qwen3.8-Flash-Next (PR #53896, unmerged) |
+| `convert-venv` | — | model conversion tooling, no vLLM |
+
+Caches follow the venv, not the model: `.cache-027` (20 GB) is prod's `VLLM_CACHE_ROOT`,
+set in `serve-qwen38.sh`; `.cache` is shared. **Delete a venv and its cache goes too** —
+an orphaned JIT cache is pure disk cost.
+
+### Building an env: clone or pin, never resolve loosely
+
+`torch` here is a **local version** (`2.13.0+cu130`) that does not exist on PyPI. A plain
+`python3 -m venv` followed by `pip install vllm` resolves bare `torch` and silently installs
+a build that will not run on this hardware. Two valid approaches:
+
+1. **Clone an existing venv** and upgrade the delta — see `/opt/llm/build-027.sh`. Note the
+   trap: `cp -a` keeps the **original's** absolute shebang in every `bin/` script, so the copy
+   silently runs the source venv's interpreter and site-packages. Rewrite `bin/*` shebangs,
+   `pyvenv.cfg` and `lib/**/*.pth`, then prove it:
+   ```bash
+   head -1 $VENV/bin/vllm                       # must point at THIS venv
+   $VENV/bin/python -c 'import vllm,os;print(os.path.dirname(vllm.__file__))'
+   ```
+2. **Build fresh with the index pinned explicitly** — `/opt/llm/build-fnext.sh`:
+   ```bash
+   pip install --index-url https://download.pytorch.org/whl/cu130 \
+     torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130
+   ```
+   Assert `+cu130` **before and after** installing everything else — a later dependency can
+   quietly pull a different torch.
+
+### When the model is not in any released wheel
+
+Flash-Next lives in PR #53896, which is open: not in mainline, not in a nightly wheel. The
+only build that has it is the official image `vllm/vllm-openai:qwen38-flash-next`. The recipe
+that keeps this honest rather than turning into a container copy:
+
+- pin **every** dependency to that image's `pip freeze`, installed normally from PyPI and the
+  cu130 index;
+- copy only what is genuinely not publicly resolvable — `vllm` and `deep_ep`, both local
+  wheels in the image;
+- record why, in `PROVENANCE.txt` inside the venv, with the condition for undoing it (*if
+  #53896 merges, install a normal wheel and delete the copy step*).
+
+Three of the image's 263 packages are Ubuntu **system-python** artifacts that pip cannot build
+(`dbus-python`, `PyGObject`, `python-apt`). Exclude them **by name**, never by ignoring errors:
+a silent skip is indistinguishable from a missing dependency later.
+
+Install the pinned set **one package at a time with `--no-deps`**. The freeze is a complete
+closure, so per-package installation is correct — and unlike `pip install -r`, it does not
+abort the entire run on the first failure. You get every unresolvable package in one pass
+instead of discovering them one rebuild at a time. (`flashinfer-cubin==0.6.17` is one: the
+image built with `uv` across several indexes, and PyPI only has up to 0.6.13.)
+
+### Dropping envs safely
+
+`/opt/llm/purge-stale-envs.sh` — dry run by default, `--apply` to delete. It refuses to run if
+prod is down, if any delete-list path is what prod is currently running, or if a keep-listed
+path appears in the delete arrays.
+
+Before deleting any venv, **check it for local modifications**, because a patched file that
+exists nowhere else is lost with it:
+
+```bash
+P=$VENV/lib/python3.12/site-packages/vllm
+ref=$(stat -c %Y $P/__init__.py)
+find $P -name '*.py' -newermt "@$((ref+3600))"     # edited well after install
+find $P \( -name '*.orig' -o -name '*.bak' -o -name '*.rej' \)
+```
+
+Then confirm each modification is recoverable — a public PR can be re-fetched; **our own**
+work must be committed *and pushed*:
+
+```bash
+git -C ~/vllm-fork log --branches --not --remotes --oneline   # must be empty
+```
+
+The 2026-08-27 cleanup removed `vllm-venv-026`, `-maintest`, `-nightly`, `.cache-026`,
+`.cache-flashnext` and the dead units `vllm.service`, `vllm-27b-dflash.service.d` and
+`qwen3-coder-next.service`, recovering **33 GB**. `-nightly` held the DFlash FlashInfer fix;
+it was verified committed on `dflash-quantized-drafter` in `jschmied/vllm` with no unpushed
+commits before deletion.
+
+### PLE CPU offload needs CAP_SYS_PTRACE (yama), and torchcodec must be absent
+
+Two things bite on a bare-metal Flash-Next unit that do not bite in a container run by root:
+
+**1. `pidfd_getfd: Operation not permitted`.** `kernel.yama.ptrace_scope=1` (the DGX OS default)
+restricts `PTRACE_MODE_ATTACH` to descendants. vLLM's `PleOffloadWorker` and its GPU worker are
+*siblings*, so the CUDA-IPC tensor handoff is refused and the engine dies **after** loading all
+206 shards, reporting only `Failed core proc(s): {}`. Having `cap_sys_ptrace` in
+`CapabilityBoundingSet` is not enough — a `User=llm` service holds no effective capabilities:
+
+```ini
+[Service]
+AmbientCapabilities=CAP_SYS_PTRACE
+```
+
+Prefer that over `sysctl kernel.yama.ptrace_scope=0`, which weakens ptrace machine-wide.
+
+**2. Do not install `torchcodec`.** It needs system ffmpeg, which this host lacks. vLLM guards
+the import with `except (ImportError, RuntimeError)`, but an unloadable `.so` raises **`OSError`**
+— so an installed-but-broken torchcodec kills the server at import, while an *absent* one falls
+back cleanly to a placeholder. Only video input is affected.
+
+Verified: the clean bare-metal venv reproduces the container result exactly — 17.0–17.1 tok/s
+against the container's 17.1–17.3, same checkpoint and flags.

@@ -1,0 +1,38 @@
+PROD GESTOPPT 14:05:24
+=== ARM BASE (14:05:24) ===
+  Prompt: 6400 Token (Ziel 6400)
+  send 1: hits +0
+  send 2: hits +0
+  send 3: hits +3200
+  --- Spur ---
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=0 Mamba+eagledrop=0
+    SCHEDPROBE[BASE] start=0 num_new=6400 block=1600 last_cache=4800
+    SCHEDPROBE[BASE] start=4800 num_new=1600 block=1600 last_cache=4800
+    STOREPROBE req=cmpl-be5 num_computed=6400 num_tokens=6401
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=3200 Mamba+eagledrop=0
+    SCHEDPROBE[BASE] start=0 num_new=6400 block=1600 last_cache=4800
+    SCHEDPROBE[BASE] start=3200 num_new=3200 block=1600 last_cache=4800
+    SCHEDPROBE[BASE] start=4800 num_new=1600 block=1600 last_cache=4800
+    STOREPROBE req=cmpl-a5e num_computed=6400 num_tokens=6401
+    HITPROBE max=6399 final=3200 | FullAttention+eagledrop=3200 Mamba+eagledrop=3200
+    SCHEDPROBE[BASE] start=3200 num_new=3200 block=1600 last_cache=4800
+    STOREPROBE req=cmpl-a0d num_computed=6400 num_tokens=6401
+=== ARM PR (14:20:50) ===
+  Prompt: 6400 Token (Ziel 6400)
+  send 1: hits +0
+  send 2: hits +0
+  send 3: hits +3200
+  --- Spur ---
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=0 Mamba+eagledrop=0
+    SCHEDPROBE[PR53479] start=0 num_new=6400 block=1600 last_cache=6400
+    SCHEDPROBE[PR53479] start=1600 num_new=4800 block=1600 last_cache=6400
+    SCHEDPROBE[PR53479] start=3200 num_new=3200 block=1600 last_cache=6400
+    SCHEDPROBE[PR53479] start=4800 num_new=1600 block=1600 last_cache=6400
+    STOREPROBE req=cmpl-9d7 num_computed=6400 num_tokens=6401
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=3200 Mamba+eagledrop=0
+    SCHEDPROBE[PR53479] start=0 num_new=6400 block=1600 last_cache=6400
+    SCHEDPROBE[PR53479] start=1600 num_new=4800 block=1600 last_cache=6400
+    STOREPROBE req=cmpl-ba4 num_computed=6400 num_tokens=6401
+    HITPROBE max=6399 final=3200 | FullAttention+eagledrop=3200 Mamba+eagledrop=3200
+    STOREPROBE req=cmpl-b01 num_computed=6400 num_tokens=6401
+ALL DONE

@@ -1,0 +1,157 @@
+PROD GESTOPPT 16:01:33
+=== ARM BASE (16:01:33) ===
+  send 3: hits +3200
+  --- Trennungstest: Eltern EINMAL, dann Geschwister B (5000 geteilt) ---
+  parent (1x): hits +0
+  sibling B (6400 Token, Praefix ok=True): hits +0
+  --- Spur ---
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=0 Mamba+eagledrop=0
+    SCHEDPROBE[BASE] start=0 num_new=6400 block=1600 last_cache=4800
+    MSTORE tokens=4800 bs=1600 full=3 cached 0->3 blocks=6 null=2 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 0->3 blocks=6 null=2 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 0->3 blocks=6 null=2 nohash=3
+    SCHEDPROBE[BASE] start=4800 num_new=1600 block=1600 last_cache=4800
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=2 nohash=4
+    STOREPROBE req=cmpl-b26 num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=2 nohash=4
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=3200 Mamba+eagledrop=0
+    SCHEDPROBE[BASE] start=0 num_new=6400 block=1600 last_cache=4800
+    MSTORE tokens=3200 bs=1600 full=2 cached 0->2 blocks=5 null=1 nohash=3
+    MSTORE tokens=3200 bs=1600 full=2 cached 0->2 blocks=5 null=1 nohash=3
+    MSTORE tokens=3200 bs=1600 full=2 cached 0->2 blocks=5 null=1 nohash=3
+    SCHEDPROBE[BASE] start=3200 num_new=3200 block=1600 last_cache=4800
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    SCHEDPROBE[BASE] start=4800 num_new=1600 block=1600 last_cache=4800
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    STOREPROBE req=cmpl-a43 num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    HITPROBE max=6399 final=3200 | FullAttention+eagledrop=3200 Mamba+eagledrop=3200
+    SCHEDPROBE[BASE] start=3200 num_new=3200 block=1600 last_cache=4800
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    STOREPROBE req=cmpl-827 num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=0 Mamba+eagledrop=0
+    MSTORE tokens=4800 bs=1600 full=3 cached 0->3 blocks=6 null=2 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 0->3 blocks=6 null=2 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 0->3 blocks=6 null=2 nohash=3
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=2 nohash=4
+    STOREPROBE req=cmpl-b3d num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=2 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=2 nohash=4
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=3200 Mamba+eagledrop=0
+    MSTORE tokens=3200 bs=1600 full=2 cached 0->2 blocks=5 null=1 nohash=3
+    MSTORE tokens=3200 bs=1600 full=2 cached 0->2 blocks=5 null=1 nohash=3
+    MSTORE tokens=3200 bs=1600 full=2 cached 0->2 blocks=5 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    STOREPROBE req=cmpl-8e0 num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+=== ARM PR (16:16:53) ===
+  send 3: hits +3200
+  --- Trennungstest: Eltern EINMAL, dann Geschwister B (5000 geteilt) ---
+  parent (1x): hits +0
+  sibling B (6400 Token, Praefix ok=True): hits +0
+  --- Spur ---
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=0 Mamba+eagledrop=0
+    SCHEDPROBE[PR53479] start=0 num_new=6400 block=1600 last_cache=6400
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    SCHEDPROBE[PR53479] start=1600 num_new=4800 block=1600 last_cache=6400
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=5
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=5
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=5
+    SCHEDPROBE[PR53479] start=3200 num_new=3200 block=1600 last_cache=6400
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=5
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=5
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=5
+    SCHEDPROBE[PR53479] start=4800 num_new=1600 block=1600 last_cache=6400
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=5
+    STOREPROBE req=cmpl-bf4 num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=5
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=3200 Mamba+eagledrop=0
+    SCHEDPROBE[PR53479] start=0 num_new=6400 block=1600 last_cache=6400
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    SCHEDPROBE[PR53479] start=1600 num_new=4800 block=1600 last_cache=6400
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=4
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=4
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=4
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=4
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=4
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    STOREPROBE req=cmpl-bad num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    HITPROBE max=6399 final=3200 | FullAttention+eagledrop=3200 Mamba+eagledrop=3200
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=1 nohash=3
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=4
+    STOREPROBE req=cmpl-b3c num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=4
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=0 Mamba+eagledrop=0
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=5
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=5
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=5
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=5
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=5
+    MSTORE tokens=4800 bs=1600 full=3 cached 2->3 blocks=6 null=0 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 3->4 blocks=7 null=1 nohash=5
+    STOREPROBE req=cmpl-84c num_computed=6400 num_tokens=6401
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=5
+    MSTORE tokens=6400 bs=1600 full=4 cached 4->4 blocks=7 null=1 nohash=5
+    HITPROBE max=6399 final=0 | FullAttention+eagledrop=3200 Mamba+eagledrop=0
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=1600 bs=1600 full=1 cached 0->1 blocks=4 null=0 nohash=4
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=4
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=4
+    MSTORE tokens=3200 bs=1600 full=2 cached 1->2 blocks=5 null=0 nohash=4
+    STOREPROBE req=cmpl-847 num_computed=6400 num_tokens=6401
+ALL DONE

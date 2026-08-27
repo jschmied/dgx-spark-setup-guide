@@ -1,0 +1,56 @@
+{
+ "label": "BASIS (main 10.08.)",
+ "block": 1600,
+ "res": [
+  {
+   "target": 6400,
+   "aligned": true,
+   "vorhergesagt_mit_rueckstufung": 4800,
+   "runs": [
+    {
+     "n": 1,
+     "s": 1.43,
+     "queries": 6400,
+     "hits": 3200
+    },
+    {
+     "n": 2,
+     "s": 1.43,
+     "queries": 6400,
+     "hits": 3200
+    },
+    {
+     "n": 3,
+     "s": 1.43,
+     "queries": 6400,
+     "hits": 3200
+    }
+   ]
+  },
+  {
+   "target": 7100,
+   "aligned": false,
+   "vorhergesagt_mit_rueckstufung": 4800,
+   "runs": [
+    {
+     "n": 1,
+     "s": 3.29,
+     "queries": 7100,
+     "hits": 0
+    },
+    {
+     "n": 2,
+     "s": 3.13,
+     "queries": 7100,
+     "hits": 0
+    },
+    {
+     "n": 3,
+     "s": 1.04,
+     "queries": 7100,
+     "hits": 4800
+    }
+   ]
+  }
+ ]
+}

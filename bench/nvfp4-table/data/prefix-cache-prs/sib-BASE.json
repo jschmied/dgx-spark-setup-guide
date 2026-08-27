@@ -1,0 +1,22 @@
+{
+ "label": "BASE",
+ "parent": 6400,
+ "res": [
+  {
+   "shared": 3400,
+   "sibling_tokens": 6400,
+   "prefix_verified": true,
+   "queries": 6400,
+   "hits": 0,
+   "s": 2.76
+  },
+  {
+   "shared": 5000,
+   "sibling_tokens": 6400,
+   "prefix_verified": true,
+   "queries": 6400,
+   "hits": 3200,
+   "s": 1.44
+  }
+ ]
+}

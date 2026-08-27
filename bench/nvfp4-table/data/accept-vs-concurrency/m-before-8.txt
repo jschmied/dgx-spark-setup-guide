@@ -1,0 +1,10 @@
+vllm:spec_decode_num_drafts_total 4092.0
+vllm:spec_decode_num_draft_tokens_total 28644.0
+vllm:spec_decode_num_accepted_tokens_total 12150.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total 3294.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total 2563.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total 2032.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total 1607.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total 1170.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total 858.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total 626.0

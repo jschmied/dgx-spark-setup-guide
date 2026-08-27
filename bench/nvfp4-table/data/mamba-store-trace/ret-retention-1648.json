@@ -1,0 +1,56 @@
+{
+ "label": "retention-1648",
+ "block": 1648,
+ "res": [
+  {
+   "target": 6592,
+   "aligned": true,
+   "vorhergesagt_mit_rueckstufung": 4944,
+   "runs": [
+    {
+     "n": 1,
+     "s": 3.21,
+     "queries": 6592,
+     "hits": 0
+    },
+    {
+     "n": 2,
+     "s": 3.38,
+     "queries": 6592,
+     "hits": 0
+    },
+    {
+     "n": 3,
+     "s": 2.08,
+     "queries": 6592,
+     "hits": 3296
+    }
+   ]
+  },
+  {
+   "target": 7292,
+   "aligned": false,
+   "vorhergesagt_mit_rueckstufung": 4944,
+   "runs": [
+    {
+     "n": 1,
+     "s": 3.16,
+     "queries": 7292,
+     "hits": 0
+    },
+    {
+     "n": 2,
+     "s": 1.04,
+     "queries": 7292,
+     "hits": 4944
+    },
+    {
+     "n": 3,
+     "s": 1.04,
+     "queries": 7292,
+     "hits": 4944
+    }
+   ]
+  }
+ ]
+}
