@@ -590,3 +590,65 @@ back cleanly to a placeholder. Only video input is affected.
 
 Verified: the clean bare-metal venv reproduces the container result exactly — 17.0–17.1 tok/s
 against the container's 17.1–17.3, same checkpoint and flags.
+
+### Check what your runtime dispatches before downloading a quantized checkpoint
+
+A quantization format the runtime **rejects** gives you an error. One it does not **recognise**
+silently reinterprets the bytes. The second is far more dangerous, and it is a ten-second offline
+check.
+
+ModelOpt `MIXED_PRECISION` checkpoints declare a `quant_algo` per layer group.
+`ModelOptMixedPrecisionConfig.get_quant_method()` dispatches a fixed list and then falls through
+to `UnquantizedLinearMethod()`, which loads packed low-precision bytes into BF16 parameters. No
+error, no warning, fluent garbage.
+
+```bash
+# what does this vLLM dispatch?
+$VENV/bin/python - <<'EOF'
+import re, vllm.model_executor.layers.quantization.modelopt as m
+s = open(m.__file__).read()
+i = s.index("class ModelOptMixedPrecisionConfig"); j = s.index("def get_quant_method", i)
+print(sorted(set(re.findall(r'quant_algo == "([A-Z0-9_]+)"', s[j:j+2600]))))
+EOF
+
+# what does the checkpoint declare?
+jq -r '.quantization.quantized_layers[].quant_algo' hf_quant_config.json | sort -u
+```
+
+The second list must be a subset of the first. On 2026-08-27 our snapshot
+(`0.1.dev20073+g8e685d198`) dispatched `FP8, MXFP8, NVFP4, W4A16_NVFP4` but **not** `FP8_PB_WO`
+(blockwise 128x128 weight-only), which `lovedheart/Qwen3.8-Flash-Next-NVFP4-FP8` uses for its
+attention and GDN projections. vLLM `main` has the branch and the method class already existed in
+our tree, so the fix was one line:
+
+```python
+if quant_algo == "FP8_PB_WO":
+    return ModelOptFp8PbWoLinearMethod(self.fp8_config)
+```
+
+`ModelOptFp8PbWoLinearMethod` additionally requires **both** matrix dimensions divisible by 128 —
+check the checkpoint's own shapes (its `fp8_quant_report.csv`, or the safetensors headers) before
+committing to a download.
+
+Related, from the same family: `MIXED_PRECISION` reads **`quantized_layers`**, not
+`config_groups`. A checkpoint declaring the latter yields a W4A4 kernel with no `input_scale` and
+zero-length output, also silently.
+
+### Diff two HF repos before downloading either
+
+HuggingFace publishes `lfs.sha256` alongside file sizes, so two checkpoints can be diffed exactly
+for the cost of two API calls. Quantization repos are usually **forks** — someone re-does one axis
+and leaves the expensive bulk untouched.
+
+```bash
+for r in RepoA RepoB; do
+  curl -s "https://huggingface.co/api/models/$r?blobs=true" \
+    | jq -r '.siblings[]|select(.lfs)|"\(.lfs.sha256)  \(.rfilename)"' | sort > /tmp/$r.sums
+done
+join -j2 /tmp/RepoA.sums /tmp/RepoB.sums | awk '$2!=$3{print $1}'
+```
+
+Switching from `RadixArk/Qwen3.8-Flash-Next-NVFP4` to `lovedheart/…-NVFP4-FP8` looked like a
+123.4 GiB download; 202 of 206 shards were byte-identical, so it was **12.45 GiB** plus hardlinks,
+which cost zero disk. Verify all 206 against the *new* repo's hashes afterwards — a hardlink is
+only as trustworthy as the file it points at.
