@@ -652,3 +652,94 @@ Switching from `RadixArk/Qwen3.8-Flash-Next-NVFP4` to `lovedheart/…-NVFP4-FP8`
 123.4 GiB download; 202 of 206 shards were byte-identical, so it was **12.45 GiB** plus hardlinks,
 which cost zero disk. Verify all 206 against the *new* repo's hashes afterwards — a hardlink is
 only as trustworthy as the file it points at.
+
+---
+
+## A.9 Quantization coverage is the decode lever on GB10
+
+The single most productive thing we measured on this box in August 2026: for a sparse-MoE model,
+**decode speed is set by the DENSE parameters, not the experts** — and most published checkpoints
+leave them alone.
+
+### The arithmetic
+
+`Qwen3.8-Flash-Next` is "125B total, 6B active". On `RadixArk/Qwen3.8-Flash-Next-NVFP4`:
+
+| component | params | bytes/param | GB/token |
+|---|---:|---:|---:|
+| dense weights (BF16, **unquantized**) | 4.84 B | 2.00 | **9.68** |
+| active experts (NVFP4, correct) | 2.36 B | 0.55 | 1.30 |
+| | | | **10.98** |
+
+An A6B model moving **11 GB/token** when it should move ~4. The BF16 dense weights are 79% of the
+bytes and only 67% of the parameters. A torch profile agrees independently: **69% of single-stream
+wall time is cuBLAS BF16 mat-vec (GEMV)**, against 0.8% for the properly-quantized experts.
+
+Switching to a checkpoint that quantizes the attention and GDN projections to FP8
+(`lovedheart/Qwen3.8-Flash-Next-NVFP4-FP8`) gave **+39% single-stream and +55% at c=4, at no
+measurable quality cost** (NLL/token 0.7610 vs 0.7748 on identical held-out chunks) — and it is
+*smaller*, 74.13 GiB vs 76.61, which buys 2.5 GiB more KV.
+
+### Check coverage before blaming the engine
+
+For any quantized checkpoint, read the dtype census straight from the safetensors headers and ask
+which groups are **read on every token**:
+
+```bash
+python - <<'EOF'
+import json, struct, os, collections
+M = "/path/to/checkpoint"
+idx = json.load(open(f"{M}/model.safetensors.index.json"))["weight_map"]
+agg = collections.Counter()
+for f in sorted(set(idx.values())):
+    with open(os.path.join(M, f), "rb") as fh:
+        n = struct.unpack("<Q", fh.read(8))[0]
+        hdr = json.loads(fh.read(n))
+    for k, v in hdr.items():
+        if k == "__metadata__": continue
+        c = 1
+        for s in v.get("shape", []): c *= s
+        agg[(k.split(".")[-2] if "." in k else k, v["dtype"])] += c
+EOF
+```
+
+Three groups are **not** per-token reads and must be excluded from the roofline, or you will
+overstate it — as we did:
+
+- the **vision tower** (only with an image),
+- **`embed_tokens`** (one row per token, not the matrix),
+- the **MTP drafter** (only when speculating), and expert weights left in BF16 (sparse, 10/512).
+
+### Speculation and quantization are substitutes
+
+Both amortize the same per-token weight read. Measured on the same box:
+
+| | c=1 | c=8 |
+|---|---|---|
+| MTP k=2 on the BF16-dense checkpoint | +67% | +2% |
+| MTP k=2 on the FP8-dense checkpoint | **+23%** | **−6%** |
+
+Having shrunk the read, there is less for speculation to recover, while its drafting cost is
+unchanged — so above c≈4 it becomes a **net loss**. Acceptance is identical (2.15 vs 2.16), so
+this is the target getting cheaper, not the drafter getting worse. **Do not stack every
+optimization**; pick by concurrency.
+
+### GB10-specific requirements for blockwise-FP8 weights
+
+Both are silent-or-cryptic and neither is documented upstream:
+
+```bash
+export VLLM_USE_DEEP_GEMM=0          # else CUDA "unspecified launch failure"
+export VLLM_GDN_DECODE_KERNEL=triton # else the engine hangs at concurrency ~32
+```
+
+`support_deep_gemm()` accepts the whole `120` capability family, and GB10 is sm_121 — so vLLM
+reports DeepGEMM supported, routes blockwise FP8 to it, and the kernel faults during the startup
+profile run (vllm#54125). This is reachable **only** through blockwise-FP8 weights, so it appears
+exactly when you adopt the checkpoint class that helps most.
+
+### And log the clock
+
+GB10 parks bandwidth-bound decode at **~82% of max SM clock** (2411-2522 MHz against 3003) and
+locking does not move it. Comparisons within one box are unaffected; quoting a single absolute
+tok/s figure against another project is not. Log `clocks.sm` beside any decode benchmark.
