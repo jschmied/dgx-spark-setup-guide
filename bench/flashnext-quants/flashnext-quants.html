@@ -247,9 +247,12 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
         small half of the model and dominates the clock.</p></div>
 
       <div class="sidebox"><span class="h">Why the hyper-connections resist</span>
-        <p>Three independent blockers: the model hardcodes <code>quant_config=None</code>;
-        the shapes are (320, 10240) and <span class="num">320 % 128 = 64</span>, so blockwise FP8
-        cannot express them; and no MXFP8 kernel on sm_121 accepts them.</p></div>
+        <p>The model hardcodes <code>quant_config=None</code>. The 128-divisibility turned out to be
+        a <em>constant</em>, not a kernel limit — Triton takes the block size at runtime, and blocks
+        need not be square. But the down-projection is built as a fused
+        <span class="num">[320, 4, 12] = 336</span> layer, and a blockwise scale cannot span a
+        fusion boundary when one shard is 4 wide. The <code>_up</code> half is unfused and
+        quantizable.</p></div>
 
       <div class="sidebox"><span class="h">Position decides composition</span>
         <p><code>lm_head</code> is evaluated once per <em>draft token</em>, so quantizing it
@@ -395,6 +398,35 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <p class="lede" style="font-size:13.5px">Acceptance is unchanged across both (mean accepted length
   2.15 → 2.21), so this is pure speed rather than better drafting. Quantizing the head flipped
   speculation from a net loss at high concurrency to a net gain.</p>
+</section>
+
+<section>
+  <h2>A constant that blocks a layer class on every GPU</h2>
+  <p><code>ModelOptFp8PbWoLinearMethod</code> refuses any layer whose dimensions are not both
+  divisible by 128. We assumed that reflected the kernel. It does not —
+  <code>TritonFp8BlockScaledMMKernel</code> declares <strong>no shape constraint at all</strong>
+  and passes the block size through as a runtime list; the Triton kernel takes
+  <code>group_n</code>/<code>group_k</code> as runtime arguments. Cutlass validates only the
+  <em>activation</em> group shape.</p>
+  <div class="blk">
+    <div class="blkrow"><span class="blkn num">1</span><span class="blkb">
+      <span>The 128 lives in one class constant</span>
+      <span class="why"><code>_WEIGHT_BLOCK_SIZE = (128, 128)</code> — one line makes a layer class unquantizable everywhere, not just on sm_121.</span></span></div>
+    <div class="blkrow"><span class="blkn num">2</span><span class="blkb">
+      <span>Blocks need not be square</span>
+      <span class="why"><span class="num">(320, 10240)</span> wants <span class="num">(64, 128)</span>; <span class="num">(10240, 320)</span> wants <span class="num">(128, 64)</span>. Assuming square silently handles half the tensors.</span></span></div>
+    <div class="blkrow"><span class="blkn num">3</span><span class="blkb">
+      <span>But fusion is a real blocker</span>
+      <span class="why">The down-projection is a <code>MergedColumnParallelLinear</code> of <span class="num">[320, 4, 12] = 336</span>. A blockwise scale cannot span a fusion boundary when one shard is 4 wide — no block size divides 4, 320 and 12 together.</span></span></div>
+  </div>
+  <div class="callout">
+    <span class="h">Checkpoint shapes are not runtime shapes</span>
+    <p>We reasoned about <span class="num">(320, 10240)</span> read from the checkpoint headers for a
+    day. The layer vLLM actually builds is <strong>336</strong> wide, and that number appears
+    nowhere until the error message. Same class of mistake as reading
+    <code>hf_quant_config.json</code> when vLLM reads <code>config.json</code>: the artefact you
+    inspect is not the artefact the code consumes.</p>
+  </div>
 </section>
 
 <section>
