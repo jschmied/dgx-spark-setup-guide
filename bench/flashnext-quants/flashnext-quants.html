@@ -59,6 +59,7 @@ section{display:flex;flex-direction:column;gap:18px}
 .v .val{font-family:Archivo,sans-serif;font-size:25px;font-weight:700;letter-spacing:-.02em;
   font-variant-numeric:tabular-nums}
 .v .note{font-size:13px;color:var(--ink-2)}
+p.note{font-size:13px;color:var(--ink-2);margin-top:-4px}
 
 /* table */
 .scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--card)}
@@ -242,9 +243,14 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
         <span class="dot d-none"></span> not a per-token cost, or untouched</p></div>
 
       <div class="sidebox"><span class="h">The counter-intuitive part</span>
-        <p>The <strong>experts are 96% of the parameters and 19% of the per-token bytes</strong> —
-        they are properly NVFP4 and only 10 of 512 are read. The <strong>dense</strong> path is the
-        small half of the model and dominates the clock.</p></div>
+        <p>At <strong>single stream</strong> the experts are 96% of the parameters and
+        <strong>20% of the per-token bytes</strong> — properly NVFP4, and only 10 of 512 are read.
+        The <strong>dense</strong> path is the small half of the model and dominates the clock.
+        <em>This reverses under load</em> — see below.</p>
+        <p style="margin-top:9px">Sharper still: <strong>GDN linear attention costs
+        <span class="num">1.95</span> GiB per token — more than all ten active experts
+        together (<span class="num">1.24</span>)</strong>. The largest single item in this
+        model is not the MoE.</p></div>
 
       <div class="sidebox"><span class="h">Why the hyper-connections resist</span>
         <p>The model hardcodes <code>quant_config=None</code>. The 128-divisibility turned out to be
@@ -260,6 +266,40 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
         so it <strong>competes</strong>.</p></div>
     </div>
   </div>
+</section>
+
+<section>
+  <h2>Whether the experts matter depends entirely on concurrency</h2>
+  <p>The dense scaffolding is read <strong>once per step</strong> and shared by every sequence in
+  the batch. The experts are not: each additional sequence routes to <em>its own</em> ten of 512,
+  so the expert term grows with concurrency while the dense term is amortized away. The answer to
+  &ldquo;do the experts dominate?&rdquo; flips at <strong>c&nbsp;=&nbsp;4</strong>.</p>
+
+  <table>
+    <thead><tr>
+      <th>Concurrency</th><th>Distinct experts / layer</th><th>Experts per step</th>
+      <th>Dense per step</th><th>Expert share</th><th>GiB per token</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td class="n">10</td><td class="n">1.24 GiB</td><td class="n">4.89 GiB</td><td class="n">20%</td><td class="n">6.13</td></tr>
+      <tr><td class="n">2</td><td class="n">20</td><td class="n">2.47 GiB</td><td class="n">4.89 GiB</td><td class="n">34%</td><td class="n">3.68</td></tr>
+      <tr><td class="n">4</td><td class="n">40</td><td class="n">4.94 GiB</td><td class="n">4.89 GiB</td><td class="n">50%</td><td class="n">2.46</td></tr>
+      <tr><td class="n">8</td><td class="n">80</td><td class="n">9.89 GiB</td><td class="n">4.89 GiB</td><td class="n">67%</td><td class="n">1.85</td></tr>
+      <tr><td class="n">16</td><td class="n">160</td><td class="n">19.78 GiB</td><td class="n">4.89 GiB</td><td class="n">80%</td><td class="n">1.54</td></tr>
+      <tr><td class="n">32</td><td class="n">320</td><td class="n">39.55 GiB</td><td class="n">4.89 GiB</td><td class="n">89%</td><td class="n">1.39</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Expert counts are the no-overlap upper bound (<span class="num">min(512, 10c)</span>);
+  real routing overlaps somewhat, so treat these as a ceiling on the expert term. Derived from the
+  <code>fp8head</code> shard headers, not from the model card.</p>
+
+  <p>Two consequences we had not been reasoning about correctly. First, our headline number has
+  always been <strong>c&nbsp;=&nbsp;1</strong>, which is precisely the regime where the experts
+  matter <em>least</em> — every dense lever we pulled was aimed at the 80% that only exists at
+  single stream. Second, it explains the aggregate scaling: throughput rises just
+  <span class="num">4.6&times;</span> across <span class="num">16&times;</span> the concurrency,
+  because bytes per token fall only <span class="num">4.0&times;</span> as the growing expert term
+  eats the amortization.</p>
 </section>
 
 <section>
