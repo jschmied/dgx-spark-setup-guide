@@ -54,6 +54,23 @@ backwards yields fluent garbage, not a crash.
 3003) and locking does not move it. Within-box comparisons are fine; cross-project absolute
 figures are not.
 
+## Record the conditions with every number
+
+The `tok/s c=1` / `c=16` columns were carried forward without recording **input length** or
+**whether speculation was on**. On 2026-08-28 a re-measurement of `fp8head` returned 38.0 at
+c=1 (consistent with the recorded value once MTP is accounted for) but **99.1 aggregate at
+c=16 against a recorded 167.8** — a gap too large to be drift, and impossible to attribute
+without knowing what the original run did. Every future row must carry:
+
+| field | why |
+| --- | --- |
+| `--input-len` | prefill is charged to wall clock, so it drags aggregate t/s hard at c=16 |
+| MTP on/off + k | speculation competes for compute once the batch saturates |
+| `--max-num-seqs` | a low cap silently ceilings concurrency (this cost us a false 33 t/s ceiling once) |
+| decode median *and* aggregate | they diverge by ~10% at c=1 and much more under load |
+
+Treat the historical `c=16` column as unattributed until re-measured.
+
 ## Cross-stack numbers are not comparable
 
 Rows marked `ours` are one box, one method, same day. Field numbers from SGLang or llama.cpp
