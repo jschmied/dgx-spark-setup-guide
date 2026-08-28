@@ -1,0 +1,316 @@
+<title>Flash-Next Quant Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f5f7f9; --card:#ffffff; --ink:#0f1317; --ink-2:#454e57; --ink-3:#6d7883;
+  --rule:#dde3e9; --rule-2:#eaeff3;
+  --teal:#1b6d8f; --teal-soft:#e4eff4;
+  --brass:#8c5a12; --brass-soft:#f6efe2;
+  --bad:#7a2e2e; --bad-soft:#f6e8e8;
+  --good:#1f6b48; --good-soft:#e6f2eb;
+  --b16:#243447; --b8:#3d6f86; --b4:#78a7bb; --bmix:#8c5a12;
+}
+@media (prefers-color-scheme:dark){
+:root:not([data-theme="light"]){
+  --paper:#0e1216; --card:#141a20; --ink:#e8edf2; --ink-2:#a8b4c0; --ink-3:#7c8792;
+  --rule:#242d36; --rule-2:#1b232b;
+  --teal:#6cb6d4; --teal-soft:#17303c;
+  --brass:#d29a4a; --brass-soft:#33280f;
+  --bad:#d98a8a; --bad-soft:#341c1c;
+  --good:#7cc9a1; --good-soft:#17301f;
+  --b16:#9fb4cc; --b8:#6cb6d4; --b4:#b3d6e4; --bmix:#d29a4a;
+}
+}
+:root[data-theme="dark"]{
+  --paper:#0e1216; --card:#141a20; --ink:#e8edf2; --ink-2:#a8b4c0; --ink-3:#7c8792;
+  --rule:#242d36; --rule-2:#1b232b;
+  --teal:#6cb6d4; --teal-soft:#17303c;
+  --brass:#d29a4a; --brass-soft:#33280f;
+  --bad:#d98a8a; --bad-soft:#341c1c;
+  --good:#7cc9a1; --good-soft:#17301f;
+  --b16:#9fb4cc; --b8:#6cb6d4; --b4:#b3d6e4; --bmix:#d29a4a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:56px 28px 96px;display:flex;flex-direction:column;gap:52px}
+h1,h2,h3{font-family:Archivo,"IBM Plex Sans",sans-serif;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,4.4vw,46px);font-weight:700;letter-spacing:-.022em;line-height:1.06}
+h2{font-size:22px;font-weight:600;letter-spacing:-.012em}
+h3{font-size:16px;font-weight:600;letter-spacing:-.005em}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3)}
+.lede{font-size:17px;color:var(--ink-2);max-width:66ch}
+header{display:flex;flex-direction:column;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:26px}
+section{display:flex;flex-direction:column;gap:18px}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+/* decision strip */
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:14px}
+.v{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:16px 18px;
+  display:flex;flex-direction:column;gap:6px;border-top:3px solid var(--teal)}
+.v.ours{border-top-color:var(--brass)}
+.v .k{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3)}
+.v .val{font-family:Archivo,sans-serif;font-size:25px;font-weight:700;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.v .note{font-size:13px;color:var(--ink-2)}
+
+/* table */
+.scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:900px;font-size:13.5px}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--rule-2);white-space:nowrap}
+thead th{background:var(--rule-2);font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  border-bottom:1px solid var(--rule);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.ours{background:var(--brass-soft)}
+tbody tr.dead td{color:var(--ink-3)}
+td.n{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;text-align:right}
+.name{font-weight:600}
+.sub{display:block;font-size:11.5px;color:var(--ink-3);font-weight:400;white-space:normal;max-width:34ch}
+
+/* precision chips: saturation encodes bit width */
+.chip{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+  letter-spacing:.04em;padding:2px 7px;border-radius:2px;color:#fff}
+.c16{background:var(--b16)} .c8{background:var(--b8)} .c4{background:var(--b4);color:#0f1317}
+.cmix{background:var(--bmix)}
+:root[data-theme="dark"] .c16,:root[data-theme="dark"] .c8{color:#0e1216}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .c16,:root:not([data-theme="light"]) .c8{color:#0e1216}}
+
+.tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:2px}
+.t-ours{background:var(--brass-soft);color:var(--brass)}
+.t-dead{background:var(--bad-soft);color:var(--bad)}
+.t-ext{background:var(--teal-soft);color:var(--teal)}
+
+/* bandwidth bars */
+.bw{display:flex;flex-direction:column;gap:10px}
+.bwrow{display:grid;grid-template-columns:190px 1fr 92px;gap:14px;align-items:center}
+.bwlab{font-size:13px;color:var(--ink-2)}
+.bar{height:22px;background:var(--rule-2);border-radius:2px;overflow:hidden;display:flex}
+.seg{height:100%}
+.s-dense{background:var(--b16)} .s-fp8{background:var(--b8)} .s-exp{background:var(--b4)}
+.bwval{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:13px;text-align:right;color:var(--ink-2)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);
+  font-family:"IBM Plex Mono",monospace}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:1px;
+  margin-right:6px;vertical-align:baseline}
+.lg-dense::before{background:var(--b16)} .lg-fp8::before{background:var(--b8)}
+.lg-exp::before{background:var(--b4)}
+
+/* blockers */
+.blk{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:3px;
+  background:var(--card);overflow:hidden}
+.blkrow{display:grid;grid-template-columns:30px 1fr;gap:14px;padding:15px 18px;
+  border-bottom:1px solid var(--rule-2)}
+.blkrow:last-child{border-bottom:none}
+.blkn{font-family:Archivo,sans-serif;font-weight:700;font-size:19px;color:var(--teal);
+  font-variant-numeric:tabular-nums}
+.blkb{display:flex;flex-direction:column;gap:5px}
+.blkb code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--rule-2);
+  padding:1px 5px;border-radius:2px}
+.blkb .why{font-size:13px;color:var(--ink-2)}
+
+.callout{border-left:3px solid var(--brass);background:var(--brass-soft);padding:14px 18px;
+  border-radius:0 3px 3px 0;display:flex;flex-direction:column;gap:7px}
+.callout .h{font-family:Archivo,sans-serif;font-weight:600;font-size:14px}
+.callout p{font-size:13.5px;color:var(--ink-2)}
+footer{border-top:1px solid var(--rule);padding-top:20px;font-size:12.5px;color:var(--ink-3);
+  display:flex;flex-direction:column;gap:7px}
+a{color:var(--teal)}
+a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Qwen3.8-Flash-Next · one DGX Spark · GB10 / sm_121</div>
+  <h1>Flash-Next Quant Map</h1>
+  <p class="lede">A 125B-total / 6B-active model on one 128&nbsp;GB box. Which checkpoint you pick
+  decides both whether it <em>fits</em> and how fast it <em>decodes</em> — and those two are set by
+  different parts of the file.</p>
+</header>
+
+<section>
+  <div class="eyebrow">Where it lands today</div>
+  <div class="verdict">
+    <div class="v"><span class="k">Fits, decodes worst</span><span class="val num">17.1</span>
+      <span class="note">tok/s · RadixArk NVFP4, dense weights left in BF16</span></div>
+    <div class="v"><span class="k">Dense projections in FP8</span><span class="val num">23.7</span>
+      <span class="note">tok/s · lovedheart NVFP4-FP8 — same size, +39%</span></div>
+    <div class="v ours"><span class="k">+ lm_head quantized (ours)</span><span class="val num">26.1</span>
+      <span class="note">tok/s · first on GPU for this model, no quality cost</span></div>
+    <div class="v ours"><span class="k">+ MTP k=2</span><span class="val num">29.2</span>
+      <span class="note">tok/s · speculation, but it stops paying above c≈4</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>The axes that matter</h2>
+  <p>Repo names are actively misleading here — two checkpoints both called “NVFP4” can differ by
+  44&nbsp;GiB and be identical where it counts. Read the dtypes from the safetensors headers, then
+  ask which groups are read <em>on every token</em>.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>Checkpoint</th><th>Dense proj.</th><th>PLE table</th><th>lm_head</th>
+      <th>Size</th><th>Resident</th><th>tok/s c=1</th><th>c=16</th><th></th>
+    </tr></thead>
+    <tbody>
+      <tr class="ours">
+        <td class="name">ours · fp8head<span class="sub">lovedheart + lm_head quantized here</span></td>
+        <td><span class="chip c8">FP8</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c8">FP8</span></td>
+        <td class="n">122.8</td><td class="n">76.5</td><td class="n">26.1</td><td class="n">—</td>
+        <td><span class="tag t-ours">measured</span></td></tr>
+      <tr class="ours">
+        <td class="name">lovedheart · NVFP4-FP8<span class="sub">attention + GDN blockwise FP8</span></td>
+        <td><span class="chip c8">FP8</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">123.4</td><td class="n">74.1</td><td class="n">23.7</td><td class="n">156.0</td>
+        <td><span class="tag t-ours">measured</span></td></tr>
+      <tr>
+        <td class="name">RadixArk · NVFP4<span class="sub">the common baseline</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">125.9</td><td class="n">76.6</td><td class="n">17.1</td><td class="n">131.6</td>
+        <td><span class="tag t-ours">measured</span></td></tr>
+      <tr>
+        <td class="name">RadixArk · via mmap PLE<span class="sub">0xBakeer inference-atlas, same engine build</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">125.9</td><td class="n">—</td><td class="n">33.6</td><td class="n">—</td>
+        <td><span class="tag t-ext">external</span></td></tr>
+      <tr class="dead">
+        <td class="name">local-inference-lab · 4p89<span class="sub">544 quantized layers — the widest coverage published</span></td>
+        <td><span class="chip cmix">MXFP8</span></td><td><span class="chip c4">NVFP4</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">102.4</td><td class="n">—</td><td class="n">—</td><td class="n">—</td>
+        <td><span class="tag t-dead">won't load</span></td></tr>
+      <tr class="dead">
+        <td class="name">Inferact · NVFP4<span class="sub">identical dense BF16 to RadixArk</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c16">BF16</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">170.2</td><td class="n">—</td><td class="n">—</td><td class="n">—</td>
+        <td><span class="tag t-dead">too large</span></td></tr>
+      <tr class="dead">
+        <td class="name">Qwen · Flash-Next<span class="sub">base model</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c16">BF16</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">335.3</td><td class="n">—</td><td class="n">—</td><td class="n">—</td>
+        <td><span class="tag t-dead">too large</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="lede" style="font-size:13.5px">Sizes in GiB. Rows marked <em>measured</em> are one box,
+  one method, same day. The mmap row is external and differs in PLE mechanism, speculation and swap
+  — it is here because it pins the same engine build, not because it is a like-for-like cell.</p>
+</section>
+
+<section>
+  <h2>Why: an “A6B” model was moving 11 GB per token</h2>
+  <p>The experts are quantized properly and cost almost nothing. The <strong>dense</strong>
+  parameters — attention, GDN projections, lm_head, shared expert — are read in full on every
+  token, and most checkpoints leave them in BF16. They are 79% of the bytes and 67% of the
+  parameters.</p>
+  <div class="bw">
+    <div class="bwrow"><span class="bwlab">RadixArk (dense BF16)</span>
+      <span class="bar"><span class="seg s-dense" style="width:88.2%"></span><span class="seg s-exp" style="width:11.8%"></span></span>
+      <span class="bwval">10.98 GB</span></div>
+    <div class="bwrow"><span class="bwlab">lovedheart (attn+GDN FP8)</span>
+      <span class="bar"><span class="seg s-dense" style="width:45.2%"></span><span class="seg s-fp8" style="width:36.8%"></span><span class="seg s-exp" style="width:18.0%"></span></span>
+      <span class="bwval">7.25 GB</span></div>
+    <div class="bwrow"><span class="bwlab">+ lm_head FP8 (ours)</span>
+      <span class="bar"><span class="seg s-dense" style="width:30.4%"></span><span class="seg s-fp8" style="width:49.9%"></span><span class="seg s-exp" style="width:19.7%"></span></span>
+      <span class="bwval">6.61 GB</span></div>
+    <div class="bwrow"><span class="bwlab">if all dense were FP8</span>
+      <span class="bar"><span class="seg s-fp8" style="width:76.1%"></span><span class="seg s-exp" style="width:23.9%"></span></span>
+      <span class="bwval">5.44 GB</span></div>
+  </div>
+  <div class="legend">
+    <span class="lg-dense">dense, BF16</span><span class="lg-fp8">dense, FP8</span>
+    <span class="lg-exp">active experts, NVFP4</span>
+  </div>
+  <p class="lede" style="font-size:13.5px">At GB10’s 273 GB/s these set a floor of 40.2, 26.6 and
+  24.2 ms per token respectively. Three groups are <em>not</em> per-token reads and must be excluded
+  from this arithmetic: the vision tower, <code>embed_tokens</code>, and the MTP drafter. We
+  over-counted our own roofline by including them.</p>
+</section>
+
+<section>
+  <h2>Why nobody had quantized lm_head</h2>
+  <p>It is BF16 in every published GPU checkpoint. Not because it is unsafe — we measured
+  <strong>+11% at no quality cost</strong> — but because three independent pieces of vLLM plumbing
+  block it, and any one alone is sufficient.</p>
+  <div class="blk">
+    <div class="blkrow"><span class="blkn num">1</span><span class="blkb">
+      <span>The model never passes <code>quant_config</code> to <code>ParallelLMHead</code></span>
+      <span class="why">So <code>UnquantizedEmbeddingMethod</code> is installed unconditionally and the checkpoint’s declaration is never consulted.</span></span></div>
+    <div class="blkrow"><span class="blkn num">2</span><span class="blkb">
+      <span><code>config.json</code> is authoritative, and its <code>ignore</code> list contains <code>lm_head</code></span>
+      <span class="why">Editing <code>hf_quant_config.json</code> — the obvious file — changes nothing. The field you read for placement is the field you must write.</span></span></div>
+    <div class="blkrow"><span class="blkn num">3</span><span class="blkb">
+      <span>The vocab loader asserts every tensor is vocab-shaped</span>
+      <span class="why"><code>assert loaded_weight.shape[output_dim] == self.org_vocab_size</code> is true of the weight and false of its <code>[1940, 20]</code> block-scale companion.</span></span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Quality</h2>
+  <p>Two paired comparisons, each on one corpus. They are <strong>not</strong> comparable across
+  rows — different corpora give different absolute NLL, so only the deltas mean anything.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Comparison</th><th>Corpus</th><th>Baseline</th><th>Variant</th><th>Δ</th><th>Reading</th></tr></thead>
+    <tbody>
+      <tr><td class="name">dense BF16 → FP8</td><td class="n">276 tok</td>
+        <td class="n">0.7748</td><td class="n">0.7610</td><td class="n">−1.8%</td>
+        <td>5 of 6 chunks better — no regression</td></tr>
+      <tr class="ours"><td class="name">lm_head BF16 → FP8</td><td class="n">646 tok</td>
+        <td class="n">0.9687</td><td class="n">0.9628</td><td class="n">−0.6%</td>
+        <td>9 of 14 better, 5 worse — mixed signs, i.e. noise</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout">
+    <span class="h">Do not use the published metrics files to compare checkpoints</span>
+    <p><code>gsm8k_metrics.json</code> and <code>aime26_metrics.json</code> are byte-identical
+    (<span class="num">sha256 88766f7e…</span>, same <code>latency_seconds</code> to ten decimals)
+    across a plain NVFP4 build, an FP8 dense-quantized fork of it, <em>and</em> a 512→448
+    expert-pruned variant. The <code>model</code> field inside names the original build. Hash them
+    before letting them inform a decision — we repeated those figures ourselves before checking.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Two environment variables, both mandatory, neither documented</h2>
+  <div class="blk">
+    <div class="blkrow"><span class="blkn num">A</span><span class="blkb">
+      <span><code>VLLM_USE_DEEP_GEMM=0</code></span>
+      <span class="why">DeepGEMM’s gate accepts the whole <code>120</code> capability family, which sm_121 satisfies — so vLLM routes blockwise FP8 to a kernel that then faults with <code>CUDA error: unspecified launch failure</code> during the startup profile run. Falls back to Cutlass and works. <a href="https://github.com/vllm-project/vllm/issues/54125">vllm#54125</a></span></span></div>
+    <div class="blkrow"><span class="blkn num">B</span><span class="blkb">
+      <span><code>VLLM_GDN_DECODE_KERNEL=triton</code></span>
+      <span class="why">With FP8 GDN projections the default CUDA kernel hangs the engine at concurrency ≈32 — no error, requests simply stall.</span></span></div>
+  </div>
+  <p class="lede" style="font-size:13.5px">Both are reachable only through blockwise-FP8 weights, so
+  they appear exactly when you adopt the checkpoint class that helps most.</p>
+</section>
+
+<footer>
+  <div>Measured on one NVIDIA GB10 (DGX Spark, sm_121, 128 GB unified), vLLM
+  <span class="num">0.1.dev20073+g8e685d198</span>, PLE CPU offload, 8192 ctx, no speculation unless
+  stated. Decode is clock-sensitive on this hardware — GB10 parks bandwidth-bound decode at ~82% of
+  max SM clock (<span class="num">2411–2522</span> against <span class="num">3003</span> MHz) and
+  locking does not move it, so absolute figures are not comparable across projects.</div>
+  <div>Sources and raw data: <code>bench/flashnext-quants/</code> in the setup guide ·
+  external row from <a href="https://0xbakeer.github.io/inference-atlas/">inference-atlas</a>.</div>
+</footer>
+
+</div>
