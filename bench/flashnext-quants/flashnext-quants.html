@@ -88,6 +88,34 @@ td.n{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;tex
 .t-dead{background:var(--bad-soft);color:var(--bad)}
 .t-ext{background:var(--teal-soft);color:var(--teal)}
 
+/* architecture schema */
+.arch{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;align-items:start}
+@media(max-width:820px){.arch{grid-template-columns:1fr}}
+.stack{display:flex;flex-direction:column;gap:7px}
+.blk2{border:1px solid var(--rule);border-radius:3px;background:var(--card);padding:11px 14px;
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.blk2 .lbl{display:flex;flex-direction:column;gap:3px;min-width:0}
+.blk2 .t{font-weight:600;font-size:13.5px}
+.blk2 .d{font-size:11.5px;color:var(--ink-3);white-space:normal}
+.blk2 .rt{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.perTok{font-family:"IBM Plex Mono",monospace;font-size:11px;font-variant-numeric:tabular-nums;
+  color:var(--ink-2);white-space:nowrap}
+.rep{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;
+  color:var(--ink-3);text-transform:uppercase;padding:6px 0 2px}
+.brace{border-left:2px solid var(--rule);margin-left:6px;padding-left:12px;
+  display:flex;flex-direction:column;gap:7px}
+.side{display:flex;flex-direction:column;gap:12px}
+.sidebox{border:1px solid var(--rule);border-radius:3px;background:var(--card);padding:13px 15px;
+  display:flex;flex-direction:column;gap:7px}
+.sidebox .h{font-family:Archivo,sans-serif;font-weight:600;font-size:13px}
+.sidebox p{font-size:12.5px;color:var(--ink-2);margin:0}
+.k-ours{border-left:3px solid var(--brass)}
+.k-blocked{border-left:3px solid var(--bad)}
+.k-done{border-left:3px solid var(--good)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.d-done{background:var(--good)} .d-ours{background:var(--brass)} .d-block{background:var(--bad)}
+.d-none{background:var(--ink-3)}
+
 /* bandwidth bars */
 .bw{display:flex;flex-direction:column;gap:10px}
 .bwrow{display:grid;grid-template-columns:190px 1fr 92px;gap:14px;align-items:center}
@@ -153,6 +181,85 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
+  <h2>What the model is, and where the bytes are</h2>
+  <p>48 layers in 12 repeats of <strong>3 × Gated&nbsp;DeltaNet → 1 × Qwen&nbsp;Sparse&nbsp;Attention</strong>,
+  512 experts with 10 active, and an n-gram table injected near the bottom of the stack. The colour
+  on the right is quantization state; the figure beside it is what that group costs
+  <em>per decoded token</em>.</p>
+
+  <div class="arch">
+    <div class="stack">
+
+      <div class="blk2 k-done"><span class="lbl"><span class="t">embed_tokens</span>
+        <span class="d">248,320 × 2,560 — one row read per token, not the matrix</span></span>
+        <span class="rt"><span class="perTok">~0</span><span class="dot d-none"></span></span></div>
+
+      <div class="blk2 k-blocked"><span class="lbl"><span class="t">PLE / n-gram table</span>
+        <span class="d">20 M n-grams × 16 heads × 160 dims, 128 shards — 47.7 GiB, offloaded. 16 rows per token = 2.5 KB, but 16 page faults</span></span>
+        <span class="rt"><span class="perTok">~0 GB</span><span class="dot d-done"></span></span></div>
+
+      <div class="rep">× 12 repeats — 48 layers</div>
+      <div class="brace">
+        <div class="blk2"><span class="lbl"><span class="t">3 × Gated DeltaNet <span style="font-weight:400;color:var(--ink-3)">(linear attention)</span></span>
+          <span class="d">in_proj_qkv / in_proj_z / out_proj — 36 layers</span></span>
+          <span class="rt"><span class="perTok">1.13 GB</span><span class="dot d-ours"></span></span></div>
+
+        <div class="blk2"><span class="lbl"><span class="t">1 × QSA <span style="font-weight:400;color:var(--ink-3)">(sparse full attention)</span></span>
+          <span class="d">24 Q / 2 KV heads, head_dim 256 — 12 layers</span></span>
+          <span class="rt"><span class="perTok">1.54 GB</span><span class="dot d-ours"></span></span></div>
+
+        <div class="blk2"><span class="lbl"><span class="t">MoE — 512 experts, top-10</span>
+          <span class="d">moe_intermediate 640; only 10 of 512 read per token</span></span>
+          <span class="rt"><span class="perTok">1.30 GB</span><span class="dot d-done"></span></span></div>
+
+        <div class="blk2"><span class="lbl"><span class="t">shared_expert</span>
+          <span class="d">640 intermediate — dense, runs on every token</span></span>
+          <span class="rt"><span class="perTok">0.47 GB</span><span class="dot d-none"></span></span></div>
+
+        <div class="blk2 k-blocked"><span class="lbl"><span class="t">hyper-connections</span>
+          <span class="d">hc_count 4, lowrank 320 — (320, 10240) mixing of residual streams, 2 per layer</span></span>
+          <span class="rt"><span class="perTok">1.32 GB</span><span class="dot d-block"></span></span></div>
+      </div>
+
+      <div class="blk2 k-ours"><span class="lbl"><span class="t">lm_head</span>
+        <span class="d">248,320 × 2,560 — full matrix every token, and once per <em>draft</em> token under MTP</span></span>
+        <span class="rt"><span class="perTok">1.27 → 0.64 GB</span><span class="dot d-ours"></span></span></div>
+
+      <div class="blk2"><span class="lbl"><span class="t">MTP drafter <span style="font-weight:400;color:var(--ink-3)">(1 layer)</span></span>
+        <span class="d">shares lm_head — only read when speculating</span></span>
+        <span class="rt"><span class="perTok">—</span><span class="dot d-none"></span></span></div>
+
+      <div class="blk2"><span class="lbl"><span class="t">vision tower <span style="font-weight:400;color:var(--ink-3)">(27 layers, 1152)</span></span>
+        <span class="d">never read during text decode</span></span>
+        <span class="rt"><span class="perTok">0</span><span class="dot d-none"></span></span></div>
+    </div>
+
+    <div class="side">
+      <div class="sidebox"><span class="h">Legend</span>
+        <p><span class="dot d-done"></span> quantized in the base checkpoint<br>
+        <span class="dot d-ours"></span> quantized by us or by lovedheart<br>
+        <span class="dot d-block"></span> blocked — see below<br>
+        <span class="dot d-none"></span> not a per-token cost, or untouched</p></div>
+
+      <div class="sidebox"><span class="h">The counter-intuitive part</span>
+        <p>The <strong>experts are 96% of the parameters and 19% of the per-token bytes</strong> —
+        they are properly NVFP4 and only 10 of 512 are read. The <strong>dense</strong> path is the
+        small half of the model and dominates the clock.</p></div>
+
+      <div class="sidebox"><span class="h">Why the hyper-connections resist</span>
+        <p>Three independent blockers: the model hardcodes <code>quant_config=None</code>;
+        the shapes are (320, 10240) and <span class="num">320 % 128 = 64</span>, so blockwise FP8
+        cannot express them; and no MXFP8 kernel on sm_121 accepts them.</p></div>
+
+      <div class="sidebox"><span class="h">Position decides composition</span>
+        <p><code>lm_head</code> is evaluated once per <em>draft token</em>, so quantizing it
+        <strong>compounds</strong> with speculation. Everything else is read once per <em>step</em>,
+        so it <strong>competes</strong>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
   <h2>The axes that matter</h2>
   <p>Repo names are actively misleading here — two checkpoints both called “NVFP4” can differ by
   44&nbsp;GiB and be identical where it counts. Read the dtypes from the safetensors headers, then
@@ -188,6 +295,12 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
         <td><span class="chip c16">BF16</span></td>
         <td class="n">125.9</td><td class="n">—</td><td class="n">33.6</td><td class="n">—</td>
         <td><span class="tag t-ext">external</span></td></tr>
+      <tr class="dead">
+        <td class="name">ours · fp8se <span class="sub">+ shared_expert — measured, rejected</span></td>
+        <td><span class="chip c8">FP8</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c8">FP8</span></td>
+        <td class="n">122.5</td><td class="n">78.5</td><td class="n">37.0</td><td class="n">—</td>
+        <td><span class="tag t-dead">not shipped</span></td></tr>
       <tr class="dead">
         <td class="name">local-inference-lab · 4p89<span class="sub">544 quantized layers — the widest coverage published</span></td>
         <td><span class="chip cmix">MXFP8</span></td><td><span class="chip c4">NVFP4</span></td>
@@ -282,6 +395,23 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <p class="lede" style="font-size:13.5px">Acceptance is unchanged across both (mean accepted length
   2.15 → 2.21), so this is pure speed rather than better drafting. Quantizing the head flipped
   speculation from a net loss at high concurrency to a net gain.</p>
+</section>
+
+<section>
+  <h2>A lever we measured and rejected</h2>
+  <p><code>shared_expert</code> is eligible for the same proven scheme, worth 0.47 GB/token, and
+  quantized by four other projects — none of which published what it costs. We measured it:
+  <strong>+1.9% at c=1, −2.8% at c=8, for +2.06% NLL.</strong> Unlike the dense projections (−1.8%)
+  and <code>lm_head</code> (−0.6%), both noise with mixed signs, that regression is directional.
+  We are not shipping it.</p>
+  <div class="callout">
+    <span class="h">And the roofline over-predicted, which matters for every projection here</span>
+    <p>0.47 GB of a 5.61 GB budget is 8.4% of the bytes and should have bought ~8%. It bought 1.9%.
+    The roofline assumes every byte removed is a byte the GPU was <em>waiting on</em> — true for the
+    dense projections at <span class="num">(10240, 2560)</span>, false for a
+    <span class="num">(640, 2560)</span> small matmul that is latency-bound. The roofline is an
+    upper bound whose tightness depends on matrix size; we had been reading it as a predictor.</p>
+  </div>
 </section>
 
 <section>

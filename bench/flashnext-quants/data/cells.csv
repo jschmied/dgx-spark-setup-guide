@@ -7,3 +7,4 @@ local-inference-lab/Qwen3.8-Flash-Next-NVFP4-4p89,MXFP8,NVFP4,BF16,NVFP4,102.4,,
 primitive-ai/Qwen3.8-Flash-Next-mixed-NVFP4-FP8,FP8,BF16,BF16,NVFP4,171.1,,,,,,,,census only,too large; compressed-tensors format
 Qwen/Qwen3.8-Flash-Next,BF16,BF16,BF16,BF16,335.3,,,,,,,,census only,base model
 RadixArk/Qwen3.8-Flash-Next-NVFP4 (0xBakeer atlas),BF16,FP8-mmap,BF16,NVFP4,125.9,,33.6,33.6,,,,vLLM 0.1.dev20073,inference-atlas,PLE via VLLM_PLE_MMAP not CPU offload; swap OFF; MTP k=3; seqs=2; util 0.85; ctx 262144; decode-only rate excl TTFT
+ours/fp8se (+ shared_expert FP8) REJECTED,FP8_PB_WO,FP8,FP8_PB_WO,NVFP4,122.5,78.5,,37.0,112.6,,0.9826,vLLM 0.1.dev20073,ours,+1.9% at c=1 but -2.8% at c=8 for +2.06% NLL - directional regression; NOT shipped
