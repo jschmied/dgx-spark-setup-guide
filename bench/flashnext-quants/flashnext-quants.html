@@ -316,7 +316,8 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <tbody>
       <tr><td class="name">MTP off</td><td class="n">26.4</td><td class="n">1.87 s</td><td class="n">96.6</td><td class="n">9.71 s</td></tr>
       <tr class="ours"><td class="name">MTP k=2</td><td class="n">38.0</td><td class="n">1.82 s</td><td class="n">99.1</td><td class="n">6.79 s</td></tr>
-      <tr><td class="name">gain</td><td class="n"><strong>+44%</strong></td><td class="n">&mdash;</td><td class="n"><strong>+2.6%</strong></td><td class="n">&minus;30%</td></tr>
+      <tr><td class="name">MTP k=3</td><td class="n">36.8</td><td class="n">1.75 s</td><td class="n">100.5</td><td class="n">7.29 s</td></tr>
+      <tr><td class="name">gain, k=2 over off</td><td class="n"><strong>+44%</strong></td><td class="n">&mdash;</td><td class="n"><strong>+2.6%</strong></td><td class="n">&minus;30%</td></tr>
     </tbody>
   </table>
 </div>
@@ -326,6 +327,14 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <p>Speculation does not <em>hurt</em> at saturation — it stops paying. <strong>+44% at single
   stream, +2.6% at c=16.</strong> It still cuts TTFT by 30% there, which is the reason to keep it
   on for agent work regardless of what it does for throughput.</p>
+
+  <p><strong>k=2 is the optimum</strong>, and k=3 is already past it (36.8 against 38.0 at c=1).
+  The mechanism is named in the log: <code>Fused multi-step draft decode is not supported by
+  attention backend QWEN38_FLASH_NEXT_EXP_QSA_STATE; falling back to rebuilding attention metadata
+  between draft steps.</code> That rebuild is charged <em>per draft step</em>, so each extra
+  speculative token costs more than the last &mdash; an inverted U with a low peak. QSA carries a
+  stateful decode backend and the fused path has no implementation for it; this is a gap in the
+  model family's support, not a misconfiguration.</p>
 </section>
 
 <section>
@@ -344,7 +353,11 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   </table>
 </div>
   <p class="note">A <span class="num">2.6&times;</span> swing with the model, checkpoint, engine and
-  concurrency all held fixed.</p>
+  concurrency all held fixed. <strong>Not a caching artefact</strong>: re-run with
+  <code>prefix_cache_hits_total</code> bracketing each arm, hits were <span class="num">0</span>
+  against <span class="num">10,538</span> and <span class="num">123,751</span> queried tokens
+  &mdash; the unique-id prompts bust the cache completely, and the re-run reproduced the effect
+  (<span class="num">184.5</span> / <span class="num">74.5</span>).</p>
 
   <p>This is how the <span class="num">167.8</span> once recorded in the table below and a
   <span class="num">96.6</span> measured on 2026-08-28 are both correct: the first was a
