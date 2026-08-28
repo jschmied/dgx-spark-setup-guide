@@ -60,6 +60,13 @@ section{display:flex;flex-direction:column;gap:18px}
   font-variant-numeric:tabular-nums}
 .v .note{font-size:13px;color:var(--ink-2)}
 p.note{font-size:13px;color:var(--ink-2);margin-top:-4px}
+.defs{max-width:74ch;font-size:13.5px;color:var(--ink-2);background:var(--card);
+  border:1px solid var(--rule);border-left:3px solid var(--brass);border-radius:3px;
+  padding:13px 16px;display:flex;flex-direction:column;gap:7px}
+.defs b{color:var(--ink)}
+.defs dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.defs dt{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--brass);white-space:nowrap}
+.defs dd{margin:0}
 
 /* table */
 .scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--card)}
@@ -165,6 +172,27 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <p class="lede">A 125B-total / 6B-active model on one 128&nbsp;GB box. Which checkpoint you pick
   decides both whether it <em>fits</em> and how fast it <em>decodes</em> — and those two are set by
   different parts of the file.</p>
+
+  <div class="defs">
+    <p><b>&ldquo;Ours&rdquo; on this page means three distinct things.</b> Everything below was
+    produced on <b>one DGX Spark</b> &mdash; GB10, sm_121, 128&nbsp;GB unified memory &mdash;
+    running vLLM <code>0.1.dev20073+g8e685d198</code> on bare metal, no container.</p>
+    <dl>
+      <dt>ours &middot; checkpoint</dt>
+      <dd>A public checkpoint whose safetensors shards we rewrote on this box. Nothing is
+      retrained and nothing is recalibrated &mdash; weights are requantized in place.
+      <code>fp8head</code> is lovedheart&rsquo;s NVFP4-FP8 with <code>lm_head</code> quantized
+      to FP8 here.</dd>
+      <dt>measured</dt>
+      <dd>We ran it: our box, our harness, both arms of any comparison on the same day.</dd>
+      <dt>external</dt>
+      <dd>Someone else&rsquo;s published number, kept in its own row because engine, PLE
+      handling, speculation and clock policy differ simultaneously &mdash; not comparable to
+      a <em>measured</em> row.</dd>
+    </dl>
+    <p>Individual figures still depend on prompt length, concurrency and whether speculation was
+    on; those conditions are stated with each table rather than assumed.</p>
+  </div>
 </header>
 
 <section>
@@ -179,6 +207,12 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <div class="v ours"><span class="k">+ MTP k=2</span><span class="val num">36.3</span>
       <span class="note">tok/s · and the quantized head makes speculation <em>more</em> valuable, not less</span></div>
   </div>
+  <p class="note">One internally consistent ladder, single stream, each step adding to the one
+  before it. Re-measured on 2026-08-28 at input-len 4000 / output-len 512, the last two steps read
+  <span class="num">26.4</span> and <span class="num">38.0</span> &mdash; the shape is the same,
+  the absolute values move with prompt length. Conditioned figures are in the tables below; see
+  <em>Aggregate throughput is mostly a statement about prompt length</em> for why a single
+  tok/s number is never portable on its own.</p>
 </section>
 
 <section>
