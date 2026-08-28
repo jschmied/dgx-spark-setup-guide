@@ -147,8 +147,8 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
       <span class="note">tok/s · lovedheart NVFP4-FP8 — same size, +39%</span></div>
     <div class="v ours"><span class="k">+ lm_head quantized (ours)</span><span class="val num">26.1</span>
       <span class="note">tok/s · first on GPU for this model, no quality cost</span></div>
-    <div class="v ours"><span class="k">+ MTP k=2</span><span class="val num">29.2</span>
-      <span class="note">tok/s · speculation, but it stops paying above c≈4</span></div>
+    <div class="v ours"><span class="k">+ MTP k=2</span><span class="val num">36.3</span>
+      <span class="note">tok/s · and the quantized head makes speculation <em>more</em> valuable, not less</span></div>
   </div>
 </section>
 
@@ -168,7 +168,7 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
         <td class="name">ours · fp8head<span class="sub">lovedheart + lm_head quantized here</span></td>
         <td><span class="chip c8">FP8</span></td><td><span class="chip c8">FP8</span></td>
         <td><span class="chip c8">FP8</span></td>
-        <td class="n">122.8</td><td class="n">76.5</td><td class="n">26.1</td><td class="n">—</td>
+        <td class="n">122.8</td><td class="n">76.5</td><td class="n">26.1</td><td class="n">167.8</td>
         <td><span class="tag t-ours">measured</span></td></tr>
       <tr class="ours">
         <td class="name">lovedheart · NVFP4-FP8<span class="sub">attention + GDN blockwise FP8</span></td>
@@ -260,6 +260,28 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
       <span>The vocab loader asserts every tensor is vocab-shaped</span>
       <span class="why"><code>assert loaded_weight.shape[output_dim] == self.org_vocab_size</code> is true of the weight and false of its <code>[1940, 20]</code> block-scale companion.</span></span></div>
   </div>
+</section>
+
+<section>
+  <h2>Does a quantization lever compose with speculation?</h2>
+  <p>It depends on <strong>where the layer sits relative to the speculative loop</strong> — and we
+  got this wrong at first, publishing a flat “they are substitutes”.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Lever</th><th>MTP gain at c=1</th><th>MTP gain at c=16</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td class="name">dense projections → FP8</td><td class="n">+67% → +23%</td>
+        <td class="n">+2% → −6%</td>
+        <td>read once per <em>step</em> — both amortize the same read, so they <strong>compete</strong></td></tr>
+      <tr class="ours"><td class="name">lm_head → FP8</td><td class="n">+23% → <strong>+40%</strong></td>
+        <td class="n">−10% → <strong>+8%</strong></td>
+        <td>evaluated once per <em>draft token</em> plus verify — ~3× per step at k=2, so they <strong>compound</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="lede" style="font-size:13.5px">Acceptance is unchanged across both (mean accepted length
+  2.15 → 2.21), so this is pure speed rather than better drafting. Quantizing the head flipped
+  speculation from a net loss at high concurrency to a net gain.</p>
 </section>
 
 <section>
