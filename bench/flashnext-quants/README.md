@@ -59,3 +59,42 @@ figures are not.
 Rows marked `ours` are one box, one method, same day. Field numbers from SGLang or llama.cpp
 builds belong in prose, not in this table — they differ in engine, PLE handling, speculation and
 clock policy simultaneously.
+
+## External reference: 0xBakeer's inference-atlas
+
+[inference-atlas](https://0xbakeer.github.io/inference-atlas/) publishes schema'd, hardware-
+fingerprinted runs with full provenance — the only external source so far that is directly
+comparable to ours, because it pins the **same engine build** (`0.1.dev20073+g8e685d198`) on the
+**same hardware**.
+
+Their `serve-single-i256-o256-v1` on `RadixArk` (concurrency 1, temperature 0, 50 requests):
+
+```
+decode_tok_s_per_request  mean 33.606  p50 33.434
+ttft_ms                   mean 541.5
+gpu_util_avg 89.48%   ram_peak 110.4 GB   KV 18.13 GiB
+```
+
+**33.6 tok/s on the checkpoint we measured at 28.5.** Their configuration differs in five ways;
+the one we think matters is the **PLE mechanism**:
+
+| | atlas | ours |
+|---|---|---|
+| PLE | `VLLM_PLE_MMAP=1` — in-process, page cache | `VLLM_PLE_CPU_OFFLOAD=1` — separate worker, CUDA IPC |
+| swap | **off** | 79 GiB, actively swapping |
+| MTP | k=3 | k=2 |
+| max-num-seqs | 2 | 16 |
+| gpu-memory-utilization | 0.85 | 0.90 |
+
+Our own trace found the offload worker idle at 5–6% CPU, but that measures the **gather**, not the
+round-trip around it — ZMQ request, CPU gather, pinned DMA, semaphore wait, every token. The mmap
+hook deletes all of that. This is the mechanism 0xBakeer and paragontasx argued for and our
+worker-CPU% metric structurally could not see; we flagged that limitation at the time and this is
+evidence on their side of it.
+
+**Also normalise the metric before comparing**: their `decode_tok_s_per_request` excludes TTFT,
+ours divides output tokens by total wall. At c=1 that is only ~3% for us (TTFT 0.19 s of 8.4 s), so
+it does not account for the gap — but it is not zero either.
+
+**Open experiment:** mmap PLE **+** the FP8-dense checkpoint. They address unrelated costs (round-trip
+latency vs bytes-per-token) and should compose.
