@@ -56,20 +56,28 @@ figures are not.
 
 ## Record the conditions with every number
 
-The `tok/s c=1` / `c=16` columns were carried forward without recording **input length** or
-**whether speculation was on**. On 2026-08-28 a re-measurement of `fp8head` returned 38.0 at
-c=1 (consistent with the recorded value once MTP is accounted for) but **99.1 aggregate at
-c=16 against a recorded 167.8** — a gap too large to be drift, and impossible to attribute
-without knowing what the original run did. Every future row must carry:
+An aggregate t/s figure without a stated **prompt length** carries almost no information. Measured
+2026-08-28 on `fp8head`, MTP k=2, c=16, output 256, everything else held fixed:
+
+| input length | aggregate t/s | TTFT |
+| --- | --- | --- |
+| 256 | 192.7 | 2.72 s |
+| 1000 | 127.5 | 2.44 s |
+| 4000 | 74.9 | 10.39 s |
+
+A **2.6x swing** from prompt length alone. This is how a recorded `167.8` and a re-measured `96.6`
+are both correct — the first was a short-prompt run, the second used 4000-token inputs. The
+`c=1` column is likewise **speculation-off**: re-measuring gave 26.4 against a recorded 26.1,
+and MTP k=2 takes the same server to 38.0.
+
+Every row must carry:
 
 | field | why |
 | --- | --- |
-| `--input-len` | prefill is charged to wall clock, so it drags aggregate t/s hard at c=16 |
-| MTP on/off + k | speculation competes for compute once the batch saturates |
-| `--max-num-seqs` | a low cap silently ceilings concurrency (this cost us a false 33 t/s ceiling once) |
-| decode median *and* aggregate | they diverge by ~10% at c=1 and much more under load |
-
-Treat the historical `c=16` column as unattributed until re-measured.
+| `--input-len` | prefill is charged to wall clock; it moves aggregate t/s by 2.6x |
+| MTP on/off + k | +44% at c=1, +2.6% at c=16 — the gain is regime-dependent |
+| `--max-num-seqs` | a low cap silently ceilings concurrency (cost us a false 33 t/s ceiling once) |
+| decode median *and* aggregate | they diverge ~10% at c=1 and much more under load |
 
 ## Cross-stack numbers are not comparable
 

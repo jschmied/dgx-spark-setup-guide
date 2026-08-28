@@ -275,7 +275,8 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   so the expert term grows with concurrency while the dense term is amortized away. The answer to
   &ldquo;do the experts dominate?&rdquo; flips at <strong>c&nbsp;=&nbsp;4</strong>.</p>
 
-  <table>
+  <div class="scroll">
+<table>
     <thead><tr>
       <th>Concurrency</th><th>Distinct experts / layer</th><th>Experts per step</th>
       <th>Dense per step</th><th>Expert share</th><th>GiB per token</th>
@@ -289,6 +290,7 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
       <tr><td class="n">32</td><td class="n">320</td><td class="n">39.55 GiB</td><td class="n">4.89 GiB</td><td class="n">89%</td><td class="n">1.39</td></tr>
     </tbody>
   </table>
+</div>
   <p class="note">Expert counts are the no-overlap upper bound (<span class="num">min(512, 10c)</span>);
   real routing overlaps somewhat, so treat these as a ceiling on the expert term. Derived from the
   <code>fp8head</code> shard headers, not from the model card.</p>
@@ -303,6 +305,54 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
+  <h2>What speculation is worth, and where</h2>
+  <p>If the experts dominate at load and the batch already saturates the machine, then MTP's draft
+  tokens have no idle capacity left to exploit. Measured on <code>fp8head</code>, one box, one
+  method, both arms the same day:</p>
+
+  <div class="scroll">
+<table>
+    <thead><tr><th>Arm</th><th>c=1 decode t/s</th><th>c=1 TTFT</th><th>c=16 aggregate t/s</th><th>c=16 TTFT</th></tr></thead>
+    <tbody>
+      <tr><td class="name">MTP off</td><td class="n">26.4</td><td class="n">1.87 s</td><td class="n">96.6</td><td class="n">9.71 s</td></tr>
+      <tr class="ours"><td class="name">MTP k=2</td><td class="n">38.0</td><td class="n">1.82 s</td><td class="n">99.1</td><td class="n">6.79 s</td></tr>
+      <tr><td class="name">gain</td><td class="n"><strong>+44%</strong></td><td class="n">&mdash;</td><td class="n"><strong>+2.6%</strong></td><td class="n">&minus;30%</td></tr>
+    </tbody>
+  </table>
+</div>
+  <p class="note">input-len 4000, output-len 512, <code>--max-num-seqs 16</code>, temp 0.6.
+  6 requests at c=1, 32 at c=16.</p>
+
+  <p>Speculation does not <em>hurt</em> at saturation — it stops paying. <strong>+44% at single
+  stream, +2.6% at c=16.</strong> It still cuts TTFT by 30% there, which is the reason to keep it
+  on for agent work regardless of what it does for throughput.</p>
+</section>
+
+<section>
+  <h2>Aggregate throughput is mostly a statement about prompt length</h2>
+  <p>Prefill is charged to the wall clock that aggregate t/s divides by, so the same server on the
+  same checkpoint reports wildly different &ldquo;throughput&rdquo; depending on the prompt:</p>
+
+  <div class="scroll">
+<table>
+    <thead><tr><th>c=16, output 256, MTP k=2</th><th>aggregate t/s</th><th>per-request decode</th><th>TTFT</th></tr></thead>
+    <tbody>
+      <tr><td class="name">input 256</td><td class="n">192.7</td><td class="n">14.8</td><td class="n">2.72 s</td></tr>
+      <tr><td class="name">input 1000</td><td class="n">127.5</td><td class="n">10.3</td><td class="n">2.44 s</td></tr>
+      <tr><td class="name">input 4000</td><td class="n">74.9</td><td class="n">6.1</td><td class="n">10.39 s</td></tr>
+    </tbody>
+  </table>
+</div>
+  <p class="note">A <span class="num">2.6&times;</span> swing with the model, checkpoint, engine and
+  concurrency all held fixed.</p>
+
+  <p>This is how the <span class="num">167.8</span> once recorded in the table below and a
+  <span class="num">96.6</span> measured on 2026-08-28 are both correct: the first was a
+  short-prompt run, the second used 4000-token inputs. Neither row had recorded its input length.
+  <strong>An aggregate t/s figure without a stated prompt length carries almost no information.</strong></p>
+</section>
+
+<section>
   <h2>The axes that matter</h2>
   <p>Repo names are actively misleading here — two checkpoints both called “NVFP4” can differ by
   44&nbsp;GiB and be identical where it counts. Read the dtypes from the safetensors headers, then
@@ -311,7 +361,7 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <table>
     <thead><tr>
       <th>Checkpoint</th><th>Dense proj.</th><th>PLE table</th><th>lm_head</th>
-      <th>Size</th><th>Resident</th><th>tok/s c=1</th><th>c=16</th><th></th>
+      <th>Size</th><th>Resident</th><th>tok/s c=1<span class="sub">MTP off</span></th><th>c=16<span class="sub">short prompt</span></th><th></th>
     </tr></thead>
     <tbody>
       <tr class="ours">
