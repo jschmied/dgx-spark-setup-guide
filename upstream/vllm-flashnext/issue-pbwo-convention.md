@@ -76,8 +76,23 @@ tensors, so the alias never becomes visible to the weight loader and failure mod
 unchanged. The second registration needs its own storage.
 
 Locally I patched exactly that (distinct `weight_scale_inv` parameter, sentinel-initialised, and
-`process_weights_after_loading` picks whichever is no longer all-sentinel). Happy to send it as a
-PR if the approach looks right — or, if the intent is that ModelOpt only ever emits rank-4
+`process_weights_after_loading` picks whichever is no longer all-sentinel), and the checkpoint then
+**loads and serves correctly** — verified on output, not just on absence of errors: 23.7 tok/s
+single-stream, 156 tok/s aggregate at 16 streams, and NLL/token 0.7610 versus 0.7748 for the
+unquantized-dense build of the same model, so the bridged scales are demonstrably being applied.
+
+One further wrinkle for whoever implements this: with a rank-2 scale,
+`Parameter(scale.contiguous(), ...)` raises
+
+```
+RuntimeError: Creating a Parameter from an instance of type BlockQuantScaleParameter requires
+that detach() returns an instance of the same type
+```
+
+The existing rank-4 path escapes it only incidentally, because `squeeze()` returns a plain Tensor
+and drops the subclass. `scale.data.contiguous()` handles both.
+
+Happy to send it as a PR if the approach looks right — or, if the intent is that ModelOpt only ever emits rank-4
 `weight_scale`, then this checkpoint class should at least be **rejected with a clear message**
 rather than producing an `AttributeError` about a module having no `.data`.
 
