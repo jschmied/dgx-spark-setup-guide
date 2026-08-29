@@ -70,12 +70,21 @@ are both correct — the first was a short-prompt run, the second used 4000-toke
 `c=1` column is likewise **speculation-off**: re-measuring gave 26.4 against a recorded 26.1,
 and MTP k=2 takes the same server to 38.0.
 
+**The noise floor is 6.9%.** Six identical k=2 runs (c=1, i4000/o512) gave 35.3, 35.7, 34.7,
+35.2, 36.1, 37.1 tok/s — mean 35.68, sd 0.84, so a single run carries about ±4.6% at 95%.
+**Differences below roughly 10% are not callable from single runs.** 0xBakeer measured 6.5%
+independently on llama.cpp, so this is a property of the box, not of one engine.
+
+This retroactively voids any single-run comparison finer than that, including one of ours:
+"k=2 is the optimum, k=3 is past it" compared a k=3 run against 38.0, the top of k=2's own
+spread. k=3's 36.8 sits inside 34.7–37.1 and above the 35.7 mean. Withdrawn.
+
 Every row must carry:
 
 | field | why |
 | --- | --- |
 | `--input-len` | prefill is charged to wall clock; it moves aggregate t/s by 2.6x |
-| MTP on/off + k | +44% at c=1, +2.6% at c=16 — the gain is regime-dependent |
+| MTP on/off + k | +35% at c=1; at c=16 the difference is inside the noise floor |
 | `--max-num-seqs` | a low cap silently ceilings concurrency (cost us a false 33 t/s ceiling once) |
 | decode median *and* aggregate | they diverge ~10% at c=1 and much more under load |
 
