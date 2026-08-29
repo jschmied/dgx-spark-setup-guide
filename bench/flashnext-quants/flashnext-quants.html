@@ -618,18 +618,36 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   Kernel dispatch was verified at the call site, not assumed — an earlier round of this
   measurement was invalid because a stale compiled graph replayed pre-patch code.</p>
 
-  <p><strong>The profile was prefill-dominated; the benchmark is decode-only.</strong> That trace
-  was taken over <code>--input-len 4000 --requests 4</code>: <span class="num">16,000</span>
-  prefill tokens against <span class="num">2,048</span> decode tokens. The same layers are called
-  at <span class="num">M = 832, 2552, 3224, 4096</span> during prefill and at
-  <span class="num">M = 1, 2, 4, 8</span> during decode — a large tiled GEMM and a skinny one are
-  different machine-level problems. <code>decode_tps_median</code>, which every arm was scored on,
-  excludes prefill entirely. Targets were ranked on one workload and the fix measured on another.</p>
+  <p><strong>An earlier version of this page blamed a prefill-contaminated profile. That was
+  wrong, and testing it is what settled the matter.</strong> The first trace was taken over
+  <code>--input-len 4000</code>, i.e. 16,000 prefill tokens against 2,048 decode tokens, so the
+  suspicion was reasonable. A decode-only re-profile — 12-token prompt, 600 generated tokens,
+  warmed first — produces essentially the same ranking:</p>
 
-  <p>The alternative explanation was checked first and ruled out: the GPU is
-  <strong>85.4% busy</strong> across the trace, with 14.6% in gaps and only 375 of 77,685 gaps
-  exceeding 100&nbsp;µs. Kernel time really is wall time here. The ranking was wrong, not the
-  premise.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Kernel group</th><th>Mixed profile</th><th>Decode-only profile</th></tr></thead>
+    <tbody>
+      <tr><td class="name">FP8 blockwise (GDN, QSA, lm_head)</td><td class="n">32.2%</td><td class="n">34.5%</td></tr>
+      <tr class="ours"><td class="name">BF16 wmma (hyper-connections)</td><td class="n">25.0%</td><td class="n">26.6%</td></tr>
+      <tr><td class="name">MoE grouped GEMM</td><td class="n">22.1%</td><td class="n">22.2%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Decode-only trace: 9.65 M events, 14.7 s span, GPU busy 89.8%, 643 k kernel
+  launches.</p>
+
+  <p>So the hyper-connections really are about a quarter of <em>decode</em> GPU time, the GPU
+  really is busy, and three interventions on them still changed nothing measurable. Those three
+  facts are all solid and they do not yet reconcile. What we can rule out: the layers are not
+  mis-ranked, the GPU is not idle, and the kernels provably dispatched.</p>
+
+  <p>The live hypothesis is narrower — that FP8 does not actually speed up <em>these</em> shapes.
+  The per-channel path routes <span class="num">(10240, 320)</span> at M&nbsp;≤&nbsp;8 through
+  <code>scaled_mm</code>, and a K of 320 is small enough that halving the bytes may buy nothing
+  against a warp-level BF16 WMMA kernel that is already latency-bound rather than
+  bandwidth-bound. That is measurable directly, per shape, without touching the server — and it
+  is the next thing to measure rather than assert.</p>
 
   <p><strong>Profile the regime you intend to measure.</strong> A decode-truthful profile needs a
   short prompt and a long generation, warmed first so JIT and cudagraph capture stay out of the
