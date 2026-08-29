@@ -287,12 +287,14 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
         model is not the MoE.</p></div>
 
       <div class="sidebox"><span class="h">Why the hyper-connections resist</span>
-        <p>The model hardcodes <code>quant_config=None</code>. The 128-divisibility turned out to be
-        a <em>constant</em>, not a kernel limit — Triton takes the block size at runtime, and blocks
-        need not be square. But the down-projection is built as a fused
-        <span class="num">[320, 4, 12] = 336</span> layer, and a blockwise scale cannot span a
-        fusion boundary when one shard is 4 wide. The <code>_up</code> half is unfused and
-        quantizable.</p></div>
+        <p>The model hardcodes <code>quant_config=None</code> on all three projections — patched,
+        and now upstream as a commit. The 128-divisibility is a constant in vLLM's code, but it
+        <em>is</em> a real limit for the fast CUTLASS blockwise kernel: every hyper-connection shape
+        fails it (<span class="num">out%128</span> = 4 or 64, <span class="num">in%128</span> = 64),
+        so blockwise FP8 falls to a slow Triton path. <strong>Per-channel</strong> FP8 has no block
+        constraint and slices cleanly across the fused
+        <span class="num">[320, 4, 12] = 336</span> layer. We built it. It changed nothing —
+        see below.</p></div>
 
       <div class="sidebox"><span class="h">Position decides composition</span>
         <p><code>lm_head</code> is evaluated once per <em>draft token</em>, so quantizing it
@@ -590,6 +592,49 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <span class="num">(640, 2560)</span> small matmul that is latency-bound. The roofline is an
     upper bound whose tightness depends on matrix size; we had been reading it as a predictor.</p>
   </div>
+</section>
+
+<section>
+  <h2>Three attempts on the hyper-connections, three nulls, and the error underneath</h2>
+  <p>A profile put <strong>25% of GPU kernel time</strong> in
+  <code>cutlass_80_wmma_tensorop_bf16</code> — Ampere-generation kernels on a Blackwell part —
+  and identified them as the hyper-connections. That looked like the largest remaining lever on
+  the box. Everything aimed at it missed:</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Attempt</th><th>What it changed</th><th>Decode tok/s, c=1</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td class="name">blockwise FP8 <span class="sub">FP8_PB_WO on <code>_up</code></span></td>
+        <td>precision</td><td class="n">35.0 vs 36.3</td><td>slower</td></tr>
+      <tr><td class="name">CUTE-DSL skinny GEMM <span class="sub">sm_121 gate + M=3 plan entry</span></td>
+        <td>kernel, fused down projection</td><td class="n">35.92 vs 36.45</td><td>null</td></tr>
+      <tr><td class="name">per-channel FP8 <span class="sub">96 <code>_up</code> projections</span></td>
+        <td>half the bytes <em>and</em> the faster kernel</td><td class="n">36.05 vs 36.45</td><td>null</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">All arms n=6 from empty compile caches, against a measured noise floor of 6.9%.
+  Kernel dispatch was verified at the call site, not assumed — an earlier round of this
+  measurement was invalid because a stale compiled graph replayed pre-patch code.</p>
+
+  <p><strong>The profile was prefill-dominated; the benchmark is decode-only.</strong> That trace
+  was taken over <code>--input-len 4000 --requests 4</code>: <span class="num">16,000</span>
+  prefill tokens against <span class="num">2,048</span> decode tokens. The same layers are called
+  at <span class="num">M = 832, 2552, 3224, 4096</span> during prefill and at
+  <span class="num">M = 1, 2, 4, 8</span> during decode — a large tiled GEMM and a skinny one are
+  different machine-level problems. <code>decode_tps_median</code>, which every arm was scored on,
+  excludes prefill entirely. Targets were ranked on one workload and the fix measured on another.</p>
+
+  <p>The alternative explanation was checked first and ruled out: the GPU is
+  <strong>85.4% busy</strong> across the trace, with 14.6% in gaps and only 375 of 77,685 gaps
+  exceeding 100&nbsp;µs. Kernel time really is wall time here. The ranking was wrong, not the
+  premise.</p>
+
+  <p><strong>Profile the regime you intend to measure.</strong> A decode-truthful profile needs a
+  short prompt and a long generation, warmed first so JIT and cudagraph capture stay out of the
+  trace. A profile over a realistic serving mix answers <em>where does this workload spend
+  time</em> — a different question from <em>what raises decode tok/s</em>.</p>
 </section>
 
 <section>
