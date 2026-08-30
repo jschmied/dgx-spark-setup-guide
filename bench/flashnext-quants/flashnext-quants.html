@@ -763,11 +763,18 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <thead><tr><th>backend</th><th>status here</th></tr></thead>
     <tbody>
       <tr><td class="num">FLASHINFER_CUTLASS</td><td>what <code>moe_backend='auto'</code> resolves to, and what every measurement on this page used</td></tr>
-      <tr><td class="num">flashinfer_b12x</td><td>rejected — <em>not supported for unquantized MoE</em>; the MTP drafter's MoE is unquantized and <code>--moe-backend</code> is global. With MTP off it faults with an IMA</td></tr>
+      <tr><td class="num">flashinfer_b12x</td><td><strong>blocked by this checkpoint, not by the backend.</strong> Both halves are present (<code>has_flashinfer_b12x_gemm/moe</code> are <code>True</code>) and the path works on this GPU — <code>CUTE_DSL_ARCH=sm_121a</code> is in our launcher <em>because</em> the 27B needed it for b12x. What vetoes it is <code>mtp.*</code> sitting in <code>ignore</code>: one unquantized drafter MoE layer disqualifies the kernel for all 48 quantized ones, and it raises 10.5 min in rather than falling back. With MTP off it faults with an IMA. <strong>Quantizing the drafter's MoE reopens it</strong></td></tr>
       <tr><td class="num">triton, cutlass</td><td>hit the SMEM overflow above</td></tr>
       <tr><td class="num">TRTLLM, CUTEDSL, VLLM_CUTLASS, MARLIN, HUMMING</td><td>untried, and no field evidence favours any of them on sm_121</td></tr>
     </tbody>
   </table>
+  <p>So the honest state of this axis is <em>closed given our current checkpoint</em>, not closed on
+  the merits. The drafter's expert pair is <span class="num">4.86</span> GiB of BF16; quantizing it
+  frees ~<span class="num">3.6</span> GiB resident <strong>and</strong> restores
+  <code>flashinfer_b12x</code>, <code>flashinfer_trtllm</code> and <code>flashinfer_cutedsl</code> as
+  selectable options for a real comparison against the <code>FLASHINFER_CUTLASS</code> that
+  <code>auto</code> picks today. It is the one lever here that pays in memory and in kernel choice
+  at once.</p>
   <div class="callout">
     <span class="h">We wrote this up as a cheap untried lever. It was never untried.</span>
     <p>The workaround is real, but <code>auto</code> already selects
