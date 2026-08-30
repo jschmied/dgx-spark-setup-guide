@@ -1,0 +1,10 @@
+checkpoint,dense_proj,ple_table,lm_head,experts,size_gib,resident_gib,tok_s_c1,tok_s_c1_mtp2,tok_s_c8,tok_s_c16,nll_token,stack,source,notes
+RadixArk/Qwen3.8-Flash-Next-NVFP4,BF16,FP8,BF16,NVFP4,125.9,76.61,17.1,28.5,87.5,131.6,0.7748,vLLM 0.1.dev20073,ours,baseline; needs modelopt PLE gate patch
+lovedheart/Qwen3.8-Flash-Next-NVFP4-FP8,FP8_PB_WO,FP8,BF16,NVFP4,123.4,74.13,23.7,29.2,105.5,156.0,0.7610,vLLM 0.1.dev20073,ours,needs VLLM_USE_DEEP_GEMM=0 + FP8_PB_WO dispatch patch
+ours/fp8head (lovedheart + lm_head FP8),FP8_PB_WO,FP8,FP8_PB_WO,NVFP4,122.8,76.5,26.1,36.3,115.8,167.8,0.9628,vLLM 0.1.dev20073,ours,FIRST quantized lm_head for this model on GPU; needed 3 vLLM patches; +11% vs fp8mix at NLL 0.9628 vs 0.9687 (paired 14-chunk corpus)
+Inferact/Qwen3.8-Flash-Next-NVFP4,BF16,BF16,BF16,NVFP4,170.2,,,,,,,,census only,too large; identical dense BF16 to RadixArk
+local-inference-lab/Qwen3.8-Flash-Next-NVFP4-4p89,MXFP8,NVFP4,BF16,NVFP4,102.4,,,,,,,,census only,UNLOADABLE: PLE is U8[rows;80]+per-shard scales; vLLM wants F8_E4M3[rows;160]+global scale
+primitive-ai/Qwen3.8-Flash-Next-mixed-NVFP4-FP8,FP8,BF16,BF16,NVFP4,171.1,,,,,,,,census only,too large; compressed-tensors format
+Qwen/Qwen3.8-Flash-Next,BF16,BF16,BF16,BF16,335.3,,,,,,,,census only,base model
+RadixArk/Qwen3.8-Flash-Next-NVFP4 (0xBakeer atlas),BF16,FP8-mmap,BF16,NVFP4,125.9,,33.6,33.6,,,,vLLM 0.1.dev20073,inference-atlas,PLE via VLLM_PLE_MMAP not CPU offload; swap OFF; MTP k=3; seqs=2; util 0.85; ctx 262144; decode-only rate excl TTFT
+ours/fp8se (+ shared_expert FP8) REJECTED,FP8_PB_WO,FP8,FP8_PB_WO,NVFP4,122.5,78.5,,37.0,112.6,,0.9826,vLLM 0.1.dev20073,ours,+1.9% at c=1 but -2.8% at c=8 for +2.06% NLL - directional regression; NOT shipped

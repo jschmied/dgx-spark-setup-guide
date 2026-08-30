@@ -1,0 +1,931 @@
+<title>Flash-Next Quant Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f5f7f9; --card:#ffffff; --ink:#0f1317; --ink-2:#454e57; --ink-3:#6d7883;
+  --rule:#dde3e9; --rule-2:#eaeff3;
+  --teal:#1b6d8f; --teal-soft:#e4eff4;
+  --brass:#8c5a12; --brass-soft:#f6efe2;
+  --bad:#7a2e2e; --bad-soft:#f6e8e8;
+  --good:#1f6b48; --good-soft:#e6f2eb;
+  --b16:#243447; --b8:#3d6f86; --b4:#78a7bb; --bmix:#8c5a12;
+}
+@media (prefers-color-scheme:dark){
+:root:not([data-theme="light"]){
+  --paper:#0e1216; --card:#141a20; --ink:#e8edf2; --ink-2:#a8b4c0; --ink-3:#7c8792;
+  --rule:#242d36; --rule-2:#1b232b;
+  --teal:#6cb6d4; --teal-soft:#17303c;
+  --brass:#d29a4a; --brass-soft:#33280f;
+  --bad:#d98a8a; --bad-soft:#341c1c;
+  --good:#7cc9a1; --good-soft:#17301f;
+  --b16:#9fb4cc; --b8:#6cb6d4; --b4:#b3d6e4; --bmix:#d29a4a;
+}
+}
+:root[data-theme="dark"]{
+  --paper:#0e1216; --card:#141a20; --ink:#e8edf2; --ink-2:#a8b4c0; --ink-3:#7c8792;
+  --rule:#242d36; --rule-2:#1b232b;
+  --teal:#6cb6d4; --teal-soft:#17303c;
+  --brass:#d29a4a; --brass-soft:#33280f;
+  --bad:#d98a8a; --bad-soft:#341c1c;
+  --good:#7cc9a1; --good-soft:#17301f;
+  --b16:#9fb4cc; --b8:#6cb6d4; --b4:#b3d6e4; --bmix:#d29a4a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:56px 28px 96px;display:flex;flex-direction:column;gap:52px}
+h1,h2,h3{font-family:Archivo,"IBM Plex Sans",sans-serif;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,4.4vw,46px);font-weight:700;letter-spacing:-.022em;line-height:1.06}
+h2{font-size:22px;font-weight:600;letter-spacing:-.012em}
+h3{font-size:16px;font-weight:600;letter-spacing:-.005em}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3)}
+.lede{font-size:17px;color:var(--ink-2);max-width:66ch}
+header{display:flex;flex-direction:column;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:26px}
+section{display:flex;flex-direction:column;gap:18px}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+/* decision strip */
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:14px}
+.v{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:16px 18px;
+  display:flex;flex-direction:column;gap:6px;border-top:3px solid var(--teal)}
+.v.ours{border-top-color:var(--brass)}
+.v .k{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3)}
+.v .val{font-family:Archivo,sans-serif;font-size:25px;font-weight:700;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.v .note{font-size:13px;color:var(--ink-2)}
+p.note{font-size:13px;color:var(--ink-2);margin-top:-4px}
+.defs{max-width:74ch;font-size:13.5px;color:var(--ink-2);background:var(--card);
+  border:1px solid var(--rule);border-left:3px solid var(--brass);border-radius:3px;
+  padding:13px 16px;display:flex;flex-direction:column;gap:7px}
+.defs b{color:var(--ink)}
+.defs dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.defs dt{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--brass);white-space:nowrap}
+.defs dd{margin:0}
+
+/* table */
+.scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:900px;font-size:13.5px}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--rule-2);white-space:nowrap}
+thead th{background:var(--rule-2);font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  border-bottom:1px solid var(--rule);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.ours{background:var(--brass-soft)}
+tbody tr.dead td{color:var(--ink-3)}
+td.n{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;text-align:right}
+.name{font-weight:600}
+.sub{display:block;font-size:11.5px;color:var(--ink-3);font-weight:400;white-space:normal;max-width:34ch}
+
+/* precision chips: saturation encodes bit width */
+.chip{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+  letter-spacing:.04em;padding:2px 7px;border-radius:2px;color:#fff}
+.c16{background:var(--b16)} .c8{background:var(--b8)} .c4{background:var(--b4);color:#0f1317}
+.cmix{background:var(--bmix)}
+:root[data-theme="dark"] .c16,:root[data-theme="dark"] .c8{color:#0e1216}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .c16,:root:not([data-theme="light"]) .c8{color:#0e1216}}
+
+.tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:2px}
+.t-ours{background:var(--brass-soft);color:var(--brass)}
+.t-dead{background:var(--bad-soft);color:var(--bad)}
+.t-ext{background:var(--teal-soft);color:var(--teal)}
+
+/* architecture schema */
+.arch{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;align-items:start}
+@media(max-width:820px){.arch{grid-template-columns:1fr}}
+.stack{display:flex;flex-direction:column;gap:7px}
+.blk2{border:1px solid var(--rule);border-radius:3px;background:var(--card);padding:11px 14px;
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.blk2 .lbl{display:flex;flex-direction:column;gap:3px;min-width:0}
+.blk2 .t{font-weight:600;font-size:13.5px}
+.blk2 .d{font-size:11.5px;color:var(--ink-3);white-space:normal}
+.blk2 .rt{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.perTok{font-family:"IBM Plex Mono",monospace;font-size:11px;font-variant-numeric:tabular-nums;
+  color:var(--ink-2);white-space:nowrap}
+.rep{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;
+  color:var(--ink-3);text-transform:uppercase;padding:6px 0 2px}
+.brace{border-left:2px solid var(--rule);margin-left:6px;padding-left:12px;
+  display:flex;flex-direction:column;gap:7px}
+.side{display:flex;flex-direction:column;gap:12px}
+.sidebox{border:1px solid var(--rule);border-radius:3px;background:var(--card);padding:13px 15px;
+  display:flex;flex-direction:column;gap:7px}
+.sidebox .h{font-family:Archivo,sans-serif;font-weight:600;font-size:13px}
+.sidebox p{font-size:12.5px;color:var(--ink-2);margin:0}
+.k-ours{border-left:3px solid var(--brass)}
+.k-blocked{border-left:3px solid var(--bad)}
+.k-done{border-left:3px solid var(--good)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.d-done{background:var(--good)} .d-ours{background:var(--brass)} .d-block{background:var(--bad)}
+.d-none{background:var(--ink-3)}
+
+/* bandwidth bars */
+.bw{display:flex;flex-direction:column;gap:10px}
+.bwrow{display:grid;grid-template-columns:190px 1fr 92px;gap:14px;align-items:center}
+.bwlab{font-size:13px;color:var(--ink-2)}
+.bar{height:22px;background:var(--rule-2);border-radius:2px;overflow:hidden;display:flex}
+.seg{height:100%}
+.s-dense{background:var(--b16)} .s-fp8{background:var(--b8)} .s-exp{background:var(--b4)}
+.bwval{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:13px;text-align:right;color:var(--ink-2)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);
+  font-family:"IBM Plex Mono",monospace}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:1px;
+  margin-right:6px;vertical-align:baseline}
+.lg-dense::before{background:var(--b16)} .lg-fp8::before{background:var(--b8)}
+.lg-exp::before{background:var(--b4)}
+
+/* blockers */
+.blk{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:3px;
+  background:var(--card);overflow:hidden}
+.blkrow{display:grid;grid-template-columns:30px 1fr;gap:14px;padding:15px 18px;
+  border-bottom:1px solid var(--rule-2)}
+.blkrow:last-child{border-bottom:none}
+.blkn{font-family:Archivo,sans-serif;font-weight:700;font-size:19px;color:var(--teal);
+  font-variant-numeric:tabular-nums}
+.blkb{display:flex;flex-direction:column;gap:5px}
+.blkb code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--rule-2);
+  padding:1px 5px;border-radius:2px}
+.blkb .why{font-size:13px;color:var(--ink-2)}
+
+.callout{border-left:3px solid var(--brass);background:var(--brass-soft);padding:14px 18px;
+  border-radius:0 3px 3px 0;display:flex;flex-direction:column;gap:7px}
+.callout .h{font-family:Archivo,sans-serif;font-weight:600;font-size:14px}
+.callout p{font-size:13.5px;color:var(--ink-2)}
+footer{border-top:1px solid var(--rule);padding-top:20px;font-size:12.5px;color:var(--ink-3);
+  display:flex;flex-direction:column;gap:7px}
+a{color:var(--teal)}
+a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Qwen3.8-Flash-Next · one DGX Spark · GB10 / sm_121</div>
+  <h1>Flash-Next Quant Map</h1>
+  <p class="lede">A 125B-total / 6B-active model on one 128&nbsp;GB box. Which checkpoint you pick
+  decides both whether it <em>fits</em> and how fast it <em>decodes</em> — and those two are set by
+  different parts of the file.</p>
+
+  <div class="defs">
+    <p><b>&ldquo;Ours&rdquo; on this page means three distinct things.</b> Everything below was
+    produced on <b>one DGX Spark</b> &mdash; GB10, sm_121, 128&nbsp;GB unified memory &mdash;
+    running vLLM <code>0.1.dev20073+g8e685d198</code> on bare metal, no container.</p>
+    <dl>
+      <dt>ours &middot; checkpoint</dt>
+      <dd>A public checkpoint whose safetensors shards we rewrote on this box. Nothing is
+      retrained and nothing is recalibrated &mdash; weights are requantized in place.
+      <code>fp8head</code> is lovedheart&rsquo;s NVFP4-FP8 with <code>lm_head</code> quantized
+      to FP8 here.</dd>
+      <dt>measured</dt>
+      <dd>We ran it: our box, our harness, both arms of any comparison on the same day.</dd>
+      <dt>external</dt>
+      <dd>Someone else&rsquo;s published number, kept in its own row because engine, PLE
+      handling, speculation and clock policy differ simultaneously &mdash; not comparable to
+      a <em>measured</em> row.</dd>
+    </dl>
+    <p>Individual figures still depend on prompt length, concurrency and whether speculation was
+    on; those conditions are stated with each table rather than assumed.</p>
+  </div>
+</header>
+
+<section>
+  <div class="eyebrow">Where it lands today</div>
+  <div class="verdict">
+    <div class="v"><span class="k">Fits, decodes worst</span><span class="val num">17.1</span>
+      <span class="note">tok/s · RadixArk NVFP4, dense weights left in BF16</span></div>
+    <div class="v"><span class="k">Dense projections in FP8</span><span class="val num">23.7</span>
+      <span class="note">tok/s · lovedheart NVFP4-FP8 — same size, +39%</span></div>
+    <div class="v ours"><span class="k">+ lm_head quantized (ours)</span><span class="val num">26.1</span>
+      <span class="note">tok/s · first on GPU for this model, no quality cost</span></div>
+    <div class="v ours"><span class="k">+ MTP k=2</span><span class="val num">36.3</span>
+      <span class="note">tok/s · and the quantized head makes speculation <em>more</em> valuable, not less</span></div>
+  </div>
+  <p class="note">One internally consistent ladder, single stream, each step adding to the one
+  before it. Re-measured on 2026-08-28 at input-len 4000 / output-len 512, the last two steps read
+  <span class="num">26.4</span> and <span class="num">38.0</span> &mdash; the shape is the same,
+  the absolute values move with prompt length. Conditioned figures are in the tables below; see
+  <em>Aggregate throughput is mostly a statement about prompt length</em> for why a single
+  tok/s number is never portable on its own.</p>
+</section>
+
+<section>
+  <h2>What the model is, and where the bytes are</h2>
+  <p>48 layers in 12 repeats of <strong>3 × Gated&nbsp;DeltaNet → 1 × Qwen&nbsp;Sparse&nbsp;Attention</strong>,
+  512 experts with 10 active, and an n-gram table injected near the bottom of the stack. The colour
+  on the right is quantization state; the figure beside it is what that group costs
+  <em>per decoded token</em>.</p>
+
+  <div class="arch">
+    <div class="stack">
+
+      <div class="blk2 k-done"><span class="lbl"><span class="t">embed_tokens</span>
+        <span class="d">248,320 × 2,560 — one row read per token, not the matrix</span></span>
+        <span class="rt"><span class="perTok">~0</span><span class="dot d-none"></span></span></div>
+
+      <div class="blk2 k-blocked"><span class="lbl"><span class="t">PLE / n-gram table</span>
+        <span class="d">20 M n-grams × 16 heads × 160 dims, 128 shards — 47.7 GiB, offloaded. 16 rows per token = 2.5 KB, but 16 page faults</span></span>
+        <span class="rt"><span class="perTok">~0 GB</span><span class="dot d-done"></span></span></div>
+
+      <div class="rep">× 12 repeats — 48 layers</div>
+      <div class="brace">
+        <div class="blk2"><span class="lbl"><span class="t">3 × Gated DeltaNet <span style="font-weight:400;color:var(--ink-3)">(linear attention)</span></span>
+          <span class="d">in_proj_qkv / in_proj_z / out_proj — 36 layers</span></span>
+          <span class="rt"><span class="perTok">1.13 GB</span><span class="dot d-ours"></span></span></div>
+
+        <div class="blk2"><span class="lbl"><span class="t">1 × QSA <span style="font-weight:400;color:var(--ink-3)">(sparse full attention)</span></span>
+          <span class="d">24 Q / 2 KV heads, head_dim 256 — 12 layers</span></span>
+          <span class="rt"><span class="perTok">1.54 GB</span><span class="dot d-ours"></span></span></div>
+
+        <div class="blk2"><span class="lbl"><span class="t">MoE — 512 experts, top-10</span>
+          <span class="d">moe_intermediate 640; only 10 of 512 read per token</span></span>
+          <span class="rt"><span class="perTok">1.30 GB</span><span class="dot d-done"></span></span></div>
+
+        <div class="blk2"><span class="lbl"><span class="t">shared_expert</span>
+          <span class="d">640 intermediate — dense, runs on every token</span></span>
+          <span class="rt"><span class="perTok">0.47 GB</span><span class="dot d-none"></span></span></div>
+
+        <div class="blk2 k-blocked"><span class="lbl"><span class="t">hyper-connections</span>
+          <span class="d">hc_count 4, lowrank 320 — (320, 10240) mixing of residual streams, 2 per layer</span></span>
+          <span class="rt"><span class="perTok">1.32 GB</span><span class="dot d-block"></span></span></div>
+      </div>
+
+      <div class="blk2 k-ours"><span class="lbl"><span class="t">lm_head</span>
+        <span class="d">248,320 × 2,560 — full matrix every token, and once per <em>draft</em> token under MTP</span></span>
+        <span class="rt"><span class="perTok">1.27 → 0.64 GB</span><span class="dot d-ours"></span></span></div>
+
+      <div class="blk2"><span class="lbl"><span class="t">MTP drafter <span style="font-weight:400;color:var(--ink-3)">(1 layer)</span></span>
+        <span class="d">shares lm_head — only read when speculating</span></span>
+        <span class="rt"><span class="perTok">—</span><span class="dot d-none"></span></span></div>
+
+      <div class="blk2"><span class="lbl"><span class="t">vision tower <span style="font-weight:400;color:var(--ink-3)">(27 layers, 1152)</span></span>
+        <span class="d">never read during text decode</span></span>
+        <span class="rt"><span class="perTok">0</span><span class="dot d-none"></span></span></div>
+    </div>
+
+    <div class="side">
+      <div class="sidebox"><span class="h">Legend</span>
+        <p><span class="dot d-done"></span> quantized in the base checkpoint<br>
+        <span class="dot d-ours"></span> quantized by us or by lovedheart<br>
+        <span class="dot d-block"></span> blocked — see below<br>
+        <span class="dot d-none"></span> not a per-token cost, or untouched</p></div>
+
+      <div class="sidebox"><span class="h">The counter-intuitive part</span>
+        <p>At <strong>single stream</strong> the experts are 96% of the parameters and
+        <strong>20% of the per-token bytes</strong> — properly NVFP4, and only 10 of 512 are read.
+        The <strong>dense</strong> path is the small half of the model and dominates the clock.
+        <em>This reverses under load</em> — see below.</p>
+        <p style="margin-top:9px">Sharper still: <strong>GDN linear attention costs
+        <span class="num">1.95</span> GiB per token — more than all ten active experts
+        together (<span class="num">1.24</span>)</strong>. The largest single item in this
+        model is not the MoE.</p></div>
+
+      <div class="sidebox"><span class="h">Why the hyper-connections resist</span>
+        <p>The model hardcodes <code>quant_config=None</code> on all three projections — patched,
+        and now upstream as a commit. The 128-divisibility is a constant in vLLM's code, but it
+        <em>is</em> a real limit for the fast CUTLASS blockwise kernel: every hyper-connection shape
+        fails it (<span class="num">out%128</span> = 4 or 64, <span class="num">in%128</span> = 64),
+        so blockwise FP8 falls to a slow Triton path. <strong>Per-channel</strong> FP8 has no block
+        constraint and slices cleanly across the fused
+        <span class="num">[320, 4, 12] = 336</span> layer. We built it. It changed nothing —
+        see below.</p></div>
+
+      <div class="sidebox"><span class="h">Position decides composition</span>
+        <p><code>lm_head</code> is evaluated once per <em>draft token</em>, so quantizing it
+        <strong>compounds</strong> with speculation. Everything else is read once per <em>step</em>,
+        so it <strong>competes</strong>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Whether the experts matter depends entirely on concurrency</h2>
+  <p>The dense scaffolding is read <strong>once per step</strong> and shared by every sequence in
+  the batch. The experts are not: each additional sequence routes to <em>its own</em> ten of 512,
+  so the expert term grows with concurrency while the dense term is amortized away. The answer to
+  &ldquo;do the experts dominate?&rdquo; flips at <strong>c&nbsp;=&nbsp;4</strong>.</p>
+
+  <div class="scroll">
+<table>
+    <thead><tr>
+      <th>Concurrency</th><th>Distinct experts / layer</th><th>Experts per step</th>
+      <th>Dense per step</th><th>Expert share</th><th>GiB per token</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td class="n">10</td><td class="n">1.24 GiB</td><td class="n">4.89 GiB</td><td class="n">20%</td><td class="n">6.13</td></tr>
+      <tr><td class="n">2</td><td class="n">20</td><td class="n">2.47 GiB</td><td class="n">4.89 GiB</td><td class="n">34%</td><td class="n">3.68</td></tr>
+      <tr><td class="n">4</td><td class="n">40</td><td class="n">4.94 GiB</td><td class="n">4.89 GiB</td><td class="n">50%</td><td class="n">2.46</td></tr>
+      <tr><td class="n">8</td><td class="n">80</td><td class="n">9.89 GiB</td><td class="n">4.89 GiB</td><td class="n">67%</td><td class="n">1.85</td></tr>
+      <tr><td class="n">16</td><td class="n">160</td><td class="n">19.78 GiB</td><td class="n">4.89 GiB</td><td class="n">80%</td><td class="n">1.54</td></tr>
+      <tr><td class="n">32</td><td class="n">320</td><td class="n">39.55 GiB</td><td class="n">4.89 GiB</td><td class="n">89%</td><td class="n">1.39</td></tr>
+    </tbody>
+  </table>
+</div>
+  <p class="note">Expert counts are the no-overlap upper bound (<span class="num">min(512, 10c)</span>);
+  real routing overlaps somewhat, so treat these as a ceiling on the expert term. Derived from the
+  <code>fp8head</code> shard headers, not from the model card.</p>
+
+  <p>Two consequences we had not been reasoning about correctly. First, our headline number has
+  always been <strong>c&nbsp;=&nbsp;1</strong>, which is precisely the regime where the experts
+  matter <em>least</em> — every dense lever we pulled was aimed at the 80% that only exists at
+  single stream. Second, it explains the aggregate scaling: throughput rises just
+  <span class="num">4.6&times;</span> across <span class="num">16&times;</span> the concurrency,
+  because bytes per token fall only <span class="num">4.0&times;</span> as the growing expert term
+  eats the amortization.</p>
+</section>
+
+<section>
+  <h2>What speculation is worth, and where</h2>
+  <p>If the experts dominate at load and the batch already saturates the machine, then MTP's draft
+  tokens have no idle capacity left to exploit. Measured on <code>fp8head</code>, one box, one
+  method, both arms the same day:</p>
+
+  <div class="scroll">
+<table>
+    <thead><tr><th>Arm</th><th>c=1 decode t/s</th><th>c=1 TTFT</th><th>c=16 aggregate t/s</th><th>c=16 TTFT</th></tr></thead>
+    <tbody>
+      <tr><td class="name">MTP off <span class="sub">1 run</span></td><td class="n">26.4</td><td class="n">1.87 s</td><td class="n">96.6</td><td class="n">9.71 s</td></tr>
+      <tr class="ours"><td class="name">MTP k=2 <span class="sub">mean of 6 runs, 34.7&ndash;37.1</span></td><td class="n">35.7</td><td class="n">1.82 s</td><td class="n">99.1</td><td class="n">6.79 s</td></tr>
+      <tr><td class="name">MTP k=3 <span class="sub">1 run, inside the k=2 spread</span></td><td class="n">36.8</td><td class="n">1.75 s</td><td class="n">100.5</td><td class="n">7.29 s</td></tr>
+      <tr><td class="name">gain, k=2 over off</td><td class="n"><strong>+35%</strong></td><td class="n">&mdash;</td><td class="n">not measurable</td><td class="n">&minus;30%</td></tr>
+    </tbody>
+  </table>
+</div>
+  <p class="note">input-len 4000, output-len 512, <code>--max-num-seqs 16</code>, temp 0.6.
+  6 requests at c=1, 32 at c=16. <strong>Measured noise floor: six identical k=2 runs gave
+  34.7&ndash;37.1 tok/s</strong> &mdash; a <span class="num">6.9%</span> spread, so a single run
+  carries about <span class="num">&plusmn;4.6%</span> at 95%. Differences below roughly 10% are not
+  callable from single runs, here or anywhere else on this page.</p>
+
+  <p>Speculation does not <em>hurt</em> at saturation — it stops paying. <strong>+35% at single
+  stream; at c=16 the difference is inside the noise floor</strong> and so is not measurable at all. It still cuts TTFT by 30% there, which is the reason to keep it
+  on for agent work regardless of what it does for throughput.</p>
+
+  <p><strong>k=2 and k=3 cannot be told apart</strong> on this box. A single k=3 run gives 36.8,
+  inside the 34.7&ndash;37.1 range six identical k=2 runs produced, and above their 35.7 mean. An
+  earlier version of this page called k=2 the optimum by comparing k=3 against 38.0 &mdash; the top
+  of k=2's own spread. That was an endpoint-versus-spread error and the claim is withdrawn. What
+  <em>is</em> solid is counter-based rather than timed: k=3 accepts <span class="num">2.471</span>
+  tokens per iteration against k=2's <span class="num">2.133</span>, so the third draft step buys
+  15.8% more tokens and returns no measurable throughput.
+  The mechanism is named in the log: <code>Fused multi-step draft decode is not supported by
+  attention backend QWEN38_FLASH_NEXT_EXP_QSA_STATE; falling back to rebuilding attention metadata
+  between draft steps.</code> That rebuild is charged <em>per draft step</em>, so each extra
+  speculative token costs more than the last &mdash; an inverted U with a low peak. QSA carries a
+  stateful decode backend and the fused path has no implementation for it; this is a gap in the
+  model family's support, not a misconfiguration.</p>
+</section>
+
+<section>
+  <h2>Aggregate throughput is mostly a statement about prompt length</h2>
+  <p>Prefill is charged to the wall clock that aggregate t/s divides by, so the same server on the
+  same checkpoint reports wildly different &ldquo;throughput&rdquo; depending on the prompt:</p>
+
+  <div class="scroll">
+<table>
+    <thead><tr><th>c=16, output 256, MTP k=2</th><th>aggregate t/s</th><th>per-request decode</th><th>TTFT</th></tr></thead>
+    <tbody>
+      <tr><td class="name">input 256</td><td class="n">192.7</td><td class="n">14.8</td><td class="n">2.72 s</td></tr>
+      <tr><td class="name">input 1000</td><td class="n">127.5</td><td class="n">10.3</td><td class="n">2.44 s</td></tr>
+      <tr><td class="name">input 4000</td><td class="n">74.9</td><td class="n">6.1</td><td class="n">10.39 s</td></tr>
+    </tbody>
+  </table>
+</div>
+  <p class="note">A <span class="num">2.6&times;</span> swing with the model, checkpoint, engine and
+  concurrency all held fixed. <strong>Not a caching artefact</strong>: re-run with
+  <code>prefix_cache_hits_total</code> bracketing each arm, hits were <span class="num">0</span>
+  against <span class="num">10,538</span> and <span class="num">123,751</span> queried tokens
+  &mdash; the unique-id prompts bust the cache completely, and the re-run reproduced the effect
+  (<span class="num">184.5</span> / <span class="num">74.5</span>).</p>
+
+  <p>This is how the <span class="num">167.8</span> once recorded in the table below and a
+  <span class="num">96.6</span> measured on 2026-08-28 are both correct: the first was a
+  short-prompt run, the second used 4000-token inputs. Neither row had recorded its input length.
+  <strong>An aggregate t/s figure without a stated prompt length carries almost no information.</strong></p>
+</section>
+
+<section>
+  <h2>The axes that matter</h2>
+  <p>Repo names are actively misleading here — two checkpoints both called “NVFP4” can differ by
+  44&nbsp;GiB and be identical where it counts. Read the dtypes from the safetensors headers, then
+  ask which groups are read <em>on every token</em>.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>Checkpoint</th><th>Dense proj.</th><th>PLE table</th><th>lm_head</th>
+      <th>Size</th><th>Resident</th><th>tok/s c=1<span class="sub">MTP off</span></th><th>c=16<span class="sub">short prompt</span></th><th></th>
+    </tr></thead>
+    <tbody>
+      <tr class="ours">
+        <td class="name">ours · fp8head<span class="sub">lovedheart + lm_head quantized here</span></td>
+        <td><span class="chip c8">FP8</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c8">FP8</span></td>
+        <td class="n">122.8</td><td class="n">76.5</td><td class="n">26.1</td><td class="n">167.8</td>
+        <td><span class="tag t-ours">measured</span></td></tr>
+      <tr class="ours">
+        <td class="name">lovedheart · NVFP4-FP8<span class="sub">attention + GDN blockwise FP8</span></td>
+        <td><span class="chip c8">FP8</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">123.4</td><td class="n">74.1</td><td class="n">23.7</td><td class="n">156.0</td>
+        <td><span class="tag t-ours">measured</span></td></tr>
+      <tr>
+        <td class="name">RadixArk · NVFP4<span class="sub">the common baseline</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">125.9</td><td class="n">76.6</td><td class="n">17.1</td><td class="n">131.6</td>
+        <td><span class="tag t-ours">measured</span></td></tr>
+      <tr>
+        <td class="name">RadixArk · via mmap PLE<span class="sub">0xBakeer inference-atlas, same engine build</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">125.9</td><td class="n">—</td><td class="n">33.6</td><td class="n">—</td>
+        <td><span class="tag t-ext">external</span></td></tr>
+      <tr class="dead">
+        <td class="name">ours · fp8se <span class="sub">+ shared_expert — measured, rejected</span></td>
+        <td><span class="chip c8">FP8</span></td><td><span class="chip c8">FP8</span></td>
+        <td><span class="chip c8">FP8</span></td>
+        <td class="n">122.5</td><td class="n">78.5</td><td class="n">37.0</td><td class="n">—</td>
+        <td><span class="tag t-dead">not shipped</span></td></tr>
+      <tr class="dead">
+        <td class="name">local-inference-lab · 4p89<span class="sub">544 quantized layers — the widest coverage published</span></td>
+        <td><span class="chip cmix">MXFP8</span></td><td><span class="chip c4">NVFP4</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">102.4</td><td class="n">—</td><td class="n">—</td><td class="n">—</td>
+        <td><span class="tag t-dead">won't load</span></td></tr>
+      <tr class="dead">
+        <td class="name">Inferact · NVFP4<span class="sub">identical dense BF16 to RadixArk</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c16">BF16</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">170.2</td><td class="n">—</td><td class="n">—</td><td class="n">—</td>
+        <td><span class="tag t-dead">too large</span></td></tr>
+      <tr class="dead">
+        <td class="name">Qwen · Flash-Next<span class="sub">base model</span></td>
+        <td><span class="chip c16">BF16</span></td><td><span class="chip c16">BF16</span></td>
+        <td><span class="chip c16">BF16</span></td>
+        <td class="n">335.3</td><td class="n">—</td><td class="n">—</td><td class="n">—</td>
+        <td><span class="tag t-dead">too large</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="lede" style="font-size:13.5px">Sizes in GiB. Rows marked <em>measured</em> are one box,
+  one method, same day. The mmap row is external and differs in PLE mechanism, speculation and swap
+  — it is here because it pins the same engine build, not because it is a like-for-like cell.</p>
+</section>
+
+<section>
+  <h2>Why: an “A6B” model was moving 11 GB per token</h2>
+  <p>The experts are quantized properly and cost almost nothing. The <strong>dense</strong>
+  parameters — attention, GDN projections, lm_head, shared expert — are read in full on every
+  token, and most checkpoints leave them in BF16. They are 79% of the bytes and 67% of the
+  parameters.</p>
+  <div class="bw">
+    <div class="bwrow"><span class="bwlab">RadixArk (dense BF16)</span>
+      <span class="bar"><span class="seg s-dense" style="width:88.2%"></span><span class="seg s-exp" style="width:11.8%"></span></span>
+      <span class="bwval">10.98 GB</span></div>
+    <div class="bwrow"><span class="bwlab">lovedheart (attn+GDN FP8)</span>
+      <span class="bar"><span class="seg s-dense" style="width:45.2%"></span><span class="seg s-fp8" style="width:36.8%"></span><span class="seg s-exp" style="width:18.0%"></span></span>
+      <span class="bwval">7.25 GB</span></div>
+    <div class="bwrow"><span class="bwlab">+ lm_head FP8 (ours)</span>
+      <span class="bar"><span class="seg s-dense" style="width:30.4%"></span><span class="seg s-fp8" style="width:49.9%"></span><span class="seg s-exp" style="width:19.7%"></span></span>
+      <span class="bwval">6.61 GB</span></div>
+    <div class="bwrow"><span class="bwlab">if all dense were FP8</span>
+      <span class="bar"><span class="seg s-fp8" style="width:76.1%"></span><span class="seg s-exp" style="width:23.9%"></span></span>
+      <span class="bwval">5.44 GB</span></div>
+  </div>
+  <div class="legend">
+    <span class="lg-dense">dense, BF16</span><span class="lg-fp8">dense, FP8</span>
+    <span class="lg-exp">active experts, NVFP4</span>
+  </div>
+  <p class="lede" style="font-size:13.5px">At GB10’s 273 GB/s these set a floor of 40.2, 26.6 and
+  24.2 ms per token respectively. Three groups are <em>not</em> per-token reads and must be excluded
+  from this arithmetic: the vision tower, <code>embed_tokens</code>, and the MTP drafter. We
+  over-counted our own roofline by including them.</p>
+</section>
+
+<section>
+  <h2>Why nobody had quantized lm_head</h2>
+  <p>It is BF16 in every published GPU checkpoint. Not because it is unsafe — we measured
+  <strong>+11% at no quality cost</strong> — but because three independent pieces of vLLM plumbing
+  block it, and any one alone is sufficient.</p>
+  <div class="blk">
+    <div class="blkrow"><span class="blkn num">1</span><span class="blkb">
+      <span>The model never passes <code>quant_config</code> to <code>ParallelLMHead</code></span>
+      <span class="why">So <code>UnquantizedEmbeddingMethod</code> is installed unconditionally and the checkpoint’s declaration is never consulted.</span></span></div>
+    <div class="blkrow"><span class="blkn num">2</span><span class="blkb">
+      <span><code>config.json</code> is authoritative, and its <code>ignore</code> list contains <code>lm_head</code></span>
+      <span class="why">Editing <code>hf_quant_config.json</code> — the obvious file — changes nothing. The field you read for placement is the field you must write.</span></span></div>
+    <div class="blkrow"><span class="blkn num">3</span><span class="blkb">
+      <span>The vocab loader asserts every tensor is vocab-shaped</span>
+      <span class="why"><code>assert loaded_weight.shape[output_dim] == self.org_vocab_size</code> is true of the weight and false of its <code>[1940, 20]</code> block-scale companion.</span></span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Does a quantization lever compose with speculation?</h2>
+  <p>It depends on <strong>where the layer sits relative to the speculative loop</strong> — and we
+  got this wrong at first, publishing a flat “they are substitutes”.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Lever</th><th>MTP gain at c=1</th><th>MTP gain at c=16</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td class="name">dense projections → FP8</td><td class="n">+67% → +23%</td>
+        <td class="n">+2% → −6%</td>
+        <td>read once per <em>step</em> — both amortize the same read, so they <strong>compete</strong></td></tr>
+      <tr class="ours"><td class="name">lm_head → FP8</td><td class="n">+23% → <strong>+40%</strong></td>
+        <td class="n">−10% → <strong>+8%</strong></td>
+        <td>evaluated once per <em>draft token</em> plus verify — ~3× per step at k=2, so they <strong>compound</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="lede" style="font-size:13.5px">Acceptance is unchanged across both (mean accepted length
+  2.15 → 2.21), so this is pure speed rather than better drafting. Quantizing the head flipped
+  speculation from a net loss at high concurrency to a net gain.</p>
+</section>
+
+<section>
+  <h2>A constant that blocks a layer class on every GPU</h2>
+  <p><code>ModelOptFp8PbWoLinearMethod</code> refuses any layer whose dimensions are not both
+  divisible by 128. We assumed that reflected the kernel. It does not —
+  <code>TritonFp8BlockScaledMMKernel</code> declares <strong>no shape constraint at all</strong>
+  and passes the block size through as a runtime list; the Triton kernel takes
+  <code>group_n</code>/<code>group_k</code> as runtime arguments. Cutlass validates only the
+  <em>activation</em> group shape.</p>
+  <div class="blk">
+    <div class="blkrow"><span class="blkn num">1</span><span class="blkb">
+      <span>The 128 lives in one class constant</span>
+      <span class="why"><code>_WEIGHT_BLOCK_SIZE = (128, 128)</code> — one line makes a layer class unquantizable everywhere, not just on sm_121.</span></span></div>
+    <div class="blkrow"><span class="blkn num">2</span><span class="blkb">
+      <span>Blocks need not be square</span>
+      <span class="why"><span class="num">(320, 10240)</span> wants <span class="num">(64, 128)</span>; <span class="num">(10240, 320)</span> wants <span class="num">(128, 64)</span>. Assuming square silently handles half the tensors.</span></span></div>
+    <div class="blkrow"><span class="blkn num">3</span><span class="blkb">
+      <span>But fusion is a real blocker</span>
+      <span class="why">The down-projection is a <code>MergedColumnParallelLinear</code> of <span class="num">[320, 4, 12] = 336</span>. A blockwise scale cannot span a fusion boundary when one shard is 4 wide — no block size divides 4, 320 and 12 together.</span></span></div>
+  </div>
+  <div class="callout">
+    <span class="h">Checkpoint shapes are not runtime shapes</span>
+    <p>We reasoned about <span class="num">(320, 10240)</span> read from the checkpoint headers for a
+    day. The layer vLLM actually builds is <strong>336</strong> wide, and that number appears
+    nowhere until the error message. Same class of mistake as reading
+    <code>hf_quant_config.json</code> when vLLM reads <code>config.json</code>: the artefact you
+    inspect is not the artefact the code consumes.</p>
+  </div>
+</section>
+
+<section>
+  <h2>A lever we measured and rejected</h2>
+  <p><code>shared_expert</code> is eligible for the same proven scheme, worth 0.47 GB/token, and
+  quantized by four other projects — none of which published what it costs. We measured it:
+  <strong>+1.9% at c=1, −2.8% at c=8, for +2.06% NLL.</strong> Unlike the dense projections (−1.8%)
+  and <code>lm_head</code> (−0.6%), both noise with mixed signs, that regression is directional.
+  We are not shipping it.</p>
+  <div class="callout">
+    <span class="h">And the roofline over-predicted, which matters for every projection here</span>
+    <p>0.47 GB of a 5.61 GB budget is 8.4% of the bytes and should have bought ~8%. It bought 1.9%.
+    The roofline assumes every byte removed is a byte the GPU was <em>waiting on</em> — true for the
+    dense projections at <span class="num">(10240, 2560)</span>, false for a
+    <span class="num">(640, 2560)</span> small matmul that is latency-bound. The roofline is an
+    upper bound whose tightness depends on matrix size; we had been reading it as a predictor.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Three attempts on the hyper-connections, three nulls, and the error underneath</h2>
+  <p>A profile put <strong>25% of GPU kernel time</strong> in
+  <code>cutlass_80_wmma_tensorop_bf16</code> — Ampere-generation kernels on a Blackwell part —
+  and identified them as the hyper-connections. That looked like the largest remaining lever on
+  the box. Everything aimed at it missed:</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Attempt</th><th>What it changed</th><th>Decode tok/s, c=1</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td class="name">blockwise FP8 <span class="sub">FP8_PB_WO on <code>_up</code></span></td>
+        <td>precision</td><td class="n">35.0 vs 36.3</td><td>slower</td></tr>
+      <tr><td class="name">CUTE-DSL skinny GEMM <span class="sub">sm_121 gate + M=3 plan entry</span></td>
+        <td>kernel, fused down projection</td><td class="n">35.92 vs 36.45</td><td>null</td></tr>
+      <tr><td class="name">per-channel FP8 <span class="sub">96 <code>_up</code> projections</span></td>
+        <td>half the bytes <em>and</em> the faster kernel</td><td class="n">36.05 vs 36.45</td><td>null</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">All arms n=6 from empty compile caches, against a measured noise floor of 6.9%.
+  Kernel dispatch was verified at the call site, not assumed — an earlier round of this
+  measurement was invalid because a stale compiled graph replayed pre-patch code.</p>
+
+  <p><strong>An earlier version of this page blamed a prefill-contaminated profile. That was
+  wrong, and testing it is what settled the matter.</strong> The first trace was taken over
+  <code>--input-len 4000</code>, i.e. 16,000 prefill tokens against 2,048 decode tokens, so the
+  suspicion was reasonable. A decode-only re-profile — 12-token prompt, 600 generated tokens,
+  warmed first — produces essentially the same ranking:</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Kernel group</th><th>Mixed profile</th><th>Decode-only profile</th></tr></thead>
+    <tbody>
+      <tr><td class="name">FP8 blockwise (GDN, QSA, lm_head)</td><td class="n">32.2%</td><td class="n">34.5%</td></tr>
+      <tr class="ours"><td class="name">BF16 wmma (hyper-connections)</td><td class="n">25.0%</td><td class="n">26.6%</td></tr>
+      <tr><td class="name">MoE grouped GEMM</td><td class="n">22.1%</td><td class="n">22.2%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Decode-only trace: 9.65 M events, 14.7 s span, GPU busy 89.8%, 643 k kernel
+  launches.</p>
+
+  <p>So the hyper-connections really are about a quarter of <em>decode</em> GPU time, the GPU
+  really is busy, and three interventions on them still changed nothing measurable. Those three
+  facts are all solid and they do not yet reconcile. What we can rule out: the layers are not
+  mis-ranked, the GPU is not idle, and the kernels provably dispatched.</p>
+
+  <p>The live hypothesis is narrower — that FP8 does not actually speed up <em>these</em> shapes.
+  The per-channel path routes <span class="num">(10240, 320)</span> at M&nbsp;≤&nbsp;8 through
+  <code>scaled_mm</code>, and a K of 320 is small enough that halving the bytes may buy nothing
+  against a warp-level BF16 WMMA kernel that is already latency-bound rather than
+  bandwidth-bound. That is measurable directly, per shape, without touching the server — and it
+  is the next thing to measure rather than assert.</p>
+
+  <p><strong>Profile the regime you intend to measure.</strong> A decode-truthful profile needs a
+  short prompt and a long generation, warmed first so JIT and cudagraph capture stay out of the
+  trace. A profile over a realistic serving mix answers <em>where does this workload spend
+  time</em> — a different question from <em>what raises decode tok/s</em>.</p>
+</section>
+
+<section>
+  <h2>Quality</h2>
+  <p>Two paired comparisons, each on one corpus. They are <strong>not</strong> comparable across
+  rows — different corpora give different absolute NLL, so only the deltas mean anything.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Comparison</th><th>Corpus</th><th>Baseline</th><th>Variant</th><th>Δ</th><th>Reading</th></tr></thead>
+    <tbody>
+      <tr><td class="name">dense BF16 → FP8</td><td class="n">276 tok</td>
+        <td class="n">0.7748</td><td class="n">0.7610</td><td class="n">−1.8%</td>
+        <td>5 of 6 chunks better — no regression</td></tr>
+      <tr class="ours"><td class="name">lm_head BF16 → FP8</td><td class="n">646 tok</td>
+        <td class="n">0.9687</td><td class="n">0.9628</td><td class="n">−0.6%</td>
+        <td>9 of 14 better, 5 worse — mixed signs, i.e. noise</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout">
+    <span class="h">Do not use the published metrics files to compare checkpoints</span>
+    <p><code>gsm8k_metrics.json</code> and <code>aime26_metrics.json</code> are byte-identical
+    (<span class="num">sha256 88766f7e…</span>, same <code>latency_seconds</code> to ten decimals)
+    across a plain NVFP4 build, an FP8 dense-quantized fork of it, <em>and</em> a 512→448
+    expert-pruned variant. The <code>model</code> field inside names the original build. Hash them
+    before letting them inform a decision — we repeated those figures ourselves before checking.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Two environment variables, both mandatory, neither documented</h2>
+  <div class="blk">
+    <div class="blkrow"><span class="blkn num">A</span><span class="blkb">
+      <span><code>VLLM_USE_DEEP_GEMM=0</code></span>
+      <span class="why">DeepGEMM’s gate accepts the whole <code>120</code> capability family, which sm_121 satisfies — so vLLM routes blockwise FP8 to a kernel that then faults with <code>CUDA error: unspecified launch failure</code> during the startup profile run. Falls back to Cutlass and works. <a href="https://github.com/vllm-project/vllm/issues/54125">vllm#54125</a></span></span></div>
+    <div class="blkrow"><span class="blkn num">B</span><span class="blkb">
+      <span><code>VLLM_GDN_DECODE_KERNEL=triton</code></span>
+      <span class="why">With FP8 GDN projections the default CUDA kernel hangs the engine at concurrency ≈32 — no error, requests simply stall.</span></span></div>
+  </div>
+  <p class="lede" style="font-size:13.5px">Both are reachable only through blockwise-FP8 weights, so
+  they appear exactly when you adopt the checkpoint class that helps most.</p>
+</section>
+
+<section>
+  <h2>Two defects that decide whether the model is usable, and no speed test can see</h2>
+  <p>Found after a full day of throughput work, on a server that had been benchmarking cleanly
+  throughout.</p>
+  <p><strong>Tool calling was rejected outright.</strong> The launcher set
+  <code>--reasoning-parser qwen3</code> and nothing else, so every request carrying a
+  <code>tools</code> field returned <span class="num">HTTP 400</span>. Adding
+  <code>--enable-auto-tool-choice --tool-call-parser qwen3_xml</code> fixes it:
+  <strong>32/32</strong> across temperatures <span class="num">0.2 / 0.6 / 1.0</span> and default,
+  correct function name every time. <code>--tool-call-parser qwen3</code> is <em>not</em> valid —
+  the reasoning parser is <code>qwen3</code>, but the tool side registers only as
+  <code>qwen3_coder</code> and <code>qwen3_xml</code>, two names for the same class.</p>
+  <p><strong><code>--max-model-len 8192</code> could not hold the model's own reasoning.</strong>
+  One code task emitted <span class="num">31,115</span> characters of thinking before
+  <span class="num">12,931</span> of content. 8192 was chosen for benchmarking and was never going
+  to serve real work.</p>
+  <div class="callout">
+    <span class="h">Why neither is visible to any measurement on this page</span>
+    <p>Throughput, acceptance, NLL, divergence and coherence tests never send a <code>tools</code>
+    field and never run a generation long enough to overflow the window. <strong>A serving config
+    has capabilities, not just speed</strong> — probe both before benchmarking a new recipe.</p>
+  </div>
+</section>
+
+<section>
+  <h2>The concurrency ceiling is real, and we nearly blamed our own cap</h2>
+  <p>Every concurrency number here was taken at <span class="num">c=16</span> against
+  <code>--max-num-seqs 16</code> — the cap bound exactly where we measured, which makes a flat
+  aggregate indistinguishable from a queue. Raising the cap to 64, changing nothing else:</p>
+  <table>
+    <thead><tr><th></th><th>SEQS 16</th><th>SEQS 64</th></tr></thead>
+    <tbody>
+      <tr><td>c=1 decode tok/s</td><td class="num">36.45 ± 1.04</td><td class="num">36.83</td></tr>
+      <tr><td>c=16 aggregate tok/s</td><td class="num">99.1 / 101.5 / 100.1</td><td class="num">97.2 / 101.4 / 100.7</td></tr>
+      <tr><td>c=32 aggregate tok/s</td><td class="num">not reachable</td><td class="num">110.1, TTFT 30.7 s</td></tr>
+    </tbody>
+  </table>
+  <p>Both moves sit inside the <span class="num">6.9%</span> noise floor. <strong>~100 tok/s at
+  c=16 is a bandwidth ceiling, not a cap artifact</strong>, and c=32 buys +10% aggregate for 4× the
+  TTFT — the wrong trade for agent work, which we rank by TTFT.</p>
+  <p>A separate recipe reports <span class="num">96–109</span> tok/s aggregate at
+  <code>SEQS=16</code> on the same hardware with a different checkpoint, speculation setting and
+  prompt length. Two independent configurations landing on the same number is much better evidence
+  for a ceiling than either alone. Their published <span class="num">1.2–2.7×</span> SEQS win came
+  from raising a baseline of <strong>2</strong> slots, not 16 — the same curve, below its knee.</p>
+  <div class="callout">
+    <span class="h">The 266.8 tok/s figure is a different configuration</span>
+    <p>An earlier uncapped sweep reached <span class="num">266.8</span> tok/s at c=48. That was the
+    <em>baseline</em> checkpoint — its c=1 row is <span class="num">17.1</span> — with speculation
+    off and short prompts. It is <strong>not comparable</strong> to the 110 above, which is the
+    shipped config at 4000-token inputs, and reading the two side by side manufactures a regression
+    that does not exist.</p>
+  </div>
+</section>
+
+<section>
+  <h2>The MoE backend axis, and a lever that was never untried</h2>
+  <p>SM120 and SM121 have <strong><span class="num">99 KiB</span> (101,376 B) of shared memory per
+  block</strong>, not the 228 KiB "Blackwell" figure — that is SM100/B200 only. CUTLASS's
+  <code>StageCountAutoCarveout</code> assumes the larger budget, picks ~6 stages, and overflows on
+  the Pingpong schedule. It surfaces as a device-side assert at
+  <code>nvfp4_blockwise_moe.cuh:78</code>, which is the next <code>cudaMallocAsync</code> sync
+  point and <em>not</em> the faulting line.</p>
+  <table>
+    <thead><tr><th>backend</th><th>status here</th></tr></thead>
+    <tbody>
+      <tr><td class="num">FLASHINFER_CUTLASS</td><td>what <code>moe_backend='auto'</code> resolves to, and what every measurement on this page used</td></tr>
+      <tr><td class="num">flashinfer_b12x</td><td>rejected — <em>not supported for unquantized MoE</em>; the MTP drafter's MoE is unquantized and <code>--moe-backend</code> is global. With MTP off it faults with an IMA</td></tr>
+      <tr><td class="num">triton, cutlass</td><td>hit the SMEM overflow above</td></tr>
+      <tr><td class="num">TRTLLM, CUTEDSL, VLLM_CUTLASS, MARLIN, HUMMING</td><td>untried, and no field evidence favours any of them on sm_121</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <span class="h">We wrote this up as a cheap untried lever. It was never untried.</span>
+    <p>The workaround is real, but <code>auto</code> already selects
+    <code>FLASHINFER_CUTLASS</code> on this box and always has — for the NVFP4 experts and for the
+    drafter's unquantized MoE alike. So the finding explains a <strong>non-event</strong>: why that
+    assert has never fired here. One <code>grep</code> of a log we already had would have caught it
+    before it was ranked as work.</p>
+  </div>
+</section>
+
+<section>
+  <h2>A startup deadlock we were winning by luck</h2>
+  <p>Four independent reporters — GB10, GX10, and two discrete-VRAM Blackwell cards — hang at
+  <code>warmup_kernels</code> with PLE CPU offload enabled, the offload thread parked in
+  <code>_copy_cuda_inputs</code> and the worker idle because the request is never sent. We have
+  never reproduced it, on this exact code, across many restarts, with and without speculation.</p>
+  <p>The cause is visible in the shipped tree without any hardware. <code>PleOffloadConnector</code>
+  allocates <strong>one</strong> <code>_input_ready_event</code> for the whole connector, on a
+  stated assumption that only one request is ever outstanding. Under async scheduling —
+  <strong>on by default</strong>; <code>"mtp"</code> sits inside <code>EagleModelTypes</code> so
+  speculation does not disable it — two batches are in flight, and
+  <code>_launch(#2)</code> re-records that same event behind forward #1's PLE semaphore wait. The
+  offload thread then waits on a record the model stream cannot reach until it sends request #1,
+  while the main thread's device-wide <code>synchronize()</code> waits on the D2H stream.</p>
+  <p>That explains what a PCIe-latency account cannot: unified memory reproduces it (the copies are
+  cheap; the <em>wait</em> hangs), eager only narrows the window, and an air-gapped box serves for
+  two days then hangs on the third identical boot. Upstream replaced the shared events with a
+  per-request pool. Backported here: serves in <span class="num">680 s</span>, c=1 decode
+  <span class="num">38.1 / 36.5 / 34.8</span> against a <span class="num">36.45 ± 1.04</span>
+  reference — no cost.</p>
+</section>
+
+<section>
+  <h2>Prefix caching does nothing below 1600 tokens</h2>
+  <p>This model forces the attention block size <strong>up</strong> to match its Mamba state page:
+  <em>"Setting attention block size to 1600 tokens to ensure that attention page size is >= mamba
+  page size"</em>, then pads the mamba page by <span class="num">0.88%</span> so the two are exactly
+  equal. A prompt shorter than one block therefore has no full block to cache.</p>
+  <p>The counters say so plainly: <strong><span class="num">0</span> hits against
+  <span class="num">77,254</span> queries</strong> across every benchmark on this page. Repeating an
+  identical ~1400-token prompt four times produces zero hits; a ~5,700-token prompt hits from the
+  third request onward. The delay to the third is a separate, documented quirk of this box — the
+  first repetition never hits — which is why any check of this needs at least three requests, not
+  two.</p>
+  <div class="callout">
+    <span class="h">What this means for the numbers here, and what is still open</span>
+    <p>Nothing on this page benefited from prefix caching, because benchmark prompts are unique per
+    request. Agent loops reuse prefixes and would — above 1600 tokens. Whether a cache hit
+    <em>changes the answer</em> on this architecture is a live question, raised by a report of an
+    all-zero restored Mamba state on a build that conflates the 16-token attention block with the
+    1600-token state block. Ours equalizes them instead, so we are probably not exposed; a
+    controlled on/off determinism test is running and this section will be updated with its result
+    rather than its expectation.</p>
+  </div>
+</section>
+
+<section>
+  <h2>What the field settled, and what it did not</h2>
+  <ul>
+    <li><strong>SGLang cannot serve this model on GB10.</strong> Its QSA decode resolver gates on
+    <code>is_sm100_supported()</code>; classic FA2 is absent and has no Blackwell kernels, so it
+    falls through to a flash-attn-4 CuTe path that will not compile there. The reporter verified the
+    flashinfer kernel <em>itself</em> runs correctly on SM121 at
+    <span class="num">4.70e-04</span> max abs diff — a gate, not a kernel, exactly like the four
+    layers of "installed but not running" documented above. Base support and the resolver fix are
+    both unmerged; the fix does cover GB10, since the gate it adds tests major 12.</li>
+    <li><strong>NVFP4 KV is closed, on a third independent measurement:</strong>
+    <span class="num">44.0</span> tok/s against <span class="num">56.8–58.6</span> for
+    <code>fp8_e4m3</code> on SM121. Note what that says about the alternative — fp8 and bf16 are
+    roughly speed-neutral, so <strong>FP8 KV buys pool size, not throughput</strong>.</li>
+    <li><strong>FP8 KV has a known collision with QSA:</strong> the FA4 decode call receives BF16
+    queries with FP8 K/V and asserts that all three dtypes match. That is precisely the plumbing an
+    FP8-QSA-KV build needs, failing in another stack — worth a source read before a build.</li>
+    <li><strong>llama.cpp's own support merged</strong> on 2026-08-27, subsuming two community
+    patches. It is a separate implementation; the vLLM one still exists only on its PR branch.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>The most comparable external run, and a number of ours it withdrew</h2>
+  <p>A single-Spark submission on <a href="https://spark-arena.com">spark-arena.com</a> is the
+  closest external comparison we have found — <strong>same runtime, same hardware, same model
+  family</strong>, TP=1. It serves <code>provsalt/Qwen3.8-Flash-Next-NVFP4-PLE-NVFP4</code> with
+  <code>VLLM_PLUGINS=qwen38_nvfp4_ple</code>, PLE CPU offload, MTP <span class="num">k=3</span> and
+  262,144 context.</p>
+  <table>
+    <thead><tr><th>depth 4,096 · c=1</th><th>that submission</th><th>here</th></tr></thead>
+    <tbody>
+      <tr><td>decode tok/s</td><td class="num">16.2</td><td class="num">36.5</td></tr>
+      <tr><td>prefill tok/s</td><td class="num">1,261</td><td class="num">~2,100–2,350</td></tr>
+    </tbody>
+  </table>
+  <p>About <strong>2.2× on decode and 1.7–1.9× on prefill</strong> at comparable depth. The likely
+  reason is the part of this page that is not in their stack: they run the <em>published</em> NVFP4,
+  which leaves the dense projections in BF16 — the same <span class="num">+39%</span> lever from the
+  ladder above — and an unquantized <code>lm_head</code>.</p>
+  <div class="callout">
+    <span class="h">A claim of ours that this checking withdrew</span>
+    <p>Hours earlier we wrote that a llama.cpp recipe's <span class="num">415</span> tok/s prefill at
+    32k beat "our ~320 tok/s". <strong>That 320 was not ours.</strong> It came from dividing a
+    <span class="num">~100 s at 32k</span> figure belonging to the Qwen3.8-<strong>27B</strong> work
+    and applied to this model. <strong>We have never measured Flash-Next prefill at 32k.</strong>
+    What we have is 4,000-token inputs at TTFT <span class="num">1.69–1.94 s</span>. The conclusion
+    that we were behind on prefill was manufactured out of a borrowed number, and is withdrawn — as
+    is the ranking in the other direction, since the depths still differ.</p>
+  </div>
+  <p>Three things worth taking from it regardless:</p>
+  <ul>
+    <li><strong>An NVFP4 PLE table exists, ships and loads</strong>, through a vLLM plugin and a
+    public container digest. At ~<span class="num">26.8</span> GiB against the
+    ~<span class="num">47.7</span> we run at FP8, that is roughly <strong>21 GiB of unified memory
+    back</strong>. The size was already on our map; a working checkpoint was not.</li>
+    <li><strong>Their prefill is flat with depth</strong> — <code>ctx_pp</code> stays between
+    <span class="num">1,231</span> and <span class="num">1,600</span> tok/s from 4k to 100k, while
+    decode decays hard (<span class="num">16.2 → 1.5</span> at c=10, d100k). Flat prefill is a
+    target shape for a depth curve we have never run.</li>
+    <li><strong>They run PLE offload without <code>--distributed-executor-backend mp</code></strong>,
+    using a 900 s ready timeout instead. Either their build carries the uniproc fix or the timeout
+    hides the startup race — worth knowing before anyone calls <code>mp</code> mandatory.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Kernel work elsewhere: QSA on llama.cpp</h2>
+  <p>A separate single-Spark repo publishes a QSA CUDA patch for llama.cpp — fused
+  <code>ggml_get_rows_mean</code> with RMS weighting, <code>__ldg</code> half2/float4 loads on the
+  lightning WMMA path, a compact FA gather at <code>topk=2048</code>, and indexer Q padded 4→8 so
+  lightning reaches WMMA. It roughly <strong>doubles long-context decode</strong>:
+  <span class="num">11.35 → 18.73</span> tok/s at 64k and <span class="num">5.60 → 11.55</span> at
+  229k, with TTFT essentially unchanged. They also publish what they reverted, which is the half
+  most repos omit.</p>
+  <p>Two of their results bear on ours directly. <strong>Acceptance is batch-geometry dependent:</strong>
+  same binary, draft and prompt, <code>-b 512 -ub 128</code> gives 33.3% acceptance while
+  <code>-b 2048 -ub 512</code> collapses to 3.7% <em>and the target output diverges</em>. Our own
+  open acceptance gap — <span class="num">56.6%</span> here against
+  <span class="num">73.7%</span> and <span class="num">75.6%</span> reported elsewhere — may be a
+  comparison of numbers that were never measured under the same geometry. And
+  <strong>speculation loses at long context</strong> on their fast kernels: MTP at 229k ran
+  <em>slower</em> than the same kernels plain autoregressive, and cost 8.4% and 6.7% of prefill at
+  16k and 32k.</p>
+  <div class="callout">
+    <span class="h">A method we are adopting from them</span>
+    <p>They <strong>lock output hashes before making any speed claim</strong> and label every row
+    measured under a different protocol as not comparable. We verify checksums on <em>weights</em>;
+    they verify hashes on <em>outputs</em>. Theirs is the guard that would have caught our
+    corrupt-shard episode, where size-correct byte-corrupt shards produced fluent garbage that was
+    invariant to every configuration change.</p>
+  </div>
+</section>
+
+<footer>
+  <div>Measured on one NVIDIA GB10 (DGX Spark, sm_121, 128 GB unified), vLLM
+  <span class="num">0.1.dev20073+g8e685d198</span>, PLE CPU offload, 8192 ctx, no speculation unless
+  stated. Decode is clock-sensitive on this hardware — GB10 parks bandwidth-bound decode at ~82% of
+  max SM clock (<span class="num">2411–2522</span> against <span class="num">3003</span> MHz) and
+  locking does not move it, so absolute figures are not comparable across projects.</div>
+  <div>Sources and raw data: <code>bench/flashnext-quants/</code> in the setup guide ·
+  external row from <a href="https://0xbakeer.github.io/inference-atlas/">inference-atlas</a>.</div>
+</footer>
+
+</div>

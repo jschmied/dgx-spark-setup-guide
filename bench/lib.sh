@@ -49,6 +49,12 @@ sampling_for() {
     # generous max_tokens or it burns the budget in <think> and scores a FAIL it never
     # earned. The card's NON-thinking set is different (0.7 / 0.80 / 20 / presence 1.5).
     qwen38-27b)          echo "1.0 0.95 20 0    0"   ;;
+    # flashnext (Qwen3.8-Flash-Next): vendor generation_config.json ->
+    # temperature 1.0, top_p 0.95, top_k 20. Same family as qwen38-27b.
+    # NOTE: its template defaults reasoning_effort to xhigh, which does not
+    # converge (all budget in <think>, empty content) -- pass
+    # BENCH_REASONING_EFFORT=medium.
+    flashnext)           echo "1.0 0.95 20 0    0"   ;;
     # step-37: card documents only temp 1.0; top_p/top_k/min_p unspecified, so
     # mild neutral nucleus. Heaviest model in the roster (Q3_K_XL ~84 GB, swaps) and
     # a reasoning model (needs generous max_tokens) — not in the run-all.sh default

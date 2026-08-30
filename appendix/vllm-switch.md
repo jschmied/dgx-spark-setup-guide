@@ -590,3 +590,156 @@ back cleanly to a placeholder. Only video input is affected.
 
 Verified: the clean bare-metal venv reproduces the container result exactly — 17.0–17.1 tok/s
 against the container's 17.1–17.3, same checkpoint and flags.
+
+### Check what your runtime dispatches before downloading a quantized checkpoint
+
+A quantization format the runtime **rejects** gives you an error. One it does not **recognise**
+silently reinterprets the bytes. The second is far more dangerous, and it is a ten-second offline
+check.
+
+ModelOpt `MIXED_PRECISION` checkpoints declare a `quant_algo` per layer group.
+`ModelOptMixedPrecisionConfig.get_quant_method()` dispatches a fixed list and then falls through
+to `UnquantizedLinearMethod()`, which loads packed low-precision bytes into BF16 parameters. No
+error, no warning, fluent garbage.
+
+```bash
+# what does this vLLM dispatch?
+$VENV/bin/python - <<'EOF'
+import re, vllm.model_executor.layers.quantization.modelopt as m
+s = open(m.__file__).read()
+i = s.index("class ModelOptMixedPrecisionConfig"); j = s.index("def get_quant_method", i)
+print(sorted(set(re.findall(r'quant_algo == "([A-Z0-9_]+)"', s[j:j+2600]))))
+EOF
+
+# what does the checkpoint declare?
+jq -r '.quantization.quantized_layers[].quant_algo' hf_quant_config.json | sort -u
+```
+
+The second list must be a subset of the first. On 2026-08-27 our snapshot
+(`0.1.dev20073+g8e685d198`) dispatched `FP8, MXFP8, NVFP4, W4A16_NVFP4` but **not** `FP8_PB_WO`
+(blockwise 128x128 weight-only), which `lovedheart/Qwen3.8-Flash-Next-NVFP4-FP8` uses for its
+attention and GDN projections. vLLM `main` has the branch and the method class already existed in
+our tree, so the fix was one line:
+
+```python
+if quant_algo == "FP8_PB_WO":
+    return ModelOptFp8PbWoLinearMethod(self.fp8_config)
+```
+
+`ModelOptFp8PbWoLinearMethod` additionally requires **both** matrix dimensions divisible by 128 —
+check the checkpoint's own shapes (its `fp8_quant_report.csv`, or the safetensors headers) before
+committing to a download.
+
+Related, from the same family: `MIXED_PRECISION` reads **`quantized_layers`**, not
+`config_groups`. A checkpoint declaring the latter yields a W4A4 kernel with no `input_scale` and
+zero-length output, also silently.
+
+### Diff two HF repos before downloading either
+
+HuggingFace publishes `lfs.sha256` alongside file sizes, so two checkpoints can be diffed exactly
+for the cost of two API calls. Quantization repos are usually **forks** — someone re-does one axis
+and leaves the expensive bulk untouched.
+
+```bash
+for r in RepoA RepoB; do
+  curl -s "https://huggingface.co/api/models/$r?blobs=true" \
+    | jq -r '.siblings[]|select(.lfs)|"\(.lfs.sha256)  \(.rfilename)"' | sort > /tmp/$r.sums
+done
+join -j2 /tmp/RepoA.sums /tmp/RepoB.sums | awk '$2!=$3{print $1}'
+```
+
+Switching from `RadixArk/Qwen3.8-Flash-Next-NVFP4` to `lovedheart/…-NVFP4-FP8` looked like a
+123.4 GiB download; 202 of 206 shards were byte-identical, so it was **12.45 GiB** plus hardlinks,
+which cost zero disk. Verify all 206 against the *new* repo's hashes afterwards — a hardlink is
+only as trustworthy as the file it points at.
+
+---
+
+## A.9 Quantization coverage is the decode lever on GB10
+
+The single most productive thing we measured on this box in August 2026: for a sparse-MoE model,
+**decode speed is set by the DENSE parameters, not the experts** — and most published checkpoints
+leave them alone.
+
+### The arithmetic
+
+`Qwen3.8-Flash-Next` is "125B total, 6B active". On `RadixArk/Qwen3.8-Flash-Next-NVFP4`:
+
+| component | params | bytes/param | GB/token |
+|---|---:|---:|---:|
+| dense weights (BF16, **unquantized**) | 4.84 B | 2.00 | **9.68** |
+| active experts (NVFP4, correct) | 2.36 B | 0.55 | 1.30 |
+| | | | **10.98** |
+
+An A6B model moving **11 GB/token** when it should move ~4. The BF16 dense weights are 79% of the
+bytes and only 67% of the parameters. A torch profile agrees independently: **69% of single-stream
+wall time is cuBLAS BF16 mat-vec (GEMV)**, against 0.8% for the properly-quantized experts.
+
+Switching to a checkpoint that quantizes the attention and GDN projections to FP8
+(`lovedheart/Qwen3.8-Flash-Next-NVFP4-FP8`) gave **+39% single-stream and +55% at c=4, at no
+measurable quality cost** (NLL/token 0.7610 vs 0.7748 on identical held-out chunks) — and it is
+*smaller*, 74.13 GiB vs 76.61, which buys 2.5 GiB more KV.
+
+### Check coverage before blaming the engine
+
+For any quantized checkpoint, read the dtype census straight from the safetensors headers and ask
+which groups are **read on every token**:
+
+```bash
+python - <<'EOF'
+import json, struct, os, collections
+M = "/path/to/checkpoint"
+idx = json.load(open(f"{M}/model.safetensors.index.json"))["weight_map"]
+agg = collections.Counter()
+for f in sorted(set(idx.values())):
+    with open(os.path.join(M, f), "rb") as fh:
+        n = struct.unpack("<Q", fh.read(8))[0]
+        hdr = json.loads(fh.read(n))
+    for k, v in hdr.items():
+        if k == "__metadata__": continue
+        c = 1
+        for s in v.get("shape", []): c *= s
+        agg[(k.split(".")[-2] if "." in k else k, v["dtype"])] += c
+EOF
+```
+
+Three groups are **not** per-token reads and must be excluded from the roofline, or you will
+overstate it — as we did:
+
+- the **vision tower** (only with an image),
+- **`embed_tokens`** (one row per token, not the matrix),
+- the **MTP drafter** (only when speculating), and expert weights left in BF16 (sparse, 10/512).
+
+### Speculation and quantization are substitutes
+
+Both amortize the same per-token weight read. Measured on the same box:
+
+| | c=1 | c=8 |
+|---|---|---|
+| MTP k=2 on the BF16-dense checkpoint | +67% | +2% |
+| MTP k=2 on the FP8-dense checkpoint | **+23%** | **−6%** |
+
+Having shrunk the read, there is less for speculation to recover, while its drafting cost is
+unchanged — so above c≈4 it becomes a **net loss**. Acceptance is identical (2.15 vs 2.16), so
+this is the target getting cheaper, not the drafter getting worse. **Do not stack every
+optimization**; pick by concurrency.
+
+### GB10-specific requirements for blockwise-FP8 weights
+
+Both are silent-or-cryptic and neither is documented upstream:
+
+```bash
+export VLLM_USE_DEEP_GEMM=0          # else CUDA "unspecified launch failure"
+export VLLM_GDN_DECODE_KERNEL=triton # else the engine hangs at concurrency ~32
+```
+
+`support_deep_gemm()` accepts the whole `120` capability family, and GB10 is sm_121 — so vLLM
+reports DeepGEMM supported, routes blockwise FP8 to it, and the kernel faults during the startup
+profile run (vllm#54125). This is reachable **only** through blockwise-FP8 weights, so it appears
+exactly when you adopt the checkpoint class that helps most.
+
+### And log the clock
+
+GB10 parks bandwidth-bound decode at **~82% of max SM clock** (2411-2522 MHz against 3003) and
+locking does not move it. Comparisons within one box are unaffected; quoting a single absolute
+tok/s figure against another project is not. Log `clocks.sm` beside any decode benchmark.
