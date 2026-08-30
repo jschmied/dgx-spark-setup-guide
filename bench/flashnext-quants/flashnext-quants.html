@@ -846,6 +846,78 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   </ul>
 </section>
 
+<section>
+  <h2>The most comparable external run, and a number of ours it withdrew</h2>
+  <p>A single-Spark submission on <a href="https://spark-arena.com">spark-arena.com</a> is the
+  closest external comparison we have found — <strong>same runtime, same hardware, same model
+  family</strong>, TP=1. It serves <code>provsalt/Qwen3.8-Flash-Next-NVFP4-PLE-NVFP4</code> with
+  <code>VLLM_PLUGINS=qwen38_nvfp4_ple</code>, PLE CPU offload, MTP <span class="num">k=3</span> and
+  262,144 context.</p>
+  <table>
+    <thead><tr><th>depth 4,096 · c=1</th><th>that submission</th><th>here</th></tr></thead>
+    <tbody>
+      <tr><td>decode tok/s</td><td class="num">16.2</td><td class="num">36.5</td></tr>
+      <tr><td>prefill tok/s</td><td class="num">1,261</td><td class="num">~2,100–2,350</td></tr>
+    </tbody>
+  </table>
+  <p>About <strong>2.2× on decode and 1.7–1.9× on prefill</strong> at comparable depth. The likely
+  reason is the part of this page that is not in their stack: they run the <em>published</em> NVFP4,
+  which leaves the dense projections in BF16 — the same <span class="num">+39%</span> lever from the
+  ladder above — and an unquantized <code>lm_head</code>.</p>
+  <div class="callout">
+    <span class="h">A claim of ours that this checking withdrew</span>
+    <p>Hours earlier we wrote that a llama.cpp recipe's <span class="num">415</span> tok/s prefill at
+    32k beat "our ~320 tok/s". <strong>That 320 was not ours.</strong> It came from dividing a
+    <span class="num">~100 s at 32k</span> figure belonging to the Qwen3.8-<strong>27B</strong> work
+    and applied to this model. <strong>We have never measured Flash-Next prefill at 32k.</strong>
+    What we have is 4,000-token inputs at TTFT <span class="num">1.69–1.94 s</span>. The conclusion
+    that we were behind on prefill was manufactured out of a borrowed number, and is withdrawn — as
+    is the ranking in the other direction, since the depths still differ.</p>
+  </div>
+  <p>Three things worth taking from it regardless:</p>
+  <ul>
+    <li><strong>An NVFP4 PLE table exists, ships and loads</strong>, through a vLLM plugin and a
+    public container digest. At ~<span class="num">26.8</span> GiB against the
+    ~<span class="num">47.7</span> we run at FP8, that is roughly <strong>21 GiB of unified memory
+    back</strong>. The size was already on our map; a working checkpoint was not.</li>
+    <li><strong>Their prefill is flat with depth</strong> — <code>ctx_pp</code> stays between
+    <span class="num">1,231</span> and <span class="num">1,600</span> tok/s from 4k to 100k, while
+    decode decays hard (<span class="num">16.2 → 1.5</span> at c=10, d100k). Flat prefill is a
+    target shape for a depth curve we have never run.</li>
+    <li><strong>They run PLE offload without <code>--distributed-executor-backend mp</code></strong>,
+    using a 900 s ready timeout instead. Either their build carries the uniproc fix or the timeout
+    hides the startup race — worth knowing before anyone calls <code>mp</code> mandatory.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Kernel work elsewhere: QSA on llama.cpp</h2>
+  <p>A separate single-Spark repo publishes a QSA CUDA patch for llama.cpp — fused
+  <code>ggml_get_rows_mean</code> with RMS weighting, <code>__ldg</code> half2/float4 loads on the
+  lightning WMMA path, a compact FA gather at <code>topk=2048</code>, and indexer Q padded 4→8 so
+  lightning reaches WMMA. It roughly <strong>doubles long-context decode</strong>:
+  <span class="num">11.35 → 18.73</span> tok/s at 64k and <span class="num">5.60 → 11.55</span> at
+  229k, with TTFT essentially unchanged. They also publish what they reverted, which is the half
+  most repos omit.</p>
+  <p>Two of their results bear on ours directly. <strong>Acceptance is batch-geometry dependent:</strong>
+  same binary, draft and prompt, <code>-b 512 -ub 128</code> gives 33.3% acceptance while
+  <code>-b 2048 -ub 512</code> collapses to 3.7% <em>and the target output diverges</em>. Our own
+  open acceptance gap — <span class="num">56.6%</span> here against
+  <span class="num">73.7%</span> and <span class="num">75.6%</span> reported elsewhere — may be a
+  comparison of numbers that were never measured under the same geometry. And
+  <strong>speculation loses at long context</strong> on their fast kernels: MTP at 229k ran
+  <em>slower</em> than the same kernels plain autoregressive, and cost 8.4% and 6.7% of prefill at
+  16k and 32k.</p>
+  <div class="callout">
+    <span class="h">A method we are adopting from them</span>
+    <p>They <strong>lock output hashes before making any speed claim</strong> and label every row
+    measured under a different protocol as not comparable. We verify checksums on <em>weights</em>;
+    they verify hashes on <em>outputs</em>. Theirs is the guard that would have caught our
+    corrupt-shard episode, where size-correct byte-corrupt shards produced fluent garbage that was
+    invariant to every configuration change.</p>
+  </div>
+</section>
+
 <footer>
   <div>Measured on one NVIDIA GB10 (DGX Spark, sm_121, 128 GB unified), vLLM
   <span class="num">0.1.dev20073+g8e685d198</span>, PLE CPU offload, 8192 ctx, no speculation unless
