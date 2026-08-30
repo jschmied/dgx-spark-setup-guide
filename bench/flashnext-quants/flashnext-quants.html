@@ -877,7 +877,7 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
       <tr><td>GPU KV cache</td><td class="num">1,077,542 tok</td><td class="num">1,853,358</td><td class="num">×1.72</td></tr>
       <tr><td>max concurrency @262k/req</td><td class="num">4.11×</td><td class="num">7.07×</td><td class="num">×1.72</td></tr>
       <tr><td>needle-in-a-haystack, 5 depths</td><td class="num">—</td><td class="num">5/5</td><td></td></tr>
-      <tr><td>decode, c=1, 4k input</td><td class="num">37.0 / 36.0</td><td class="num">34.6 / 34.3</td><td class="num">−5.6%</td></tr>
+      <tr><td>decode, c=1, 4k input (n=6)</td><td class="num">36.28 mean</td><td class="num">37.22 mean</td><td class="num">+2.6%</td></tr>
     </tbody>
   </table>
   <p><strong>There is no speed gain, and there was never going to be one.</strong> QSA is
@@ -903,9 +903,18 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   matching one machine's number by coincidence. Quality was checked as <em>retrieval</em>, not text
   identity, because temperature 0 is not reproducible on this model; an identity check would have
   been meaningless while retrieval is unaffected.</p>
-  <p><strong>One number still open:</strong> the −5.6% decode sits inside the 6.9% noise floor, but
-  both fp8 runs fell below both bf16 runs — a direction rather than scatter, which n=2 per arm
-  cannot separate. A six-per-arm rerun is in flight.</p>
+  <div class="callout">
+    <span class="h">A false pattern in four data points, and how it went away</span>
+    <p>At n=2 per arm decode read <span class="num">−5.6%</span>, and — the part that made it look
+    real — <strong>both</strong> fp8 runs sat below <strong>both</strong> bf16 runs. A direction,
+    not scatter. At <strong>n=6 per arm the sign flips</strong>: bf16 36.28 mean against fp8
+    <span class="num">37.22</span>, ranges overlapping, <strong>0 of 6</strong> fp8 runs below the
+    bf16 range. With a standard deviation near 1.7–2.1 on a ~36 tok/s mean, two samples cannot
+    resolve five percent, and "both below both" arises by chance roughly a quarter of the time. The
+    caveat was withdrawn upstream. The page's own rule already covered this — nothing under ~10% is
+    callable from a single run — but the subtler error was letting an <em>ordering</em> pattern in
+    four points carry information it could not carry.</p>
+  </div>
 </section>
 
 <section>
