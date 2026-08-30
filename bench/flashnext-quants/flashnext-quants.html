@@ -696,6 +696,156 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   they appear exactly when you adopt the checkpoint class that helps most.</p>
 </section>
 
+<section>
+  <h2>Two defects that decide whether the model is usable, and no speed test can see</h2>
+  <p>Found after a full day of throughput work, on a server that had been benchmarking cleanly
+  throughout.</p>
+  <p><strong>Tool calling was rejected outright.</strong> The launcher set
+  <code>--reasoning-parser qwen3</code> and nothing else, so every request carrying a
+  <code>tools</code> field returned <span class="num">HTTP 400</span>. Adding
+  <code>--enable-auto-tool-choice --tool-call-parser qwen3_xml</code> fixes it:
+  <strong>32/32</strong> across temperatures <span class="num">0.2 / 0.6 / 1.0</span> and default,
+  correct function name every time. <code>--tool-call-parser qwen3</code> is <em>not</em> valid —
+  the reasoning parser is <code>qwen3</code>, but the tool side registers only as
+  <code>qwen3_coder</code> and <code>qwen3_xml</code>, two names for the same class.</p>
+  <p><strong><code>--max-model-len 8192</code> could not hold the model's own reasoning.</strong>
+  One code task emitted <span class="num">31,115</span> characters of thinking before
+  <span class="num">12,931</span> of content. 8192 was chosen for benchmarking and was never going
+  to serve real work.</p>
+  <div class="callout">
+    <span class="h">Why neither is visible to any measurement on this page</span>
+    <p>Throughput, acceptance, NLL, divergence and coherence tests never send a <code>tools</code>
+    field and never run a generation long enough to overflow the window. <strong>A serving config
+    has capabilities, not just speed</strong> — probe both before benchmarking a new recipe.</p>
+  </div>
+</section>
+
+<section>
+  <h2>The concurrency ceiling is real, and we nearly blamed our own cap</h2>
+  <p>Every concurrency number here was taken at <span class="num">c=16</span> against
+  <code>--max-num-seqs 16</code> — the cap bound exactly where we measured, which makes a flat
+  aggregate indistinguishable from a queue. Raising the cap to 64, changing nothing else:</p>
+  <table>
+    <thead><tr><th></th><th>SEQS 16</th><th>SEQS 64</th></tr></thead>
+    <tbody>
+      <tr><td>c=1 decode tok/s</td><td class="num">36.45 ± 1.04</td><td class="num">36.83</td></tr>
+      <tr><td>c=16 aggregate tok/s</td><td class="num">99.1 / 101.5 / 100.1</td><td class="num">97.2 / 101.4 / 100.7</td></tr>
+      <tr><td>c=32 aggregate tok/s</td><td class="num">not reachable</td><td class="num">110.1, TTFT 30.7 s</td></tr>
+    </tbody>
+  </table>
+  <p>Both moves sit inside the <span class="num">6.9%</span> noise floor. <strong>~100 tok/s at
+  c=16 is a bandwidth ceiling, not a cap artifact</strong>, and c=32 buys +10% aggregate for 4× the
+  TTFT — the wrong trade for agent work, which we rank by TTFT.</p>
+  <p>A separate recipe reports <span class="num">96–109</span> tok/s aggregate at
+  <code>SEQS=16</code> on the same hardware with a different checkpoint, speculation setting and
+  prompt length. Two independent configurations landing on the same number is much better evidence
+  for a ceiling than either alone. Their published <span class="num">1.2–2.7×</span> SEQS win came
+  from raising a baseline of <strong>2</strong> slots, not 16 — the same curve, below its knee.</p>
+  <div class="callout">
+    <span class="h">The 266.8 tok/s figure is a different configuration</span>
+    <p>An earlier uncapped sweep reached <span class="num">266.8</span> tok/s at c=48. That was the
+    <em>baseline</em> checkpoint — its c=1 row is <span class="num">17.1</span> — with speculation
+    off and short prompts. It is <strong>not comparable</strong> to the 110 above, which is the
+    shipped config at 4000-token inputs, and reading the two side by side manufactures a regression
+    that does not exist.</p>
+  </div>
+</section>
+
+<section>
+  <h2>The MoE backend axis, and a lever that was never untried</h2>
+  <p>SM120 and SM121 have <strong><span class="num">99 KiB</span> (101,376 B) of shared memory per
+  block</strong>, not the 228 KiB "Blackwell" figure — that is SM100/B200 only. CUTLASS's
+  <code>StageCountAutoCarveout</code> assumes the larger budget, picks ~6 stages, and overflows on
+  the Pingpong schedule. It surfaces as a device-side assert at
+  <code>nvfp4_blockwise_moe.cuh:78</code>, which is the next <code>cudaMallocAsync</code> sync
+  point and <em>not</em> the faulting line.</p>
+  <table>
+    <thead><tr><th>backend</th><th>status here</th></tr></thead>
+    <tbody>
+      <tr><td class="num">FLASHINFER_CUTLASS</td><td>what <code>moe_backend='auto'</code> resolves to, and what every measurement on this page used</td></tr>
+      <tr><td class="num">flashinfer_b12x</td><td>rejected — <em>not supported for unquantized MoE</em>; the MTP drafter's MoE is unquantized and <code>--moe-backend</code> is global. With MTP off it faults with an IMA</td></tr>
+      <tr><td class="num">triton, cutlass</td><td>hit the SMEM overflow above</td></tr>
+      <tr><td class="num">TRTLLM, CUTEDSL, VLLM_CUTLASS, MARLIN, HUMMING</td><td>untried, and no field evidence favours any of them on sm_121</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <span class="h">We wrote this up as a cheap untried lever. It was never untried.</span>
+    <p>The workaround is real, but <code>auto</code> already selects
+    <code>FLASHINFER_CUTLASS</code> on this box and always has — for the NVFP4 experts and for the
+    drafter's unquantized MoE alike. So the finding explains a <strong>non-event</strong>: why that
+    assert has never fired here. One <code>grep</code> of a log we already had would have caught it
+    before it was ranked as work.</p>
+  </div>
+</section>
+
+<section>
+  <h2>A startup deadlock we were winning by luck</h2>
+  <p>Four independent reporters — GB10, GX10, and two discrete-VRAM Blackwell cards — hang at
+  <code>warmup_kernels</code> with PLE CPU offload enabled, the offload thread parked in
+  <code>_copy_cuda_inputs</code> and the worker idle because the request is never sent. We have
+  never reproduced it, on this exact code, across many restarts, with and without speculation.</p>
+  <p>The cause is visible in the shipped tree without any hardware. <code>PleOffloadConnector</code>
+  allocates <strong>one</strong> <code>_input_ready_event</code> for the whole connector, on a
+  stated assumption that only one request is ever outstanding. Under async scheduling —
+  <strong>on by default</strong>; <code>"mtp"</code> sits inside <code>EagleModelTypes</code> so
+  speculation does not disable it — two batches are in flight, and
+  <code>_launch(#2)</code> re-records that same event behind forward #1's PLE semaphore wait. The
+  offload thread then waits on a record the model stream cannot reach until it sends request #1,
+  while the main thread's device-wide <code>synchronize()</code> waits on the D2H stream.</p>
+  <p>That explains what a PCIe-latency account cannot: unified memory reproduces it (the copies are
+  cheap; the <em>wait</em> hangs), eager only narrows the window, and an air-gapped box serves for
+  two days then hangs on the third identical boot. Upstream replaced the shared events with a
+  per-request pool. Backported here: serves in <span class="num">680 s</span>, c=1 decode
+  <span class="num">38.1 / 36.5 / 34.8</span> against a <span class="num">36.45 ± 1.04</span>
+  reference — no cost.</p>
+</section>
+
+<section>
+  <h2>Prefix caching does nothing below 1600 tokens</h2>
+  <p>This model forces the attention block size <strong>up</strong> to match its Mamba state page:
+  <em>"Setting attention block size to 1600 tokens to ensure that attention page size is >= mamba
+  page size"</em>, then pads the mamba page by <span class="num">0.88%</span> so the two are exactly
+  equal. A prompt shorter than one block therefore has no full block to cache.</p>
+  <p>The counters say so plainly: <strong><span class="num">0</span> hits against
+  <span class="num">77,254</span> queries</strong> across every benchmark on this page. Repeating an
+  identical ~1400-token prompt four times produces zero hits; a ~5,700-token prompt hits from the
+  third request onward. The delay to the third is a separate, documented quirk of this box — the
+  first repetition never hits — which is why any check of this needs at least three requests, not
+  two.</p>
+  <div class="callout">
+    <span class="h">What this means for the numbers here, and what is still open</span>
+    <p>Nothing on this page benefited from prefix caching, because benchmark prompts are unique per
+    request. Agent loops reuse prefixes and would — above 1600 tokens. Whether a cache hit
+    <em>changes the answer</em> on this architecture is a live question, raised by a report of an
+    all-zero restored Mamba state on a build that conflates the 16-token attention block with the
+    1600-token state block. Ours equalizes them instead, so we are probably not exposed; a
+    controlled on/off determinism test is running and this section will be updated with its result
+    rather than its expectation.</p>
+  </div>
+</section>
+
+<section>
+  <h2>What the field settled, and what it did not</h2>
+  <ul>
+    <li><strong>SGLang cannot serve this model on GB10.</strong> Its QSA decode resolver gates on
+    <code>is_sm100_supported()</code>; classic FA2 is absent and has no Blackwell kernels, so it
+    falls through to a flash-attn-4 CuTe path that will not compile there. The reporter verified the
+    flashinfer kernel <em>itself</em> runs correctly on SM121 at
+    <span class="num">4.70e-04</span> max abs diff — a gate, not a kernel, exactly like the four
+    layers of "installed but not running" documented above. Base support and the resolver fix are
+    both unmerged; the fix does cover GB10, since the gate it adds tests major 12.</li>
+    <li><strong>NVFP4 KV is closed, on a third independent measurement:</strong>
+    <span class="num">44.0</span> tok/s against <span class="num">56.8–58.6</span> for
+    <code>fp8_e4m3</code> on SM121. Note what that says about the alternative — fp8 and bf16 are
+    roughly speed-neutral, so <strong>FP8 KV buys pool size, not throughput</strong>.</li>
+    <li><strong>FP8 KV has a known collision with QSA:</strong> the FA4 decode call receives BF16
+    queries with FP8 K/V and asserts that all three dtypes match. That is precisely the plumbing an
+    FP8-QSA-KV build needs, failing in another stack — worth a source read before a build.</li>
+    <li><strong>llama.cpp's own support merged</strong> on 2026-08-27, subsuming two community
+    patches. It is a separate implementation; the vLLM one still exists only on its PR branch.</li>
+  </ul>
+</section>
+
 <footer>
   <div>Measured on one NVIDIA GB10 (DGX Spark, sm_121, 128 GB unified), vLLM
   <span class="num">0.1.dev20073+g8e685d198</span>, PLE CPU offload, 8192 ctx, no speculation unless
