@@ -869,6 +869,46 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
+  <h2>FP8 KV: ×1.72 the KV pool, and no speed at all</h2>
+  <p>Two arms, KV dtype the only variable, <code>--max-model-len 262144</code>, TP=1, MTP k=2.</p>
+  <table>
+    <thead><tr><th></th><th>bf16</th><th>fp8_e4m3</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>GPU KV cache</td><td class="num">1,077,542 tok</td><td class="num">1,853,358</td><td class="num">×1.72</td></tr>
+      <tr><td>max concurrency @262k/req</td><td class="num">4.11×</td><td class="num">7.07×</td><td class="num">×1.72</td></tr>
+      <tr><td>needle-in-a-haystack, 5 depths</td><td class="num">—</td><td class="num">5/5</td><td></td></tr>
+      <tr><td>decode, c=1, 4k input</td><td class="num">37.0 / 36.0</td><td class="num">34.6 / 34.3</td><td class="num">−5.6%</td></tr>
+    </tbody>
+  </table>
+  <p><strong>There is no speed gain, and there was never going to be one.</strong> QSA is
+  <em>sparse</em> — with <code>indexer_budget = 2048</code> the model attends over a top-k selection
+  rather than the whole cache, so KV bandwidth is not the decode bottleneck. The depth curve above
+  proves that independently: decode is flat across a 15× context increase, which it could not be if
+  reading the cache were the constraint. Halving the precision of something that is not the
+  bottleneck buys nothing. <strong>What it buys is admission</strong> — roughly 4 to 7 concurrent
+  262k-token requests before a queue forms.</p>
+  <div class="callout">
+    <span class="h">This reverses our own closure from the same morning</span>
+    <p>Hours earlier this was recorded as <em>"unsupported, not unmeasured"</em>: the QSA backend
+    declares <code>supported_kv_cache_dtypes = ["auto", "bfloat16"]</code> and enforces it in four
+    places. That was right about <em>stock</em> vLLM and wrong as a verdict on feasibility — the
+    guards were guarding an <strong>unimplemented read path</strong>, not a hardware limit, and a
+    17-hunk community patch landed the same day. <em>"The code refuses it"</em> and <em>"it cannot
+    work"</em> are different claims.</p>
+  </div>
+  <p>Corroborating the RFC's author on a second GB10: their ratio <span class="num">×1.79</span>
+  against our <span class="num">×1.72</span>, while the absolute totals differ by ~38% because the
+  checkpoints differ. <strong>The ratio reproducing while the totals do not is the stronger
+  result</strong> — the effect scales with whatever KV budget a checkpoint leaves, rather than
+  matching one machine's number by coincidence. Quality was checked as <em>retrieval</em>, not text
+  identity, because temperature 0 is not reproducible on this model; an identity check would have
+  been meaningless while retrieval is unaffected.</p>
+  <p><strong>One number still open:</strong> the −5.6% decode sits inside the 6.9% noise floor, but
+  both fp8 runs fell below both bf16 runs — a direction rather than scatter, which n=2 per arm
+  cannot separate. A six-per-arm rerun is in flight.</p>
+</section>
+
+<section>
   <h2>Depth: decode does not decay, and that is a QSA result</h2>
   <p>We had never measured this, and twice quoted a figure for it anyway — see the withdrawal below.
   One sweep settled it. Both arms: one GB10, 65,536 context, c=1, three requests per depth, prefill
