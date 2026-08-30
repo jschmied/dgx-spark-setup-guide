@@ -813,6 +813,21 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <em>"Setting attention block size to 1600 tokens to ensure that attention page size is >= mamba
   page size"</em>, then pads the mamba page by <span class="num">0.88%</span> so the two are exactly
   equal. A prompt shorter than one block therefore has no full block to cache.</p>
+  <div class="callout">
+    <span class="h">1,600 is the attention group's block, not <em>the</em> block size</span>
+    <p>There is a <strong>third</strong> KV group this alignment does not touch: the QSA raw-key
+    ring, a <code>CircularBufferSpec</code> whose block is its ring capacity —
+    <code>compress_ratio * cdiv(compress_ratio + num_speculative_tokens, compress_ratio)</code>,
+    which is <span class="num">8</span> here (<code>indexer_compress_ratio 4</code>, MTP k=2).
+    Since <code>v1/engine/core.py:321</code> sets <code>cache_config.block_size</code> to the
+    <strong>minimum over all groups</strong>, and the scheduler config does not drop the ring, the
+    value a caller reads from the config is plausibly <span class="num">8</span>, not 1,600.
+    The hit measurements below are the attention group's blocks and are unaffected; the wording
+    "the block size" was not. Credit to 0xBakeer#20, which retracts their own earlier conclusion
+    on this — and note their point that <strong>identical-output tests cannot detect</strong> a
+    resulting split bug, because reaching the zero-state restore requires a Mamba block to have
+    been published first, which is scheduling-dependent.</p>
+  </div>
   <p>The counters say so plainly: <strong><span class="num">0</span> hits against
   <span class="num">77,254</span> queries</strong> across every benchmark on this page. Repeating an
   identical ~1400-token prompt four times produces zero hits; a ~5,700-token prompt hits from the
