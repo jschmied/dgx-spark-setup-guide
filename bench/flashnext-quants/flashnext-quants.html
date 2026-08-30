@@ -854,6 +854,44 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
+  <h2>Depth: decode does not decay, and that is a QSA result</h2>
+  <p>We had never measured this, and twice quoted a figure for it anyway — see the withdrawal below.
+  One sweep settled it. Both arms: one GB10, 65,536 context, c=1, three requests per depth, prefill
+  derived as <code>depth / TTFT</code>, prompts unique per request so nothing is cache-assisted.</p>
+  <table>
+    <thead><tr><th>depth</th><th>prefill · MTP k=2</th><th>decode · MTP k=2</th><th>prefill · MTP off</th><th>decode · MTP off</th><th>MTP gain</th></tr></thead>
+    <tbody>
+      <tr><td class="num">4,000</td><td class="num">2,123</td><td class="num">37.9</td><td class="num">2,103</td><td class="num">26.8</td><td class="num">+41%</td></tr>
+      <tr><td class="num">8,000</td><td class="num">2,163</td><td class="num">40.8</td><td class="num">2,380</td><td class="num">26.8</td><td class="num">+52%</td></tr>
+      <tr><td class="num">16,000</td><td class="num">2,314</td><td class="num">41.2</td><td class="num">2,093</td><td class="num">26.8</td><td class="num">+54%</td></tr>
+      <tr><td class="num">32,000</td><td class="num">2,368</td><td class="num">41.4</td><td class="num">2,136</td><td class="num">26.9</td><td class="num">+54%</td></tr>
+      <tr><td class="num">60,000</td><td class="num">2,003</td><td class="num">41.7</td><td class="num">2,341</td><td class="num">27.1</td><td class="num">+54%</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Decode is depth-independent.</strong> With speculation off it moves from
+  <span class="num">26.8</span> to <span class="num">27.1</span> tok/s across a <strong>15× span of
+  context</strong> — 1.1%, far inside our 6.9% noise floor. A dense-attention model's decode falls
+  with context because the retained attention work grows with every token. Here it does not move.
+  That is what QSA's top-k selection predicts once the sparse budget binds, and the speculation-off
+  arm is the clean demonstration, with no draft dynamics layered on top.</p>
+  <p><strong>Prefill is flat and speculation-neutral</strong> — 2,003–2,380 tok/s across both arms,
+  means <span class="num">2,194</span> with MTP against <span class="num">2,211</span> without. The
+  row-to-row ordering is run spread, not an effect. And <strong>MTP is a ~1.54× decode win that does
+  not erode with depth</strong>: +41% at 4k, then flat at +52–54% out to 60k, for nothing at
+  prefill.</p>
+  <div class="callout">
+    <span class="h">This contradicts a field caution we had already adopted</span>
+    <p>A llama.cpp recipe reports <code>draft-mtp</code> running <em>slower</em> than plain
+    autoregressive at 229k on their hand-patched QSA kernels, and costing 8.4% / 6.7% of prefill at
+    16k / 32k. <strong>Neither reproduces here.</strong> Different runtime, different kernels, and
+    their fastest arm is a QSA patch we do not have — so both can be true. The mistake was ours: we
+    carried the caution into planning before measuring our own stack. The sweep exists because of
+    that, and it settled the question in the opposite direction. <strong>MTP stays on at every
+    depth.</strong></p>
+  </div>
+</section>
+
+<section>
   <h2>The most comparable external run, and a number of ours it withdrew</h2>
   <p>A single-Spark submission on <a href="https://spark-arena.com">spark-arena.com</a> is the
   closest external comparison we have found — <strong>same runtime, same hardware, same model
