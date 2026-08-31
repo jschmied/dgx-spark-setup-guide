@@ -869,6 +869,48 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
+  <h2>MTP costs exactly one cache block — so the trade has a threshold, not a price</h2>
+  <p>Every benchmark on this page sends <em>unique</em> prompts, which busts the prefix cache
+  deliberately. That is right for measuring prefill and it meant we were blind to what speculation
+  costs a workload that <em>reuses</em> prefixes — which is what agent work is.</p>
+  <p><code>v1/core/sched/scheduler.py:397</code> backs the cacheable position off by one full block
+  when <code>use_eagle</code> is set, and MTP sets it: <em>"FullAttn prunes the last matching block,
+  so back off one block to avoid a Mamba cache miss."</em> The cost is <strong>fixed at one block —
+  1,600 tokens here — at every prompt length</strong>:</p>
+  <table>
+    <thead><tr><th>prompt</th><th>k=2</th><th>k=1</th><th>k=0</th><th>deficit</th><th>as % of k=0</th></tr></thead>
+    <tbody>
+      <tr><td class="num">~2k</td><td class="num">1,600</td><td class="num">1,584</td><td class="num">3,200</td><td class="num">1,600</td><td class="num">50.0%</td></tr>
+      <tr><td class="num">~4k</td><td class="num">4,800</td><td class="num">4,752</td><td class="num">7,200</td><td class="num">2,400</td><td class="num">33.3%</td></tr>
+      <tr><td class="num">~8k</td><td class="num">12,800</td><td class="num">12,672</td><td class="num">14,400</td><td class="num">1,600</td><td class="num">11.1%</td></tr>
+      <tr><td class="num">~16k</td><td class="num">27,200</td><td class="num">26,928</td><td class="num">28,800</td><td class="num">1,600</td><td class="num">5.6%</td></tr>
+      <tr><td class="num">~32k</td><td class="num">56,000</td><td class="num">57,024</td><td class="num">58,400</td><td class="num">2,400</td><td class="num">4.1%</td></tr>
+    </tbody>
+  </table>
+  <p>Absolute cost flat, relative cost collapsing. <strong>Above ~8k there is barely a trade at
+  all</strong> — MTP buys +56% decode for ~5% of the cache.</p>
+  <div class="callout">
+    <span class="h">k=1 is strictly dominated — a config option to delete</span>
+    <p>The back-off is <code>if self.use_eagle:</code>, unconditional on <code>k</code>. So k=1 pays
+    the <strong>same block</strong> (1,584 against 1,600 is prompt alignment, not a saving) for
+    <strong>+31% decode instead of +56%</strong>. Same cost, half the benefit. There is never a
+    reason to run k=1 on this model.</p>
+  </div>
+  <p><strong>The threshold.</strong> MTP costs one lost block ≈ <span class="num">0.67 s</span> of
+  re-prefill per turn at 2,400 tok/s, and saves
+  <code>out/26.9 − out/41.9</code> on decode. Break-even lands at
+  <strong>≈50 output tokens per turn</strong>. On an 8-turn agent loop with short answers, MTP off
+  won <strong>3 of 3 rounds</strong> — 14.93 s against 18.83 s. So the answer is not a compromise
+  setting: <strong>MTP is right whenever turns exceed ~50 output tokens, and wrong for terse
+  tool-calling turns.</strong></p>
+  <p>Two smaller results from the same sweep: <code>--max-num-batched-tokens</code> <strong>8192
+  beats the shipped 4096</strong> by ~10–12% prefill at 4k–16k while 16384 beats neither; and the
+  <em>"first repetition never hits"</em> quirk is <strong>length-dependent</strong> — two cold
+  requests at ~2k, but by ~4k the first request already hits, and an agent loop hits from turn 2
+  because its prefix grows rather than repeating.</p>
+</section>
+
+<section>
   <h2>FP8 KV: ×1.72 the KV pool, and no speed at all</h2>
   <p>Two arms, KV dtype the only variable, <code>--max-model-len 262144</code>, TP=1, MTP k=2.</p>
   <table>
