@@ -917,13 +917,18 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 <section>
   <h2>What the field settled, and what it did not</h2>
   <ul>
-    <li><strong>SGLang cannot serve this model on GB10.</strong> Its QSA decode resolver gates on
-    <code>is_sm100_supported()</code>; classic FA2 is absent and has no Blackwell kernels, so it
-    falls through to a flash-attn-4 CuTe path that will not compile there. The reporter verified the
-    flashinfer kernel <em>itself</em> runs correctly on SM121 at
-    <span class="num">4.70e-04</span> max abs diff — a gate, not a kernel, exactly like the four
-    layers of "installed but not running" documented above. Base support and the resolver fix are
-    both unmerged; the fix does cover GB10, since the gate it adds tests major 12.</li>
+    <li><strong>SGLang serves this model on GB10 — on a branch, not mainline.</strong> An earlier
+    version of this page said it <em>could not</em>, which was true of the resolver at the time and
+    is now contradicted by published results: two single-Spark repos report
+    <span class="num">41.5</span> tok/s median code decode and GSM8K 192/200, and up to
+    <span class="num">49.8</span> tok/s with a QSA ring-width patch. Mainline still carries no
+    <code>qwen4</code> model file; the work lives on <code>qwen4-main-squashed</code>.
+    <strong>The GB10 gate story inverted, too.</strong> sglang#36806 (merged 2026-08-28) routes
+    FlashInfer sparse decode to SM100 or <em>exact</em> SM120 and <strong>deliberately excludes
+    SM121</strong> — forcing GB10 onto that path corrupts output at long context (1 of 4 runs wrong
+    at 120k tokens, 4 of 4 at 210k, HTTP 200 throughout). So a "SM121 fix" that widens the gate by
+    capability family is the thing that was <em>retracted</em>, and it is still circulating in at
+    least one popular DGX Spark repo.</li>
     <li><strong>NVFP4 KV is closed, on a third independent measurement:</strong>
     <span class="num">44.0</span> tok/s against <span class="num">56.8–58.6</span> for
     <code>fp8_e4m3</code> on SM121. Note what that says about the alternative — fp8 and bf16 are
