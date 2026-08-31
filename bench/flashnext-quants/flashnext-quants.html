@@ -890,6 +890,47 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <p>Absolute cost flat, relative cost collapsing. <strong>Above ~8k there is barely a trade at
   all</strong> — MTP buys +56% decode for ~5% of the cache.</p>
   <div class="callout">
+    <span class="h">The depth limit was a hole, not a ceiling — and it blocks every GPU</span>
+    <p>We had recorded <code>k=5</code> as an upper bound because it hard-fails with
+    <em>"QSA ring capacity 12 must divide the attention block size 848"</em>. It is not a bound.
+    <code>qsa_cache.py</code> computes <code>capacity = compress_ratio · cdiv(compress_ratio + n,
+    compress_ratio)</code>, so <strong>n = 0..4 and 9..12 are legal and only 5..8 are not</strong>.
+    Capacity 12 needs a factor of 3, and no power-of-two block size has one — so this band is
+    unreachable for every user of this model on every GPU, not just at our LCM-derived 848.</p>
+    <p>The requirement is also <strong>one-sided</strong>: the code's own comment says a ring
+    <em>narrower</em> than <code>span</code> lets a rejected draft row overwrite a committed key, so
+    wider is only slack. Widening 12 → 16 instead of asserting unlocks the band and is a no-op at
+    every legal depth. Reported as
+    <a href="https://github.com/vllm-project/vllm/issues/54552">vllm#54552</a>; verified here by
+    capacity 12 hard-failing for two different drafters before the change and
+    <code>num_spec_tokens=6</code> serving after it.</p>
+    <p class="note">Shown to initialise and generate — <em>not</em> verified correct under draft
+    rejection, which is the property the assert protects.</p>
+  </div>
+
+  <div class="callout">
+    <span class="h">And the unlocked band loses on agent work — but read the direction, not the size</span>
+    <p>The arm that proved the fix also argues against using it here. n=6, same checkpoint and
+    harness, measured twice:</p>
+    <table>
+      <thead><tr><th>config</th><th>decode @4k</th><th>TTFT @4k</th><th>agent loop, 8 turns</th></tr></thead>
+      <tbody>
+        <tr><td>no speculation</td><td class="num">27.0 tok/s</td><td class="num">1.60 s</td><td class="num">1.94 s/turn</td></tr>
+        <tr><td>MTP n=6, run 1</td><td class="num">35.2 tok/s</td><td class="num">2.63 s</td><td class="num">2.70 s/turn</td></tr>
+        <tr><td>MTP n=6, run 2</td><td class="num">38.8 tok/s</td><td class="num">2.35 s</td><td class="num">2.13 s/turn</td></tr>
+      </tbody>
+    </table>
+    <p>Those last two rows are the <em>same configuration</em>: decode spans 10%, the agent loop
+    21%. <strong>The 6.9% noise floor quoted on this page is a decode figure and does not transfer
+    to the agent loop</strong>, which we had never characterised for variance. A first write-up
+    quoted "+39% per turn" off run 1 alone; run 2 makes that unsupportable.</p>
+    <p>What survives both samples: n=6 is <strong>faster at decode and slower per agent turn</strong>
+    than no speculation at all. Deeper speculation buys decode and pays TTFT, and a ~130-token turn
+    cannot amortise the block it costs. At 28k context the same config gives <strong>TTFT 12.3 s</strong>
+    against 2.35 s at 4k — the depth term dwarfs every speculation effect on this page.</p>
+  </div>
+
+  <div class="callout">
     <span class="h">k=1 is strictly dominated — a config option to delete</span>
     <p>The back-off is <code>if self.use_eagle:</code>, unconditional on <code>k</code>. So k=1 pays
     the <strong>same block</strong> (1,584 against 1,600 is prompt alignment, not a saving) for
