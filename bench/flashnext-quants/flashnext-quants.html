@@ -871,23 +871,34 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
-  <h2>Prefill batch size: the one setting worth changing</h2>
-  <p>Deep TTFT improves monotonically with <code>--max-num-batched-tokens</code>, against ~2%
-  within-config noise, at no decode cost (26.8–27.0 tok/s throughout):</p>
+  <h2>Prefill batch size: we checked, and the default was already right</h2>
+  <p>Deep TTFT and fixed-work agent latency across four batch sizes, no speculation, medians of six
+  requests per cell:</p>
   <table>
-    <thead><tr><th>batch</th><th>TTFT @4k</th><th>TTFT @28k</th><th>vs 4096</th></tr></thead>
+    <thead><tr><th>batch</th><th>TTFT @28k (each arm)</th><th>mean</th><th>ms/tok</th></tr></thead>
     <tbody>
-      <tr><td class="num">2048</td><td class="num">1.95 s</td><td class="num">14.01 s</td><td class="num">+18%</td></tr>
-      <tr><td class="num">4096 (default)</td><td class="num">1.60–2.13 s</td><td class="num">11.96 / 11.73 s</td><td class="num">—</td></tr>
-      <tr><td class="num">8192</td><td class="num">1.99 s</td><td class="num">11.78 s</td><td class="num">−0.6%</td></tr>
-      <tr><td class="num">16384</td><td class="num">1.83 s</td><td class="num">10.41 s</td><td class="num">−12%</td></tr>
+      <tr><td class="num">2048</td><td class="num">13.04 / 13.08 / 13.74</td><td class="num">13.3</td><td class="num">43.5 / 43.9</td></tr>
+      <tr><td class="num">4096 (default)</td><td class="num">11.62 / 11.73 / 11.96</td><td class="num">11.77</td><td class="num">43.4 / 43.6 / 43.8</td></tr>
+      <tr><td class="num">8192</td><td class="num">11.78</td><td class="num">11.78</td><td class="num">—</td></tr>
+      <tr><td class="num">16384</td><td class="num">10.41 / 13.64 / 11.57</td><td class="num">11.87</td><td class="num">45.5 / 45.4</td></tr>
     </tbody>
   </table>
-  <p>At 4k it does nothing — a 4000-token prompt is one chunk at every size ≥4096. The effect is
-  entirely how many chunks a long prompt is cut into: 4 at 16384 against 14 at 2048.
-  <strong>4096 and 8192 are the same setting in effect</strong>; 2048 is clearly worse and 16384
-  clearly better. For long-context work, <strong>16384 is a one-flag ~12% TTFT win</strong> with no
-  rebuild and no quality effect.</p>
+  <p><strong>Keep 4096.</strong> Below it costs ~13% deep TTFT; above it buys nothing and costs
+  ~4.5% per agent turn. At 4k context batch size does nothing at all — a 4000-token prompt is one
+  chunk at any size ≥ 4096. Decode is flat at 26.7–27.3 throughout.</p>
+  <div class="callout">
+    <span class="h">This page previously recommended 16384. That was one arm, and it did not replicate</span>
+    <p>The first 16384 arm measured <span class="num">10.41 s</span>, which with tight arms either
+    side produced a clean monotonic trend — published here as <em>established</em>. The next two
+    arms gave <span class="num">13.64</span> and <span class="num">11.57</span>: that setting spans
+    <strong>31%</strong> where 4096 spans 3%, and its mean matches 4096's. Engine config was
+    identical across those arms (KV pool 1,011,875, block 800), so this is not a compile-cache
+    effect — the configuration is simply noisier.</p>
+    <p>The error generalises: three tight arms each at two settings convinced us the <em>metric</em>
+    was stable, so single points elsewhere looked trustworthy. <strong>Noise belongs to the (metric,
+    configuration) pair, not to the metric.</strong> The counter-example is in the same arms — at
+    16384, <code>ms/tok</code> reproduces to 0.2% while TTFT spans 31%.</p>
+  </div>
 </section>
 
 <section>
