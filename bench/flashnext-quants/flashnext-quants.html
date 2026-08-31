@@ -847,6 +847,74 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
+  <h2>A day of agent-loop numbers, withdrawn</h2>
+  <p>On 2026-08-31 this page briefly carried an agent-loop column ranking drafters and batch sizes,
+  including a "37% monotonic trade" called <em>established</em>. <strong>All of it is
+  withdrawn.</strong> The harness sent <code>max_tokens: 130</code> with no <code>ignore_eos</code>
+  and never recorded <code>completion_tokens</code> — and <code>max_tokens</code> is a
+  <strong>ceiling, not a target</strong>. Each arm was timed on however many tokens the model
+  happened to emit, so an arm whose turns stopped at 40 tokens beat one whose turns ran to 130 with
+  no difference in speed.</p>
+  <p>The tell came from replication: the <em>same</em> no-speculation config gave <strong>1.94
+  s/turn and then 1.43</strong> — a 36% spread, as large as the trend being read into it. This is
+  the defect this page already documents under <em>"an all-empty cell is not a comparison"</em>. The
+  guard was written in the notes and not in the tool, which is exactly the failure that entry warns
+  about.</p>
+  <p>Fixed: <code>ignore_eos</code> pins the work at 8 × 130 tokens, per-turn token counts are
+  recorded, the summary reports <code>ms/tok</code>, and it prints a loud <code>!! UNEQUAL
+  WORK</code> flag unless the total is exactly 1,040. First valid pair — no speculation
+  <strong>43.37 ms/tok</strong> against ngram n=4 <strong>33.26 ms/tok</strong> — agrees with the
+  independent decode benchmark to about 1%, which the broken version never could.</p>
+  <p class="note">Reliability ordering, measured across identical configs: decode (~1%) &gt; deep
+  TTFT (~2%) &gt; short TTFT (33%) &gt; the old agent loop (36%). Short-prompt TTFT is far noisier
+  than assumed here; deep TTFT is the trustworthy latency metric.</p>
+</section>
+
+<section>
+  <h2>Prefill batch size: the one setting worth changing</h2>
+  <p>Deep TTFT improves monotonically with <code>--max-num-batched-tokens</code>, against ~2%
+  within-config noise, at no decode cost (26.8–27.0 tok/s throughout):</p>
+  <table>
+    <thead><tr><th>batch</th><th>TTFT @4k</th><th>TTFT @28k</th><th>vs 4096</th></tr></thead>
+    <tbody>
+      <tr><td class="num">2048</td><td class="num">1.95 s</td><td class="num">14.01 s</td><td class="num">+18%</td></tr>
+      <tr><td class="num">4096 (default)</td><td class="num">1.60–2.13 s</td><td class="num">11.96 / 11.73 s</td><td class="num">—</td></tr>
+      <tr><td class="num">8192</td><td class="num">1.99 s</td><td class="num">11.78 s</td><td class="num">−0.6%</td></tr>
+      <tr><td class="num">16384</td><td class="num">1.83 s</td><td class="num">10.41 s</td><td class="num">−12%</td></tr>
+    </tbody>
+  </table>
+  <p>At 4k it does nothing — a 4000-token prompt is one chunk at every size ≥4096. The effect is
+  entirely how many chunks a long prompt is cut into: 4 at 16384 against 14 at 2048.
+  <strong>4096 and 8192 are the same setting in effect</strong>; 2048 is clearly worse and 16384
+  clearly better. For long-context work, <strong>16384 is a one-flag ~12% TTFT win</strong> with no
+  rebuild and no quality effect.</p>
+</section>
+
+<section>
+  <h2>Three things that will bite you, none of them about speed</h2>
+  <p><strong>Greedy decoding is not reproducible on this model.</strong> Same prompt,
+  <code>temperature=0</code>, different output — from as few as 582 prompt tokens. On sm_121
+  <code>use_cooperative_topk</code> is False, because the check excludes the whole 12.x capability
+  <em>family</em>, so every request takes <code>torch.ops._C.persistent_topk</code> — the op
+  <a href="https://github.com/vllm-project/vllm/issues/51782">vllm#51782</a> reports as silently
+  returning wrong values in a data-dependent way, with a histogram path active <em>below</em>
+  <code>indexer_budget</code>. Four other explanations were tested and eliminated. Candidate, not
+  conclusion: we have not demonstrated the wrong values ourselves.</p>
+  <p><strong>Do not take FlashInfer 0.6.18.</strong> flashinfer#4757 dropped SM121a from the aarch64
+  JIT-cache arch list and it shipped in that release. You lose the prebuilt cubins, fall back to
+  runtime JIT, and the unbounded ninja fan-out can take the <em>whole box</em> into a global OOM —
+  not just vLLM. vllm#54313 bumped vLLM's own pin to 0.6.18, so re-pin 0.6.17 after any vLLM change.</p>
+  <p><strong>Quantization is closed as a decode lever here.</strong> 98% of weight tensors in the
+  shipped checkpoint already carry scales. What is left unscaled is exactly the hyper-connections
+  (three interventions, three nulls), the shared expert (measures worse than it models), the MoE
+  router gate, and biases. There is nothing left worth quantizing — which also means the
+  "73% of decode is dense BF16 GEMM" figure describes the <em>base</em> checkpoint, not this one.</p>
+  <p class="note">The pattern behind the first two: a capability <em>family</em> is not a
+  capability. Three family-level gates have misfired on sm_121 — two conservative, one permissive —
+  producing a silent correctness bug, a deadlock, and a fault.</p>
+</section>
+
+<section>
   <h2>What the field settled, and what it did not</h2>
   <ul>
     <li><strong>SGLang cannot serve this model on GB10.</strong> Its QSA decode resolver gates on
@@ -890,44 +958,23 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <p>Absolute cost flat, relative cost collapsing. <strong>Above ~8k there is barely a trade at
   all</strong> — MTP buys +56% decode for ~5% of the cache.</p>
   <div class="callout">
-    <span class="h">The depth limit was a hole, not a ceiling — and it blocks every GPU</span>
-    <p>We had recorded <code>k=5</code> as an upper bound because it hard-fails with
-    <em>"QSA ring capacity 12 must divide the attention block size 848"</em>. It is not a bound.
-    <code>qsa_cache.py</code> computes <code>capacity = compress_ratio · cdiv(compress_ratio + n,
-    compress_ratio)</code>, so <strong>n = 0..4 and 9..12 are legal and only 5..8 are not</strong>.
-    Capacity 12 needs a factor of 3, and no power-of-two block size has one — so this band is
-    unreachable for every user of this model on every GPU, not just at our LCM-derived 848.</p>
-    <p>The requirement is also <strong>one-sided</strong>: the code's own comment says a ring
-    <em>narrower</em> than <code>span</code> lets a rejected draft row overwrite a committed key, so
-    wider is only slack. Widening 12 → 16 instead of asserting unlocks the band and is a no-op at
-    every legal depth. Reported as
-    <a href="https://github.com/vllm-project/vllm/issues/54552">vllm#54552</a>; verified here by
-    capacity 12 hard-failing for two different drafters before the change and
-    <code>num_spec_tokens=6</code> serving after it.</p>
-    <p class="note">Shown to initialise and generate — <em>not</em> verified correct under draft
-    rejection, which is the property the assert protects.</p>
-  </div>
-
-  <div class="callout">
-    <span class="h">And the unlocked band loses on agent work — but read the direction, not the size</span>
-    <p>The arm that proved the fix also argues against using it here. n=6, same checkpoint and
-    harness, measured twice:</p>
-    <table>
-      <thead><tr><th>config</th><th>decode @4k</th><th>TTFT @4k</th><th>agent loop, 8 turns</th></tr></thead>
-      <tbody>
-        <tr><td>no speculation</td><td class="num">27.0 tok/s</td><td class="num">1.60 s</td><td class="num">1.94 s/turn</td></tr>
-        <tr><td>MTP n=6, run 1</td><td class="num">35.2 tok/s</td><td class="num">2.63 s</td><td class="num">2.70 s/turn</td></tr>
-        <tr><td>MTP n=6, run 2</td><td class="num">38.8 tok/s</td><td class="num">2.35 s</td><td class="num">2.13 s/turn</td></tr>
-      </tbody>
-    </table>
-    <p>Those last two rows are the <em>same configuration</em>: decode spans 10%, the agent loop
-    21%. <strong>The 6.9% noise floor quoted on this page is a decode figure and does not transfer
-    to the agent loop</strong>, which we had never characterised for variance. A first write-up
-    quoted "+39% per turn" off run 1 alone; run 2 makes that unsupportable.</p>
-    <p>What survives both samples: n=6 is <strong>faster at decode and slower per agent turn</strong>
-    than no speculation at all. Deeper speculation buys decode and pays TTFT, and a ~130-token turn
-    cannot amortise the block it costs. At 28k context the same config gives <strong>TTFT 12.3 s</strong>
-    against 2.35 s at 4k — the depth term dwarfs every speculation effect on this page.</p>
+    <span class="h">The depth limit is a hole, not a ceiling — and it blocks every GPU</span>
+    <p><code>k=5</code> hard-fails with <em>"QSA ring capacity 12 must divide the attention block
+    size 848"</em>, which we had recorded as an upper bound. It is a hole: capacity is
+    <code>compress_ratio · cdiv(compress_ratio + n, compress_ratio)</code>, so <strong>n = 0..4 and
+    9..12 are legal, only 5..8 are not</strong>. Capacity 12 needs a factor of 3 and no power-of-two
+    block size has one — so the band is unreachable on <em>every</em> GPU, not just at our 848.</p>
+    <p>The rule is one-sided: the code's own comment says a ring <em>narrower</em> than
+    <code>span</code> lets a rejected draft row overwrite a committed key, so wider is only slack.
+    Widening 12 → 16 unlocks the band and is a no-op at every legal depth
+    (<a href="https://github.com/vllm-project/vllm/issues/54552">vllm#54552</a>).</p>
+    <p>Measuring it also closed it, but not the way first reported. n=6 <strong>is faster at
+    decode</strong> (35.2–38.8 against 27.0 tok/s) and <strong>slower to first token</strong>
+    (2.35–2.63 s against 1.60–2.13 s) — it pays the one-block cache back-off that
+    <code>use_eagle</code> triggers. Whether that nets out worse for agent turns is
+    <strong>currently unmeasured</strong>: see the withdrawal below.</p>
+    <p class="note">The widened ring is shown to initialise and generate, <em>not</em> verified
+    correct under draft rejection — the property the assert protects.</p>
   </div>
 
   <div class="callout">
