@@ -903,11 +903,21 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   won <strong>3 of 3 rounds</strong> — 14.93 s against 18.83 s. So the answer is not a compromise
   setting: <strong>MTP is right whenever turns exceed ~50 output tokens, and wrong for terse
   tool-calling turns.</strong></p>
-  <p>Two smaller results from the same sweep: <code>--max-num-batched-tokens</code> <strong>8192
-  beats the shipped 4096</strong> by ~10–12% prefill at 4k–16k while 16384 beats neither; and the
-  <em>"first repetition never hits"</em> quirk is <strong>length-dependent</strong> — two cold
-  requests at ~2k, but by ~4k the first request already hits, and an agent loop hits from turn 2
-  because its prefix grows rather than repeating.</p>
+  <p>One smaller result from the same sweep: the <em>"first repetition never hits"</em> quirk is
+  <strong>length-dependent</strong> — two cold requests at ~2k, but by ~4k the first request already
+  hits, and an agent loop hits from turn 2 because its prefix grows rather than repeating.</p>
+  <div class="callout">
+    <span class="h">A batch-size result from this sweep that did not survive checking</span>
+    <p>The same run suggested <code>--max-num-batched-tokens 8192</code> beat the shipped 4096 by
+    ~10–12% at 4k–16k. At n=3 it <strong>reversed</strong>: 4096 averaged
+    <span class="num">2,212</span> tok/s against 8192's <span class="num">2,005</span>, with a
+    within-arm spread of <span class="num">1,633–2,367</span> — a <strong>45% range in one
+    configuration</strong>. The effect was noise and the setting stays at 4096.</p>
+    <p>The transferable part: <strong>prefill is far noisier than decode on this box.</strong> The
+    6.9% noise floor quoted throughout this page was measured on <em>decode</em>; prefill at 8k input
+    swings ±20% run to run. Every single-run prefill figure carries that, and the depth curve above
+    is smooth because its points are three-request medians — not because prefill is stable.</p>
+  </div>
 </section>
 
 <section>
