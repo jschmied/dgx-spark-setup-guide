@@ -896,13 +896,29 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <strong>+31% decode instead of +56%</strong>. Same cost, half the benefit. There is never a
     reason to run k=1 on this model.</p>
   </div>
-  <p><strong>The threshold.</strong> MTP costs one lost block ≈ <span class="num">0.67 s</span> of
-  re-prefill per turn at 2,400 tok/s, and saves
-  <code>out/26.9 − out/41.9</code> on decode. Break-even lands at
-  <strong>≈50 output tokens per turn</strong>. On an 8-turn agent loop with short answers, MTP off
-  won <strong>3 of 3 rounds</strong> — 14.93 s against 18.83 s. So the answer is not a compromise
-  setting: <strong>MTP is right whenever turns exceed ~50 output tokens, and wrong for terse
-  tool-calling turns.</strong></p>
+  <p><strong>The threshold, and a prediction that held.</strong> MTP costs one lost block of
+  re-prefill per turn and saves <code>out/26.9 − out/41.9</code> on decode, so there should be an
+  output length at which the sign flips. Forcing the generation length with <code>ignore_eos</code>
+  (a first attempt failed — <code>max_tokens</code> is a <em>ceiling</em>, and the model produced 45
+  tokens whether the cap was 130 or 400):</p>
+  <table>
+    <thead><tr><th>forced turn length</th><th>MTP k=2</th><th>MTP off</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="num">30 tokens</td><td class="num">19.4 s</td><td class="num">16.0 s</td><td>no-MTP <strong>+17.5%</strong></td></tr>
+      <tr><td class="num">400 tokens</td><td class="num">92.6 s</td><td class="num">122.2 s</td><td>MTP <strong>+24.2%</strong></td></tr>
+    </tbody>
+  </table>
+  <p>Solving <code>advantage(t) = a·t − b</code> from those two points recovers the model that
+  predicted the reversal: decode saving <span class="num">0.01114</span> s/token against
+  <span class="num">0.01331</span> derived, block cost <span class="num">0.754</span> s against
+  <span class="num">0.667</span> derived, <strong>break-even 68 output tokens</strong> against ~50
+  predicted. Both coefficients within ~15% of values computed <em>before</em> the measurement.</p>
+  <div class="callout">
+    <span class="h">The rule</span>
+    <p><strong>Run MTP k=2 when turns exceed ~68 output tokens; disable it below that; never
+    k=1.</strong> Not a compromise setting — a threshold with both sides measured. Ordinary
+    generation sits far above it; terse tool-calling loops sit below.</p>
+  </div>
   <p>One smaller result from the same sweep: the <em>"first repetition never hits"</em> quirk is
   <strong>length-dependent</strong> — two cold requests at ~2k, but by ~4k the first request already
   hits, and an agent loop hits from turn 2 because its prefix grows rather than repeating.</p>
