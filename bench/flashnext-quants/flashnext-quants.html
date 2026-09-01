@@ -364,8 +364,7 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   callable from single runs, here or anywhere else on this page.</p>
 
   <p>Speculation does not <em>hurt</em> at saturation — it stops paying. <strong>+35% at single
-  stream; at c=16 the difference is inside the noise floor</strong> and so is not measurable at all. It still cuts TTFT by 30% there, which is the reason to keep it
-  on for agent work regardless of what it does for throughput.</p>
+  stream; at c=16 the difference is inside the noise floor</strong> and so is not measurable at all. It still cuts TTFT by 30% there. <strong>⚠️ We then inferred &ldquo;so turn it on for agent work regardless of throughput&rdquo; &mdash; that inference is withdrawn.</strong> On a fixed-work agent loop MTP k=2 is the <em>worst</em> configuration measured here, worse than no speculation at all (48.6 vs 43.5 ms/tok, 3 arms each). Decode and TTFT at c=16 do not predict per-turn cost; see the drafter section below.</p>
 
   <p><strong>k=2 and k=3 cannot be told apart</strong> on this box. A single k=3 run gives 36.8,
   inside the 34.7&ndash;37.1 range six identical k=2 runs produced, and above their 35.7 mean. An
@@ -1244,4 +1243,4 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   external row from <a href="https://0xbakeer.github.io/inference-atlas/">inference-atlas</a>.</div>
 </footer>
 
-</div>
+</div>k=2 and k=3 cannot be told apart <em>on decode</em>: a single k=3 run gives 36.8, inside the k=2 spread. <strong>They are dramatically different on agent work</strong> &mdash; 48.6 vs 32.5 ms/tok on the fixed-work loop. A decode benchmark cannot separate these two settings; a turn-shaped one separates them by 50%.
