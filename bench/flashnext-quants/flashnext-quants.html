@@ -878,7 +878,7 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <span class="num">32.5</span> · k=4 <span class="num">31.7</span> · n=5
     <span class="num">31.9</span> · n=6 <span class="num">73.5</span> · n=7
     <span class="num">57.0</span> · n=9 <span class="num">37.2</span>.</p>
-    <p><strong>Each setting replicates to under 4%; adjacent settings differ by up to 2.3×.</strong>
+    <p><strong>⚠️ This curve is under re-measurement and should not be relied on.</strong> Every figure in it was collected while leftover debug instrumentation was live in the venv — a per-forward counter doing <code>.item()</code> device syncs on the PLE path. With that removed, <strong>n=6 measures 33.3 ms/tok against the 73.5 published here</strong>, so the 2.3× gap that made this curve interesting was substantially our own instrumentation. k=2 (48.6) and n=7 (57.0) are equally suspect and are being re-run. What is not in doubt: k=3/k=4/n=5 sit at ~32, and they measured the same with the instrumentation present.</p><p><strong>Each setting replicates to under 4%; adjacent settings differ by up to 2.3×.</strong>
     n=5 (31.9) and n=6 (73.5) are each stable and differ by more than double. Three explanations were
     proposed and measured wrong — two ring-capacity stories and a smooth-U — so they are recorded as
     closed, not open. <strong>Practical answer: run k=3, k=4 or n=5.</strong> Acceptance rate is not
