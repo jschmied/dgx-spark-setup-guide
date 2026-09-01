@@ -213,6 +213,12 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   the absolute values move with prompt length. Conditioned figures are in the tables below; see
   <em>Aggregate throughput is mostly a statement about prompt length</em> for why a single
   tok/s number is never portable on its own.</p>
+  <p class="note">⚠️ <strong>This ladder is decode tok/s, and its last rung does not carry over to
+  agent work.</strong> Each step is a genuine single-stream decode gain. But on a fixed-work agent
+  loop <strong>MTP k=2 is the slowest configuration measured here</strong> &mdash; slower than no
+  speculation at all (48.6 vs 43.5 ms/tok) &mdash; while <code>ngram</code>, which is nowhere on this
+  ladder, is the fastest (29.0 edit-shaped). The quantization rungs hold on both metrics; the
+  speculation rung is decode-only.</p>
 </section>
 
 <section>
