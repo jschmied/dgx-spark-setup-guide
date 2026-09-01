@@ -213,6 +213,12 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   the absolute values move with prompt length. Conditioned figures are in the tables below; see
   <em>Aggregate throughput is mostly a statement about prompt length</em> for why a single
   tok/s number is never portable on its own.</p>
+  <p class="note">⚠️ <strong>This ladder is decode tok/s, and its last rung does not carry over to
+  agent work.</strong> Each step is a genuine single-stream decode gain. But on a fixed-work agent
+  loop <strong>MTP k=2 is the slowest configuration measured here</strong> &mdash; slower than no
+  speculation at all (48.6 vs 43.5 ms/tok) &mdash; while <code>ngram</code>, which is nowhere on this
+  ladder, is the fastest (29.0 edit-shaped). The quantization rungs hold on both metrics; the
+  speculation rung is decode-only.</p>
 </section>
 
 <section>
@@ -364,8 +370,7 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   callable from single runs, here or anywhere else on this page.</p>
 
   <p>Speculation does not <em>hurt</em> at saturation — it stops paying. <strong>+35% at single
-  stream; at c=16 the difference is inside the noise floor</strong> and so is not measurable at all. It still cuts TTFT by 30% there, which is the reason to keep it
-  on for agent work regardless of what it does for throughput.</p>
+  stream; at c=16 the difference is inside the noise floor</strong> and so is not measurable at all. It still cuts TTFT by 30% there. <strong>⚠️ We then inferred &ldquo;so turn it on for agent work regardless of throughput&rdquo; &mdash; that inference is withdrawn.</strong> On a fixed-work agent loop MTP k=2 is the <em>worst</em> configuration measured here, worse than no speculation at all (48.6 vs 43.5 ms/tok, 3 arms each). Decode and TTFT at c=16 do not predict per-turn cost; see the drafter section below.</p>
 
   <p><strong>k=2 and k=3 cannot be told apart</strong> on this box. A single k=3 run gives 36.8,
   inside the 34.7&ndash;37.1 range six identical k=2 runs produced, and above their 35.7 mean. An
@@ -763,11 +768,18 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <thead><tr><th>backend</th><th>status here</th></tr></thead>
     <tbody>
       <tr><td class="num">FLASHINFER_CUTLASS</td><td>what <code>moe_backend='auto'</code> resolves to, and what every measurement on this page used</td></tr>
-      <tr><td class="num">flashinfer_b12x</td><td>rejected — <em>not supported for unquantized MoE</em>; the MTP drafter's MoE is unquantized and <code>--moe-backend</code> is global. With MTP off it faults with an IMA</td></tr>
+      <tr><td class="num">flashinfer_b12x</td><td><strong>blocked by this checkpoint, not by the backend.</strong> Both halves are present (<code>has_flashinfer_b12x_gemm/moe</code> are <code>True</code>) and the path works on this GPU — <code>CUTE_DSL_ARCH=sm_121a</code> is in our launcher <em>because</em> the 27B needed it for b12x. What vetoes it is <code>mtp.*</code> sitting in <code>ignore</code>: one unquantized drafter MoE layer disqualifies the kernel for all 48 quantized ones, and it raises 10.5 min in rather than falling back. With MTP off it faults with an IMA. <strong>Quantizing the drafter's MoE reopens it</strong></td></tr>
       <tr><td class="num">triton, cutlass</td><td>hit the SMEM overflow above</td></tr>
       <tr><td class="num">TRTLLM, CUTEDSL, VLLM_CUTLASS, MARLIN, HUMMING</td><td>untried, and no field evidence favours any of them on sm_121</td></tr>
     </tbody>
   </table>
+  <p>So the honest state of this axis is <em>closed given our current checkpoint</em>, not closed on
+  the merits. The drafter's expert pair is <span class="num">4.86</span> GiB of BF16; quantizing it
+  frees ~<span class="num">3.6</span> GiB resident <strong>and</strong> restores
+  <code>flashinfer_b12x</code>, <code>flashinfer_trtllm</code> and <code>flashinfer_cutedsl</code> as
+  selectable options for a real comparison against the <code>FLASHINFER_CUTLASS</code> that
+  <code>auto</code> picks today. It is the one lever here that pays in memory and in kernel choice
+  at once.</p>
   <div class="callout">
     <span class="h">We wrote this up as a cheap untried lever. It was never untried.</span>
     <p>The workaround is real, but <code>auto</code> already selects
@@ -806,6 +818,21 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   <em>"Setting attention block size to 1600 tokens to ensure that attention page size is >= mamba
   page size"</em>, then pads the mamba page by <span class="num">0.88%</span> so the two are exactly
   equal. A prompt shorter than one block therefore has no full block to cache.</p>
+  <div class="callout">
+    <span class="h">1,600 is the attention group's block, not <em>the</em> block size</span>
+    <p>There is a <strong>third</strong> KV group this alignment does not touch: the QSA raw-key
+    ring, a <code>CircularBufferSpec</code> whose block is its ring capacity —
+    <code>compress_ratio * cdiv(compress_ratio + num_speculative_tokens, compress_ratio)</code>,
+    which is <span class="num">8</span> here (<code>indexer_compress_ratio 4</code>, MTP k=2).
+    Since <code>v1/engine/core.py:321</code> sets <code>cache_config.block_size</code> to the
+    <strong>minimum over all groups</strong>, and the scheduler config does not drop the ring, the
+    value a caller reads from the config is plausibly <span class="num">8</span>, not 1,600.
+    The hit measurements below are the attention group's blocks and are unaffected; the wording
+    "the block size" was not. Credit to 0xBakeer#20, which retracts their own earlier conclusion
+    on this — and note their point that <strong>identical-output tests cannot detect</strong> a
+    resulting split bug, because reaching the zero-state restore requires a Mamba block to have
+    been published first, which is scheduling-dependent.</p>
+  </div>
   <p>The counters say so plainly: <strong><span class="num">0</span> hits against
   <span class="num">77,254</span> queries</strong> across every benchmark on this page. Repeating an
   identical ~1400-token prompt four times produces zero hits; a ~5,700-token prompt hits from the
@@ -825,15 +852,134 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
 </section>
 
 <section>
+  <h2>Which drafter for agent work — and why tok/s picks the wrong one</h2>
+  <p>Fixed-work agent loop (<code>ignore_eos</code>, 8 × 130 tokens, <code>ms/tok</code>), quiet box,
+  three arms per workload:</p>
+  <table>
+    <thead><tr><th>config</th><th>prose ms/tok</th><th>edit-shaped ms/tok</th><th>decode @4k</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ngram n=4</strong></td><td class="num">33.3</td><td class="num"><strong>29.0</strong></td><td class="num">30.5–32.6</td></tr>
+      <tr><td>ngram_gpu n=4</td><td class="num">33.8</td><td class="num">27.8</td><td class="num">31.2–32.6</td></tr>
+      <tr><td>no speculation</td><td class="num">43.5</td><td class="num">43.6</td><td class="num">27.0</td></tr>
+      <tr><td>MTP k=2</td><td class="num">48.6</td><td class="num">36.9</td><td class="num">37–42</td></tr>
+    </tbody>
+  </table>
+  <p><strong>MTP k=2 has the best decode on this box and the worst agent loop</strong> — worse than
+  no speculation at all, across three arms. ngram has the third-best decode and the best agent loop.
+  <strong>Selecting a drafter on tok/s picks exactly the wrong one.</strong></p>
+  <p>ngram's advantage is <em>larger</em> on edit-shaped work (−33%) than on prose (−23%), while the
+  no-speculation baseline is identical across both (43.5 vs 43.6) — so the gain is the drafter
+  matching context, isolated rather than inferred. Real agent turns sit closer to the edit-shaped
+  end. <code>ngram_gpu</code> is <strong>not</strong> measurably better than plain <code>ngram</code>
+  (overlapping ranges); an earlier version of this page called it the fastest config, off one arm.</p>
+  <div class="callout">
+    <span class="h">The MTP depth curve is reproducible and has no known mechanism</span>
+    <p>Quiet box, <code>ms/tok</code>: k=2 <span class="num">48.6</span> · k=3
+    <span class="num">32.5</span> · k=4 <span class="num">31.7</span> · n=5
+    <span class="num">31.9</span> · n=6 <span class="num">73.5</span> · n=7
+    <span class="num">57.0</span> · n=9 <span class="num">37.2</span>.</p>
+    <p><strong>Each setting replicates to under 4%; adjacent settings differ by up to 2.3×.</strong>
+    n=5 (31.9) and n=6 (73.5) are each stable and differ by more than double. Three explanations were
+    proposed and measured wrong — two ring-capacity stories and a smooth-U — so they are recorded as
+    closed, not open. <strong>Practical answer: run k=3, k=4 or n=5.</strong> Acceptance rate is not
+    instrumented; that is the next measurement, not another timing arm.</p>
+  </div>
+</section>
+
+<section>
+  <h2>A day of agent-loop numbers, withdrawn</h2>
+  <p>On 2026-08-31 this page briefly carried an agent-loop column ranking drafters and batch sizes,
+  including a "37% monotonic trade" called <em>established</em>. <strong>All of it is
+  withdrawn.</strong> The harness sent <code>max_tokens: 130</code> with no <code>ignore_eos</code>
+  and never recorded <code>completion_tokens</code> — and <code>max_tokens</code> is a
+  <strong>ceiling, not a target</strong>. Each arm was timed on however many tokens the model
+  happened to emit, so an arm whose turns stopped at 40 tokens beat one whose turns ran to 130 with
+  no difference in speed.</p>
+  <p>The tell came from replication: the <em>same</em> no-speculation config gave <strong>1.94
+  s/turn and then 1.43</strong> — a 36% spread, as large as the trend being read into it. This is
+  the defect this page already documents under <em>"an all-empty cell is not a comparison"</em>. The
+  guard was written in the notes and not in the tool, which is exactly the failure that entry warns
+  about.</p>
+  <p>Fixed: <code>ignore_eos</code> pins the work at 8 × 130 tokens, per-turn token counts are
+  recorded, the summary reports <code>ms/tok</code>, and it prints a loud <code>!! UNEQUAL
+  WORK</code> flag unless the total is exactly 1,040. First valid pair — no speculation
+  <strong>43.37 ms/tok</strong> against ngram n=4 <strong>33.26 ms/tok</strong> — agrees with the
+  independent decode benchmark to about 1%, which the broken version never could.</p>
+  <p class="note">Reliability ordering, measured across identical configs: decode (~1%) &gt; deep
+  TTFT (~2%) &gt; short TTFT (33%) &gt; the old agent loop (36%). Short-prompt TTFT is far noisier
+  than assumed here; deep TTFT is the trustworthy latency metric.</p>
+</section>
+
+<section>
+  <h2>Prefill batch size: we checked, and the default was already right</h2>
+  <p>Deep TTFT and fixed-work agent latency across four batch sizes, no speculation, medians of six
+  requests per cell:</p>
+  <table>
+    <thead><tr><th>batch</th><th>TTFT @28k (each arm)</th><th>mean</th><th>ms/tok</th></tr></thead>
+    <tbody>
+      <tr><td class="num">2048</td><td class="num">13.04 / 13.08 / 13.74</td><td class="num">13.3</td><td class="num">43.5 / 43.9</td></tr>
+      <tr><td class="num">4096 (default)</td><td class="num">11.62 / 11.73 / 11.96</td><td class="num">11.77</td><td class="num">43.4 / 43.6 / 43.8</td></tr>
+      <tr><td class="num">8192</td><td class="num">11.78</td><td class="num">11.78</td><td class="num">—</td></tr>
+      <tr><td class="num">16384</td><td class="num">10.41 / 13.64 / 11.57</td><td class="num">11.87</td><td class="num">45.5 / 45.4</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Keep 4096.</strong> Below it costs ~13% deep TTFT; above it buys nothing and costs
+  ~4.5% per agent turn. At 4k context batch size does nothing at all — a 4000-token prompt is one
+  chunk at any size ≥ 4096. Decode is flat at 26.7–27.3 throughout.</p>
+  <div class="callout">
+    <span class="h">This page previously recommended 16384. That was one arm, and it did not replicate</span>
+    <p>The first 16384 arm measured <span class="num">10.41 s</span>, which with tight arms either
+    side produced a clean monotonic trend — published here as <em>established</em>. The next two
+    arms gave <span class="num">13.64</span> and <span class="num">11.57</span>: that setting spans
+    <strong>31%</strong> where 4096 spans 3%, and its mean matches 4096's. Engine config was
+    identical across those arms (KV pool 1,011,875, block 800), so this is not a compile-cache
+    effect — the configuration is simply noisier.</p>
+    <p>The error generalises: three tight arms each at two settings convinced us the <em>metric</em>
+    was stable, so single points elsewhere looked trustworthy. <strong>Noise belongs to the (metric,
+    configuration) pair, not to the metric.</strong> The counter-example is in the same arms — at
+    16384, <code>ms/tok</code> reproduces to 0.2% while TTFT spans 31%.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Three things that will bite you, none of them about speed</h2>
+  <p><strong>Greedy decoding is not reproducible on this model.</strong> Same prompt,
+  <code>temperature=0</code>, different output — from as few as 582 prompt tokens. On sm_121
+  <code>use_cooperative_topk</code> is False, because the check excludes the whole 12.x capability
+  <em>family</em>, so every request takes <code>torch.ops._C.persistent_topk</code> — the op
+  <a href="https://github.com/vllm-project/vllm/issues/51782">vllm#51782</a> reports as silently
+  returning wrong values in a data-dependent way, with a histogram path active <em>below</em>
+  <code>indexer_budget</code>. Four other explanations were tested and eliminated. Candidate, not
+  conclusion: we have not demonstrated the wrong values ourselves.</p>
+  <p><strong>Do not take FlashInfer 0.6.18.</strong> flashinfer#4757 dropped SM121a from the aarch64
+  JIT-cache arch list and it shipped in that release. You lose the prebuilt cubins, fall back to
+  runtime JIT, and the unbounded ninja fan-out can take the <em>whole box</em> into a global OOM —
+  not just vLLM. vllm#54313 bumped vLLM's own pin to 0.6.18, so re-pin 0.6.17 after any vLLM change.</p>
+  <p><strong>Quantization is closed as a decode lever here.</strong> 98% of weight tensors in the
+  shipped checkpoint already carry scales. What is left unscaled is exactly the hyper-connections
+  (three interventions, three nulls), the shared expert (measures worse than it models), the MoE
+  router gate, and biases. There is nothing left worth quantizing — which also means the
+  "73% of decode is dense BF16 GEMM" figure describes the <em>base</em> checkpoint, not this one.</p>
+  <p class="note">The pattern behind the first two: a capability <em>family</em> is not a
+  capability. Three family-level gates have misfired on sm_121 — two conservative, one permissive —
+  producing a silent correctness bug, a deadlock, and a fault.</p>
+</section>
+
+<section>
   <h2>What the field settled, and what it did not</h2>
   <ul>
-    <li><strong>SGLang cannot serve this model on GB10.</strong> Its QSA decode resolver gates on
-    <code>is_sm100_supported()</code>; classic FA2 is absent and has no Blackwell kernels, so it
-    falls through to a flash-attn-4 CuTe path that will not compile there. The reporter verified the
-    flashinfer kernel <em>itself</em> runs correctly on SM121 at
-    <span class="num">4.70e-04</span> max abs diff — a gate, not a kernel, exactly like the four
-    layers of "installed but not running" documented above. Base support and the resolver fix are
-    both unmerged; the fix does cover GB10, since the gate it adds tests major 12.</li>
+    <li><strong>SGLang serves this model on GB10 — on a branch, not mainline.</strong> An earlier
+    version of this page said it <em>could not</em>, which was true of the resolver at the time and
+    is now contradicted by published results: two single-Spark repos report
+    <span class="num">41.5</span> tok/s median code decode and GSM8K 192/200, and up to
+    <span class="num">49.8</span> tok/s with a QSA ring-width patch. Mainline still carries no
+    <code>qwen4</code> model file; the work lives on <code>qwen4-main-squashed</code>.
+    <strong>The GB10 gate story inverted, too.</strong> sglang#36806 (merged 2026-08-28) routes
+    FlashInfer sparse decode to SM100 or <em>exact</em> SM120 and <strong>deliberately excludes
+    SM121</strong> — forcing GB10 onto that path corrupts output at long context (1 of 4 runs wrong
+    at 120k tokens, 4 of 4 at 210k, HTTP 200 throughout). So a "SM121 fix" that widens the gate by
+    capability family is the thing that was <em>retracted</em>, and it is still circulating in at
+    least one popular DGX Spark repo.</li>
     <li><strong>NVFP4 KV is closed, on a third independent measurement:</strong>
     <span class="num">44.0</span> tok/s against <span class="num">56.8–58.6</span> for
     <code>fp8_e4m3</code> on SM121. Note what that says about the alternative — fp8 and bf16 are
@@ -844,6 +990,181 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
     <li><strong>llama.cpp's own support merged</strong> on 2026-08-27, subsuming two community
     patches. It is a separate implementation; the vLLM one still exists only on its PR branch.</li>
   </ul>
+</section>
+
+<section>
+  <h2>MTP costs exactly one cache block — so the trade has a threshold, not a price</h2>
+  <p>Every benchmark on this page sends <em>unique</em> prompts, which busts the prefix cache
+  deliberately. That is right for measuring prefill and it meant we were blind to what speculation
+  costs a workload that <em>reuses</em> prefixes — which is what agent work is.</p>
+  <p><code>v1/core/sched/scheduler.py:397</code> backs the cacheable position off by one full block
+  when <code>use_eagle</code> is set, and MTP sets it: <em>"FullAttn prunes the last matching block,
+  so back off one block to avoid a Mamba cache miss."</em> The cost is <strong>fixed at one block —
+  1,600 tokens here — at every prompt length</strong>:</p>
+  <table>
+    <thead><tr><th>prompt</th><th>k=2</th><th>k=1</th><th>k=0</th><th>deficit</th><th>as % of k=0</th></tr></thead>
+    <tbody>
+      <tr><td class="num">~2k</td><td class="num">1,600</td><td class="num">1,584</td><td class="num">3,200</td><td class="num">1,600</td><td class="num">50.0%</td></tr>
+      <tr><td class="num">~4k</td><td class="num">4,800</td><td class="num">4,752</td><td class="num">7,200</td><td class="num">2,400</td><td class="num">33.3%</td></tr>
+      <tr><td class="num">~8k</td><td class="num">12,800</td><td class="num">12,672</td><td class="num">14,400</td><td class="num">1,600</td><td class="num">11.1%</td></tr>
+      <tr><td class="num">~16k</td><td class="num">27,200</td><td class="num">26,928</td><td class="num">28,800</td><td class="num">1,600</td><td class="num">5.6%</td></tr>
+      <tr><td class="num">~32k</td><td class="num">56,000</td><td class="num">57,024</td><td class="num">58,400</td><td class="num">2,400</td><td class="num">4.1%</td></tr>
+    </tbody>
+  </table>
+  <p>Absolute cost flat, relative cost collapsing. <strong>Above ~8k there is barely a trade at
+  all</strong> — MTP buys +56% decode for ~5% of the cache.</p>
+  <div class="callout">
+    <span class="h">The depth limit is a hole, not a ceiling — and it blocks every GPU</span>
+    <p><code>k=5</code> hard-fails with <em>"QSA ring capacity 12 must divide the attention block
+    size 848"</em>, which we had recorded as an upper bound. It is a hole: capacity is
+    <code>compress_ratio · cdiv(compress_ratio + n, compress_ratio)</code>, so <strong>n = 0..4 and
+    9..12 are legal, only 5..8 are not</strong>. Capacity 12 needs a factor of 3 and no power-of-two
+    block size has one — so the band is unreachable on <em>every</em> GPU, not just at our 848.</p>
+    <p>The rule is one-sided: the code's own comment says a ring <em>narrower</em> than
+    <code>span</code> lets a rejected draft row overwrite a committed key, so wider is only slack.
+    Widening 12 → 16 unlocks the band and is a no-op at every legal depth
+    (<a href="https://github.com/vllm-project/vllm/issues/54552">vllm#54552</a>).</p>
+    <p>Measuring it also closed it, but not the way first reported. n=6 <strong>is faster at
+    decode</strong> (35.2–38.8 against 27.0 tok/s) and <strong>slower to first token</strong>
+    (2.35–2.63 s against 1.60–2.13 s) — it pays the one-block cache back-off that
+    <code>use_eagle</code> triggers. Whether that nets out worse for agent turns is
+    <strong>currently unmeasured</strong>: see the withdrawal below.</p>
+    <p class="note">The widened ring is shown to initialise and generate, <em>not</em> verified
+    correct under draft rejection — the property the assert protects.</p>
+  </div>
+
+  <div class="callout">
+    <span class="h">k=1 is strictly dominated — a config option to delete</span>
+    <p>The back-off is <code>if self.use_eagle:</code>, unconditional on <code>k</code>. So k=1 pays
+    the <strong>same block</strong> (1,584 against 1,600 is prompt alignment, not a saving) for
+    <strong>+31% decode instead of +56%</strong>. Same cost, half the benefit. There is never a
+    reason to run k=1 on this model.</p>
+  </div>
+  <p><strong>The threshold, and a prediction that held.</strong> MTP costs one lost block of
+  re-prefill per turn and saves <code>out/26.9 − out/41.9</code> on decode, so there should be an
+  output length at which the sign flips. Forcing the generation length with <code>ignore_eos</code>
+  (a first attempt failed — <code>max_tokens</code> is a <em>ceiling</em>, and the model produced 45
+  tokens whether the cap was 130 or 400):</p>
+  <table>
+    <thead><tr><th>forced turn length</th><th>MTP k=2</th><th>MTP off</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="num">30 tokens</td><td class="num">19.4 s</td><td class="num">16.0 s</td><td>no-MTP <strong>+17.5%</strong></td></tr>
+      <tr><td class="num">400 tokens</td><td class="num">92.6 s</td><td class="num">122.2 s</td><td>MTP <strong>+24.2%</strong></td></tr>
+    </tbody>
+  </table>
+  <p>Solving <code>advantage(t) = a·t − b</code> from those two points recovers the model that
+  predicted the reversal: decode saving <span class="num">0.01114</span> s/token against
+  <span class="num">0.01331</span> derived, block cost <span class="num">0.754</span> s against
+  <span class="num">0.667</span> derived, <strong>break-even 68 output tokens</strong> against ~50
+  predicted. Both coefficients within ~15% of values computed <em>before</em> the measurement.</p>
+  <div class="callout">
+    <span class="h">The rule</span>
+    <p><strong>Run MTP k=2 when turns exceed ~68 output tokens; disable it below that; never
+    k=1.</strong> Not a compromise setting — a threshold with both sides measured. Ordinary
+    generation sits far above it; terse tool-calling loops sit below.</p>
+  </div>
+  <p>One smaller result from the same sweep: the <em>"first repetition never hits"</em> quirk is
+  <strong>length-dependent</strong> — two cold requests at ~2k, but by ~4k the first request already
+  hits, and an agent loop hits from turn 2 because its prefix grows rather than repeating.</p>
+  <div class="callout">
+    <span class="h">A batch-size result from this sweep that did not survive checking</span>
+    <p>The same run suggested <code>--max-num-batched-tokens 8192</code> beat the shipped 4096 by
+    ~10–12% at 4k–16k. At n=3 it <strong>reversed</strong>: 4096 averaged
+    <span class="num">2,212</span> tok/s against 8192's <span class="num">2,005</span>, with a
+    within-arm spread of <span class="num">1,633–2,367</span> — a <strong>45% range in one
+    configuration</strong>. The effect was noise and the setting stays at 4096.</p>
+    <p>The transferable part: <strong>prefill is far noisier than decode on this box.</strong> The
+    6.9% noise floor quoted throughout this page was measured on <em>decode</em>; prefill at 8k input
+    swings ±20% run to run. Every single-run prefill figure carries that, and the depth curve above
+    is smooth because its points are three-request medians — not because prefill is stable.</p>
+  </div>
+</section>
+
+<section>
+  <h2>FP8 KV: ×1.72 the KV pool, and no speed at all</h2>
+  <p>Two arms, KV dtype the only variable, <code>--max-model-len 262144</code>, TP=1, MTP k=2.</p>
+  <table>
+    <thead><tr><th></th><th>bf16</th><th>fp8_e4m3</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>GPU KV cache</td><td class="num">1,077,542 tok</td><td class="num">1,853,358</td><td class="num">×1.72</td></tr>
+      <tr><td>max concurrency @262k/req</td><td class="num">4.11×</td><td class="num">7.07×</td><td class="num">×1.72</td></tr>
+      <tr><td>needle-in-a-haystack, 5 depths</td><td class="num">—</td><td class="num">5/5</td><td></td></tr>
+      <tr><td>decode, c=1, 4k input (n=6)</td><td class="num">36.28 mean</td><td class="num">37.22 mean</td><td class="num">+2.6%</td></tr>
+    </tbody>
+  </table>
+  <p><strong>There is no speed gain, and there was never going to be one.</strong> QSA is
+  <em>sparse</em> — with <code>indexer_budget = 2048</code> the model attends over a top-k selection
+  rather than the whole cache, so KV bandwidth is not the decode bottleneck. The depth curve above
+  proves that independently: decode is flat across a 15× context increase, which it could not be if
+  reading the cache were the constraint. Halving the precision of something that is not the
+  bottleneck buys nothing. <strong>What it buys is admission</strong> — roughly 4 to 7 concurrent
+  262k-token requests before a queue forms.</p>
+  <div class="callout">
+    <span class="h">This reverses our own closure from the same morning</span>
+    <p>Hours earlier this was recorded as <em>"unsupported, not unmeasured"</em>: the QSA backend
+    declares <code>supported_kv_cache_dtypes = ["auto", "bfloat16"]</code> and enforces it in four
+    places. That was right about <em>stock</em> vLLM and wrong as a verdict on feasibility — the
+    guards were guarding an <strong>unimplemented read path</strong>, not a hardware limit, and a
+    17-hunk community patch landed the same day. <em>"The code refuses it"</em> and <em>"it cannot
+    work"</em> are different claims.</p>
+  </div>
+  <p>Corroborating the RFC's author on a second GB10: their ratio <span class="num">×1.79</span>
+  against our <span class="num">×1.72</span>, while the absolute totals differ by ~38% because the
+  checkpoints differ. <strong>The ratio reproducing while the totals do not is the stronger
+  result</strong> — the effect scales with whatever KV budget a checkpoint leaves, rather than
+  matching one machine's number by coincidence. Quality was checked as <em>retrieval</em>, not text
+  identity, because temperature 0 is not reproducible on this model; an identity check would have
+  been meaningless while retrieval is unaffected.</p>
+  <div class="callout">
+    <span class="h">A false pattern in four data points, and how it went away</span>
+    <p>At n=2 per arm decode read <span class="num">−5.6%</span>, and — the part that made it look
+    real — <strong>both</strong> fp8 runs sat below <strong>both</strong> bf16 runs. A direction,
+    not scatter. At <strong>n=6 per arm the sign flips</strong>: bf16 36.28 mean against fp8
+    <span class="num">37.22</span>, ranges overlapping, <strong>0 of 6</strong> fp8 runs below the
+    bf16 range. With a standard deviation near 1.7–2.1 on a ~36 tok/s mean, two samples cannot
+    resolve five percent, and "both below both" arises by chance roughly a quarter of the time. The
+    caveat was withdrawn upstream. The page's own rule already covered this — nothing under ~10% is
+    callable from a single run — but the subtler error was letting an <em>ordering</em> pattern in
+    four points carry information it could not carry.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Depth: decode does not decay, and that is a QSA result</h2>
+  <p>We had never measured this, and twice quoted a figure for it anyway — see the withdrawal below.
+  One sweep settled it. Both arms: one GB10, 65,536 context, c=1, three requests per depth, prefill
+  derived as <code>depth / TTFT</code>, prompts unique per request so nothing is cache-assisted.</p>
+  <table>
+    <thead><tr><th>depth</th><th>prefill · MTP k=2</th><th>decode · MTP k=2</th><th>prefill · MTP off</th><th>decode · MTP off</th><th>MTP gain</th></tr></thead>
+    <tbody>
+      <tr><td class="num">4,000</td><td class="num">2,123</td><td class="num">37.9</td><td class="num">2,103</td><td class="num">26.8</td><td class="num">+41%</td></tr>
+      <tr><td class="num">8,000</td><td class="num">2,163</td><td class="num">40.8</td><td class="num">2,380</td><td class="num">26.8</td><td class="num">+52%</td></tr>
+      <tr><td class="num">16,000</td><td class="num">2,314</td><td class="num">41.2</td><td class="num">2,093</td><td class="num">26.8</td><td class="num">+54%</td></tr>
+      <tr><td class="num">32,000</td><td class="num">2,368</td><td class="num">41.4</td><td class="num">2,136</td><td class="num">26.9</td><td class="num">+54%</td></tr>
+      <tr><td class="num">60,000</td><td class="num">2,003</td><td class="num">41.7</td><td class="num">2,341</td><td class="num">27.1</td><td class="num">+54%</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Decode is depth-independent.</strong> With speculation off it moves from
+  <span class="num">26.8</span> to <span class="num">27.1</span> tok/s across a <strong>15× span of
+  context</strong> — 1.1%, far inside our 6.9% noise floor. A dense-attention model's decode falls
+  with context because the retained attention work grows with every token. Here it does not move.
+  That is what QSA's top-k selection predicts once the sparse budget binds, and the speculation-off
+  arm is the clean demonstration, with no draft dynamics layered on top.</p>
+  <p><strong>Prefill is flat and speculation-neutral</strong> — 2,003–2,380 tok/s across both arms,
+  means <span class="num">2,194</span> with MTP against <span class="num">2,211</span> without. The
+  row-to-row ordering is run spread, not an effect. And <strong>MTP is a ~1.54× decode win that does
+  not erode with depth</strong>: +41% at 4k, then flat at +52–54% out to 60k, for nothing at
+  prefill.</p>
+  <div class="callout">
+    <span class="h">This contradicts a field caution we had already adopted</span>
+    <p>A llama.cpp recipe reports <code>draft-mtp</code> running <em>slower</em> than plain
+    autoregressive at 229k on their hand-patched QSA kernels, and costing 8.4% / 6.7% of prefill at
+    16k / 32k. <strong>Neither reproduces here.</strong> Different runtime, different kernels, and
+    their fastest arm is a QSA patch we do not have — so both can be true. The mistake was ours: we
+    carried the caution into planning before measuring our own stack. The sweep exists because of
+    that, and it settled the question in the opposite direction. <strong>MTP stays on at every
+    depth.</strong></p>
+  </div>
 </section>
 
 <section>
@@ -928,4 +1249,4 @@ a:focus-visible,th:focus-visible{outline:2px solid var(--teal);outline-offset:2p
   external row from <a href="https://0xbakeer.github.io/inference-atlas/">inference-atlas</a>.</div>
 </footer>
 
-</div>
+</div>k=2 and k=3 cannot be told apart <em>on decode</em>: a single k=3 run gives 36.8, inside the k=2 spread. <strong>They are dramatically different on agent work</strong> &mdash; 48.6 vs 32.5 ms/tok on the fixed-work loop. A decode benchmark cannot separate these two settings; a turn-shaped one separates them by 50%.
